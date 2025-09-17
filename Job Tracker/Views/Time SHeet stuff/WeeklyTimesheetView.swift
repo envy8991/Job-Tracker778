@@ -445,6 +445,7 @@ extension WeeklyTimesheetView {
             endOfWeek: endOfWeek,
             jobs: timesheetJobsVM.jobs,
             currentUserID: authViewModel.currentUser?.id ?? "",
+            partnerUserID: partnerUid,
             supervisor: supervisor,
             name1: name1Val,
             name2: name2Val,
