@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.quinton.Job-Tracker-CS25</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>jobtracker</string>
+			</array>
+		</dict>
+	</array>
+	<key>OPENAI_API_KEY</key>
+	<string>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</string>
+</dict>
+</plist>
