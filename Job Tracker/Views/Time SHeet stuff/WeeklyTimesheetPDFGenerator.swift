@@ -8,6 +8,7 @@ class WeeklyTimesheetPDFGenerator {
     let endOfWeek: Date
     let jobs: [Job]
     let currentUserID: String
+    let partnerUserID: String?
 
     let supervisor: String
     let name1: String
@@ -35,6 +36,7 @@ class WeeklyTimesheetPDFGenerator {
         endOfWeek: Date,
         jobs: [Job],
         currentUserID: String,
+        partnerUserID: String?,
         supervisor: String,
         name1: String,
         name2: String,
@@ -50,6 +52,7 @@ class WeeklyTimesheetPDFGenerator {
         self.endOfWeek = endOfWeek
         self.jobs = jobs
         self.currentUserID = currentUserID
+        self.partnerUserID = partnerUserID
         self.supervisor = supervisor
         self.name1 = name1
         self.name2 = name2
@@ -320,10 +323,24 @@ extension WeeklyTimesheetPDFGenerator {
     }
 
     private func filterJobs(for date: Date) -> [Job] {
+        let allowedUserIDs: Set<String> = {
+            var ids: Set<String> = []
+            if !currentUserID.isEmpty {
+                ids.insert(currentUserID)
+            }
+            if let partner = partnerUserID, !partner.isEmpty {
+                ids.insert(partner)
+            }
+            return ids
+        }()
+
         return jobs.filter { job in
             guard job.status.lowercased() != "pending" else { return false }
-            let isMine = (job.createdBy == currentUserID) || (job.assignedTo == currentUserID)
-            guard isMine else { return false }
+
+            let createdByAllowed = job.createdBy.flatMap { allowedUserIDs.contains($0) } ?? false
+            let assignedToAllowed = job.assignedTo.flatMap { allowedUserIDs.contains($0) } ?? false
+            guard createdByAllowed || assignedToAllowed else { return false }
+
             return Calendar.current.isDate(job.date, inSameDayAs: date)
         }
     }
