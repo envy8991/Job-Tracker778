@@ -435,74 +435,131 @@ private struct SupervisorJobRow: View {
     let userNameResolver: (String?) -> String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(job.address)
-                    .font(.headline)
-                    .lineLimit(2)
-                Spacer()
-                Text(job.status)
-                    .font(.caption2)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(job.status.lowercased() == "pending" ? Color.orange.opacity(0.35) : Color.teal.opacity(0.35))
-                    .clipShape(Capsule())
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            metadata
+        }
+        .padding(16)
+        .supervisorGlassCard(cornerRadius: 16, shadow: 12)
+    }
 
-            HStack(spacing: 10) {
-                if let jn = job.jobNumber, !jn.isEmpty {
-                    Label(jn, systemImage: "number.circle")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(job.address)
+                .font(.headline.weight(.semibold))
+                .foregroundColor(.white)
+                .lineLimit(2)
+                .truncationMode(.tail)
 
-                Label(dateString(job.date), systemImage: "calendar")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+            Spacer(minLength: 8)
 
-                // Prefer assignedTo name; fall back to creator
-                let workerName = !((job.assignedTo ?? "").isEmpty) ? userNameResolver(job.assignedTo) : userNameResolver(job.createdBy)
-                if !workerName.isEmpty {
-                    Label(workerName, systemImage: "person")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
+            Text(job.status)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(statusBadgeColor)
+                .clipShape(Capsule())
+        }
+    }
 
-                let creatorRole = userRoleResolver(job.createdBy)
-                if !creatorRole.isEmpty {
-                    Label(creatorRole, systemImage: "person.fill")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-
-                if let assignee = job.assignedTo, !assignee.isEmpty {
-                    let role = userRoleResolver(assignee)
-                    if !role.isEmpty {
-                        Label("→ \(role)", systemImage: "arrowshape.turn.up.right.fill")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+    private var metadata: some View {
+        HStack(alignment: .top, spacing: 12) {
+            LazyVGrid(columns: metadataColumns, alignment: .leading, spacing: 8) {
+                ForEach(Array(metadataItems.enumerated()), id: \.offset) { _, item in
+                    Label {
+                        Text(item.text)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    } icon: {
+                        Image(systemName: item.icon)
                     }
-                }
-
-                Spacer()
-
-                Text(String(format: "%.1f h", job.hours))
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.85))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            hoursBadge
+        }
+    }
+
+    private var hoursBadge: some View {
+        Text(hoursText)
+            .font(.caption.weight(.semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.16))
+            .clipShape(Capsule())
+    }
+
+    private var hoursText: String {
+        String(format: "%.1f h", job.hours)
+    }
+
+    private var metadataColumns: [GridItem] {
+        [
+            GridItem(.flexible(minimum: 110, maximum: .infinity), spacing: 12, alignment: .leading),
+            GridItem(.flexible(minimum: 110, maximum: .infinity), spacing: 12, alignment: .leading)
+        ]
+    }
+
+    private var metadataItems: [(icon: String, text: String)] {
+        var items: [(String, String)] = []
+
+        if let jobNumber = job.jobNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !jobNumber.isEmpty {
+            items.append(("number.circle", jobNumber))
+        }
+
+        items.append(("calendar", dateString(job.date)))
+
+        let assignedID = job.assignedTo?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let workerSource: String? = (assignedID?.isEmpty == false) ? job.assignedTo : job.createdBy
+        let workerName = userNameResolver(workerSource).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !workerName.isEmpty {
+            items.append(("person", workerName))
+        }
+
+        let creatorRole = userRoleResolver(job.createdBy).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !creatorRole.isEmpty {
+            items.append(("person.fill", creatorRole))
+        }
+
+        if let assignedID, !assignedID.isEmpty {
+            let role = userRoleResolver(job.assignedTo).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !role.isEmpty {
+                items.append(("arrowshape.turn.up.right.fill", "→ \(role)"))
             }
         }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.black.opacity(0.30))
-                .shadow(color: Color.black.opacity(0.25), radius: 8, x: 0, y: 4)
-        )
+
+        return items
+    }
+
+    private var statusBadgeColor: Color {
+        job.status.lowercased() == "pending" ? Color.orange.opacity(0.35) : Color.teal.opacity(0.35)
     }
 
     private func dateString(_ d: Date) -> String {
         let f = DateFormatter()
         f.dateFormat = "M/d"
         return f.string(from: d)
+    }
+}
+
+private extension View {
+    func supervisorGlassCard(cornerRadius: CGFloat = 16, shadow: CGFloat = 10) -> some View {
+        self
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.ultraThinMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .shadow(color: Color.black.opacity(0.20), radius: shadow, x: 0, y: 6)
     }
 }
 
