@@ -1067,6 +1067,7 @@ struct MapsView: View {
     private func serializePoles(_ poles: [Pole]) -> [[String: Any]] {
         poles.map {
             [
+                "id": $0.id.uuidString,
                 "lat": $0.coordinate.latitude,
                 "lng": $0.coordinate.longitude,
                 "assignment": $0.assignment,
@@ -1080,7 +1081,16 @@ struct MapsView: View {
         items.compactMap { dict in
             guard let lat = dict["lat"] as? CLLocationDegrees,
                   let lng = dict["lng"] as? CLLocationDegrees else { return nil }
-            var p = Pole(coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng))
+            let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+            let poleID: UUID = {
+                if let idString = dict["id"] as? String,
+                   let uuid = UUID(uuidString: idString) {
+                    return uuid
+                }
+                return UUID()
+            }()
+
+            var p = Pole(id: poleID, coordinate: coordinate)
             if let assignment = dict["assignment"] as? String { p.assignment = assignment }
             if let can = dict["can"] as? Bool { p.canAtLocation = can }
             if let feet = dict["footageFeet"] as? Double { p.footageFeet = feet }
