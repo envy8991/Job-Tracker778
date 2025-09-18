@@ -55,7 +55,7 @@ struct JobDetailView: View {
     @State private var customStatusText = ""
     @State private var editedNotes = ""
     @State private var editedJobNumber = ""
-    @State private var selectedMaterialAriel = ""
+    @State private var selectedMaterialAriel = "None"
     @State private var selectedMaterialNid = ""
     @State private var preformCount = 0
     @State private var canFootage = ""     // CAN footage
@@ -93,7 +93,7 @@ struct JobDetailView: View {
         "Talk to Rick",   // fixed option
         "Custom"          // allows manual entry
     ]
-    let arielMaterials = ["Weatherhead", "Rams Head"]
+    let arielMaterials = ["None", "Weatherhead", "Rams Head"]
     let nidMaterials: [String] = [] // NID uses toggles/steppers instead of fixed list
 private let fiberChoices = ["Flat", "Round", "Mainline"]
 
@@ -403,7 +403,7 @@ private let fiberChoices = ["Flat", "Round", "Mainline"]
                 }
                 editedNotes      = job.notes ?? ""
                 editedJobNumber  = job.jobNumber ?? ""
-                selectedMaterialAriel = "Weatherhead"
+                selectedMaterialAriel = "None"
                 selectedMaterialNid   = nidMaterials.first ?? ""
                 canFootage       = job.canFootage ?? ""
                 nidFootage       = job.nidFootage ?? ""
@@ -511,7 +511,7 @@ extension JobDetailView {
             // Head type
             LabeledContent("Head Type") {
                 Picker("", selection: $selectedMaterialAriel) {
-                    ForEach(["Weatherhead", "Rams Head"], id: \.self) { Text($0) }
+                    ForEach(arielMaterials, id: \.self) { Text($0) }
                 }
                 .labelsHidden()
                 .pickerStyle(MenuPickerStyle())
@@ -814,7 +814,9 @@ extension JobDetailView {
             case "Ariel":
                 var parts: [String] = []
                 if !fiberType.isEmpty { parts.append("Fiber: \(fiberType)") }
-                parts.append(selectedMaterialAriel) // Weatherhead or Rams Head
+                if !selectedMaterialAriel.isEmpty && selectedMaterialAriel != "None" {
+                    parts.append(selectedMaterialAriel) // Weatherhead or Rams Head
+                }
                 if preformCount > 0 { parts.append("Preforms: \(preformCount)") }
                 if uGuardCount > 0 { parts.append("U-Guard: \(uGuardCount)") }
                 if storageBracket { parts.append("Storage Bracket") }
@@ -942,9 +944,17 @@ extension JobDetailView {
     /// Parse an Aerial materials string we previously saved to restore UI state.
     private func parseAerialMaterials(from text: String) {
         // Expected tokens like: "Weatherhead" or "Rams Head", "Preforms: N", "U-Guard: N", "Storage Bracket"
+        selectedMaterialAriel = "None"
         let lower = text.lowercased()
-        if lower.contains("weatherhead") { selectedMaterialAriel = "Weatherhead" }
-        if lower.contains("rams head") { selectedMaterialAriel = "Rams Head" }
+        if lower.contains("weatherhead") {
+            selectedMaterialAriel = "Weatherhead"
+        } else if lower.contains("rams head") {
+            selectedMaterialAriel = "Rams Head"
+        } else {
+            // Legacy data may explicitly store "None" as a token
+            let tokens = lower.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            if tokens.contains("none") { selectedMaterialAriel = "None" }
+        }
 
         if let n = captureInt(after: "preforms:", in: lower) { preformCount = n }
         if let n = captureInt(after: "u-guard:", in: lower) { uGuardCount = n }
