@@ -1071,7 +1071,8 @@ struct MapsView: View {
                 "lng": $0.coordinate.longitude,
                 "assignment": $0.assignment,
                 "can": $0.canAtLocation,
-                "footageFeet": $0.footageFeet as Any
+                "footageFeet": $0.footageFeet as Any,
+                "notes": $0.notes
             ].compactMapValues { $0 }
         }
     }
@@ -1084,6 +1085,7 @@ struct MapsView: View {
             if let assignment = dict["assignment"] as? String { p.assignment = assignment }
             if let can = dict["can"] as? Bool { p.canAtLocation = can }
             if let feet = dict["footageFeet"] as? Double { p.footageFeet = feet }
+            if let notes = dict["notes"] as? String { p.notes = notes }
             return p
         }
     }
