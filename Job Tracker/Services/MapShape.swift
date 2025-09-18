@@ -34,7 +34,7 @@ private extension CLLocationCoordinate2D {
 }
 
 // MARK: - ShapeStyle
-public struct ShapeStyle: Equatable, Codable {
+public struct ShapeStyle: Equatable, Hashable, Codable {
     public var color: UIColor
     public var width: CGFloat
     public var dashed: Bool
@@ -62,6 +62,30 @@ public struct ShapeStyle: Equatable, Codable {
 
     public static var `default`: ShapeStyle { ShapeStyle() }
 
+    // MARK: Equatable
+    public static func == (lhs: ShapeStyle, rhs: ShapeStyle) -> Bool {
+        lhs.rgbaComponents == rhs.rgbaComponents &&
+        lhs.width == rhs.width &&
+        lhs.dashed == rhs.dashed &&
+        lhs.arrow == rhs.arrow &&
+        lhs.arrowSize == rhs.arrowSize &&
+        lhs.arrowLength == rhs.arrowLength
+    }
+
+    // MARK: Hashable
+    public func hash(into hasher: inout Hasher) {
+        let rgba = rgbaComponents
+        hasher.combine(rgba.r)
+        hasher.combine(rgba.g)
+        hasher.combine(rgba.b)
+        hasher.combine(rgba.a)
+        hasher.combine(width)
+        hasher.combine(dashed)
+        hasher.combine(arrow)
+        hasher.combine(arrowSize)
+        hasher.combine(arrowLength)
+    }
+
     // MARK: Codable
     private enum CodingKeys: String, CodingKey { case color, width, dashed, arrow, arrowSize, arrowLength }
     public init(from decoder: Decoder) throws {
@@ -83,6 +107,10 @@ public struct ShapeStyle: Equatable, Codable {
         try c.encode(arrowSize, forKey: .arrowSize)
         try c.encode(arrowLength, forKey: .arrowLength)
     }
+}
+
+private extension ShapeStyle {
+    var rgbaComponents: RGBAColor { RGBAColor(color) }
 }
 
 // MARK: - MapShape

@@ -158,6 +158,35 @@ struct MarkupShape: Identifiable, Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
+// MARK: - Route Legend
+struct RouteLegendEntry: Identifiable, Hashable {
+    let id: UUID
+    var label: String
+    var detail: String?
+    var style: ShapeStyle
+
+    init(id: UUID = UUID(), label: String, detail: String? = nil, style: ShapeStyle) {
+        self.id = id
+        self.label = label
+        self.detail = detail
+        self.style = style
+    }
+
+    static func == (lhs: RouteLegendEntry, rhs: RouteLegendEntry) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.label == rhs.label &&
+        lhs.detail == rhs.detail &&
+        lhs.style == rhs.style
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(label)
+        hasher.combine(detail)
+        hasher.combine(style)
+    }
+}
+
 // MARK: - MapCanvas (UIKit MapKit wrapper)
 struct MapCanvas: UIViewRepresentable {
     @Binding var poles: [Pole]
