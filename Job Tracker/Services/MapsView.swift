@@ -101,11 +101,144 @@ struct Pole: Identifiable, Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
+// MARK: - Map Markup Models
+enum MarkupTool: String, CaseIterable {
+    case none
+    case aerial
+    case underground
+    case polygon
+
+    var geometry: MarkupShape.Geometry {
+        switch self {
+        case .polygon:
+            return .polygon
+        case .none, .aerial, .underground:
+            return .polyline
+        }
+    }
+
+    var defaultStrokeColor: UIColor {
+        switch self {
+        case .aerial:
+            return .systemBlue
+        case .underground:
+            return .systemOrange
+        case .polygon:
+            return .systemRed
+        case .none:
+            return .systemBlue
+        }
+    }
+
+    var defaultLineWidth: CGFloat { 4 }
+
+    var defaultLineDashPattern: [NSNumber]? {
+        switch self {
+        case .underground:
+            return [8, 6]
+        default:
+            return nil
+        }
+    }
+
+    var defaultFillColor: UIColor? {
+        switch self {
+        case .polygon:
+            return defaultStrokeColor.withAlphaComponent(0.2)
+        default:
+            return nil
+        }
+    }
+}
+
+struct MarkupStyle: Equatable {
+    var strokeColor: UIColor
+    var lineWidth: CGFloat
+    var lineDashPattern: [NSNumber]?
+    var fillColor: UIColor?
+
+    static func == (lhs: MarkupStyle, rhs: MarkupStyle) -> Bool {
+        let strokeMatches = lhs.strokeColor.isEqual(rhs.strokeColor)
+        let fillMatches: Bool
+        if let lFill = lhs.fillColor, let rFill = rhs.fillColor {
+            fillMatches = lFill.isEqual(rFill)
+        } else {
+            fillMatches = lhs.fillColor == nil && rhs.fillColor == nil
+        }
+        return strokeMatches && fillMatches && lhs.lineWidth == rhs.lineWidth && lhs.lineDashPattern == rhs.lineDashPattern
+    }
+}
+
+struct MarkupDrawingMode {
+    var isDrawingEnabled: Bool
+    var tool: MarkupTool
+    var strokeColor: UIColor
+    var lineWidth: CGFloat
+    var lineDashPattern: [NSNumber]?
+    var fillColor: UIColor?
+
+    init(isDrawingEnabled: Bool = false,
+         tool: MarkupTool = .none,
+         strokeColor: UIColor? = nil,
+         lineWidth: CGFloat? = nil,
+         lineDashPattern: [NSNumber]? = nil,
+         fillColor: UIColor? = nil) {
+        self.isDrawingEnabled = isDrawingEnabled
+        self.tool = tool
+        self.strokeColor = strokeColor ?? tool.defaultStrokeColor
+        self.lineWidth = lineWidth ?? tool.defaultLineWidth
+        self.lineDashPattern = lineDashPattern ?? tool.defaultLineDashPattern
+        self.fillColor = fillColor ?? tool.defaultFillColor
+    }
+
+    var isDrawingActive: Bool { isDrawingEnabled && tool != .none }
+
+    var style: MarkupStyle {
+        MarkupStyle(
+            strokeColor: strokeColor,
+            lineWidth: lineWidth,
+            lineDashPattern: lineDashPattern,
+            fillColor: fillColor
+        )
+    }
+}
+
+struct MarkupShape: Identifiable {
+    enum Geometry {
+        case polyline
+        case polygon
+
+        var minimumPointCount: Int {
+            switch self {
+            case .polyline: return 2
+            case .polygon: return 3
+            }
+        }
+    }
+
+    let id: UUID
+    var points: [CLLocationCoordinate2D]
+    var geometry: Geometry
+    var style: MarkupStyle
+
+    init(id: UUID = UUID(),
+         points: [CLLocationCoordinate2D] = [],
+         geometry: Geometry,
+         style: MarkupStyle) {
+        self.id = id
+        self.points = points
+        self.geometry = geometry
+        self.style = style
+    }
+}
+
 // MARK: - MapCanvas (UIKit MapKit wrapper)
 struct MapCanvas: UIViewRepresentable {
     @Binding var poles: [Pole]
     @Binding var region: MKCoordinateRegion
     @Binding var showUserLocation: Bool
+    @Binding var markups: [MarkupShape]
+    @Binding var drawingMode: MarkupDrawingMode
 
     // programmatic region change version (only apply when this changes)
     let regionNonce: Int
@@ -133,6 +266,24 @@ struct MapCanvas: UIViewRepresentable {
                                                 action: #selector(Coordinator.handleLong(_:)))
         mv.addGestureRecognizer(long)
 
+        let pan = UIPanGestureRecognizer(target: context.coordinator,
+                                         action: #selector(Coordinator.handlePan(_:)))
+        pan.maximumNumberOfTouches = 1
+        pan.delegate = context.coordinator
+        mv.addGestureRecognizer(pan)
+#if targetEnvironment(macCatalyst)
+        // No pencil support on macCatalyst
+#else
+        if #available(iOS 13.4, *) {
+            let pencilPan = UIPanGestureRecognizer(target: context.coordinator,
+                                                   action: #selector(Coordinator.handlePan(_:)))
+            pencilPan.maximumNumberOfTouches = 1
+            pencilPan.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.pencil.rawValue)]
+            pencilPan.delegate = context.coordinator
+            mv.addGestureRecognizer(pencilPan)
+        }
+#endif
+
         mv.mapType = mapType
         mv.setRegion(region, animated: false)
         context.coordinator.lastAppliedRegionNonce = regionNonce
@@ -149,6 +300,7 @@ struct MapCanvas: UIViewRepresentable {
         mv.isPitchEnabled = false
         mv.showsCompass = true
         mv.camera.heading = 0
+        context.coordinator.syncMarkups(markups, on: mv)
         return mv
     }
 
@@ -164,22 +316,26 @@ struct MapCanvas: UIViewRepresentable {
         }
 
         mv.showsUserLocation = showUserLocation
-        mv.isZoomEnabled = isInteractionEnabled
-        mv.isScrollEnabled = isInteractionEnabled
-        mv.isRotateEnabled = isInteractionEnabled
+        let drawingActive = drawingMode.isDrawingActive
+        mv.isZoomEnabled = isInteractionEnabled && !drawingActive
+        mv.isScrollEnabled = isInteractionEnabled && !drawingActive
+        mv.isRotateEnabled = isInteractionEnabled && !drawingActive
 
         context.coordinator.syncPoles(poles, on: mv)
+        context.coordinator.syncMarkups(markups, on: mv)
     }
 
     // MARK: - Coordinator
-    class Coordinator: NSObject, MKMapViewDelegate {
+    class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
         let parent: MapCanvas
         var suppressRegionCallback = false
         var lastAppliedRegionNonce: Int = -1
 
-        init(parent: MapCanvas) { self.parent = parent }
+        private var markupOverlays: [UUID: MKOverlay] = [:]
+        private var overlayStyles: [ObjectIdentifier: MarkupStyle] = [:]
+        private var activeMarkupID: UUID?
 
-        private var routeOverlay: MKPolyline?
+        init(parent: MapCanvas) { self.parent = parent }
 
         private final class PoleAnnotation: MKPointAnnotation {
             let poleID: UUID
@@ -210,24 +366,26 @@ struct MapCanvas: UIViewRepresentable {
             map.removeAnnotations(toRemove)
             let anns = poles.map { PoleAnnotation(id: $0.id, coordinate: $0.coordinate) }
             map.addAnnotations(anns)
-
-            if let old = routeOverlay { map.removeOverlay(old) }
-            routeOverlay = nil
-            if poles.count > 1 {
-                let coords = poles.map(\.coordinate)
-                let pl = MKPolyline(coordinates: coords, count: coords.count)
-                routeOverlay = pl
-                map.addOverlay(pl)
-            }
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            if let pl = overlay as? MKPolyline, pl === routeOverlay {
-                let r = MKPolylineRenderer(polyline: pl)
-                r.strokeColor = .systemOrange
-                r.lineWidth = 4
-                return r
+            let identifier = ObjectIdentifier(overlay as AnyObject)
+            guard let style = overlayStyles[identifier] else {
+                return MKOverlayRenderer(overlay: overlay)
             }
+
+            if let polyline = overlay as? MKPolyline {
+                let renderer = MKPolylineRenderer(polyline: polyline)
+                configure(renderer: renderer, with: style)
+                return renderer
+            }
+
+            if let polygon = overlay as? MKPolygon {
+                let renderer = MKPolygonRenderer(polygon: polygon)
+                configure(renderer: renderer, with: style)
+                return renderer
+            }
+
             return MKOverlayRenderer(overlay: overlay)
         }
 
@@ -281,6 +439,162 @@ struct MapCanvas: UIViewRepresentable {
                 }
             }
         }
+
+        // MARK: - Gesture Handling
+        @objc func handlePan(_ gr: UIPanGestureRecognizer) {
+            guard parent.isInteractionEnabled else { return }
+            guard let map = gr.view as? MKMapView else { return }
+
+            let drawingMode = parent.drawingMode
+            let coordinate = map.convert(gr.location(in: map), toCoordinateFrom: map)
+
+            switch gr.state {
+            case .began:
+                guard drawingMode.isDrawingActive else { return }
+                beginMarkup(at: coordinate, style: drawingMode.style, geometry: drawingMode.tool.geometry, on: map)
+            case .changed:
+                guard drawingMode.isDrawingActive else { return }
+                appendPoint(coordinate, on: map)
+            case .ended:
+                finishMarkup(on: map)
+            case .cancelled, .failed:
+                cancelMarkup(on: map)
+            default:
+                break
+            }
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard gestureRecognizer is UIPanGestureRecognizer else { return true }
+            guard parent.isInteractionEnabled else { return false }
+            return parent.drawingMode.isDrawingActive
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            // When drawing we want the map to ignore its own pan gesture.
+            if parent.drawingMode.isDrawingActive { return false }
+            return true
+        }
+
+        // MARK: - Markup Overlay Management
+        func syncMarkups(_ markups: [MarkupShape], on map: MKMapView) {
+            let ids = Set(markups.map { $0.id })
+
+            // Remove overlays for markups that no longer exist.
+            let stale = Set(markupOverlays.keys).subtracting(ids)
+            for id in stale {
+                removeOverlay(for: id, from: map)
+            }
+
+            for markup in markups {
+                guard let overlay = makeOverlay(for: markup) else {
+                    removeOverlay(for: markup.id, from: map)
+                    continue
+                }
+
+                if let existing = markupOverlays[markup.id] {
+                    map.removeOverlay(existing)
+                    overlayStyles.removeValue(forKey: ObjectIdentifier(existing as AnyObject))
+                }
+
+                markupOverlays[markup.id] = overlay
+                overlayStyles[ObjectIdentifier(overlay as AnyObject)] = markup.style
+                map.addOverlay(overlay)
+            }
+
+            if let active = activeMarkupID, !ids.contains(active) {
+                activeMarkupID = nil
+            }
+        }
+
+        private func makeOverlay(for markup: MarkupShape) -> MKOverlay? {
+            guard markup.points.count >= markup.geometry.minimumPointCount else { return nil }
+            switch markup.geometry {
+            case .polyline:
+                return MKPolyline(coordinates: markup.points, count: markup.points.count)
+            case .polygon:
+                return MKPolygon(coordinates: markup.points, count: markup.points.count)
+            }
+        }
+
+        private func removeOverlay(for id: UUID, from map: MKMapView) {
+            guard let overlay = markupOverlays[id] else { return }
+            map.removeOverlay(overlay)
+            overlayStyles.removeValue(forKey: ObjectIdentifier(overlay as AnyObject))
+            markupOverlays.removeValue(forKey: id)
+        }
+
+        private func beginMarkup(at coordinate: CLLocationCoordinate2D,
+                                 style: MarkupStyle,
+                                 geometry: MarkupShape.Geometry,
+                                 on map: MKMapView) {
+            let markup = MarkupShape(points: [coordinate], geometry: geometry, style: style)
+            activeMarkupID = markup.id
+            parent.markups.append(markup)
+            syncMarkups(parent.markups, on: map)
+        }
+
+        private func appendPoint(_ coordinate: CLLocationCoordinate2D, on map: MKMapView) {
+            guard let id = activeMarkupID,
+                  let idx = parent.markups.firstIndex(where: { $0.id == id }) else { return }
+
+            var markup = parent.markups[idx]
+            if let last = markup.points.last, last.isApproximatelyEqual(to: coordinate) {
+                return
+            }
+
+            markup.points.append(coordinate)
+            parent.markups[idx] = markup
+            syncMarkups(parent.markups, on: map)
+        }
+
+        private func finishMarkup(on map: MKMapView) {
+            guard let id = activeMarkupID,
+                  let idx = parent.markups.firstIndex(where: { $0.id == id }) else {
+                activeMarkupID = nil
+                return
+            }
+
+            let markup = parent.markups[idx]
+            if markup.points.count < markup.geometry.minimumPointCount {
+                parent.markups.remove(at: idx)
+                removeOverlay(for: id, from: map)
+            } else {
+                syncMarkups(parent.markups, on: map)
+            }
+            activeMarkupID = nil
+        }
+
+        private func cancelMarkup(on map: MKMapView) {
+            guard let id = activeMarkupID,
+                  let idx = parent.markups.firstIndex(where: { $0.id == id }) else {
+                activeMarkupID = nil
+                return
+            }
+
+            parent.markups.remove(at: idx)
+            removeOverlay(for: id, from: map)
+            activeMarkupID = nil
+        }
+
+        private func configure(renderer: MKOverlayPathRenderer, with style: MarkupStyle) {
+            renderer.strokeColor = style.strokeColor
+            renderer.lineWidth = style.lineWidth
+            renderer.lineDashPattern = style.lineDashPattern
+            renderer.lineCap = .round
+            renderer.lineJoin = .round
+
+            if let polygonRenderer = renderer as? MKPolygonRenderer {
+                polygonRenderer.fillColor = style.fillColor
+            }
+        }
+    }
+}
+
+private extension CLLocationCoordinate2D {
+    func isApproximatelyEqual(to other: CLLocationCoordinate2D, epsilon: Double = 0.000_001) -> Bool {
+        abs(latitude - other.latitude) < epsilon && abs(longitude - other.longitude) < epsilon
     }
 }
 
@@ -294,6 +608,8 @@ struct MapsView: View {
     @State private var regionSetNonce = 0
 
     @State private var poles: [Pole] = []
+    @State private var markups: [MarkupShape] = []
+    @State private var drawingMode = MarkupDrawingMode()
     @State private var totalDistance: Double = 0
     @State private var showingHelp = false
     @State private var selectedPole: Pole?
@@ -347,6 +663,8 @@ struct MapsView: View {
                     poles: $poles,
                     region: $region,
                     showUserLocation: $showUserLocation,
+                    markups: $markups,
+                    drawingMode: $drawingMode,
                     regionNonce: regionSetNonce,
                     isInteractionEnabled: true,
                     mapType: mapTypes[mapTypeIndex],
