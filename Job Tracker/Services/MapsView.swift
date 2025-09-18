@@ -101,6 +101,38 @@ struct Pole: Identifiable, Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
+struct MarkupShape: Identifiable, Hashable {
+    enum Kind: String, CaseIterable {
+        case line
+        case polygon
+        case freehand
+    }
+
+    let id: UUID
+    var kind: Kind
+    var points: [CLLocationCoordinate2D]
+    var strokeColor: UIColor
+    var isDashed: Bool
+    var fillColor: UIColor?
+
+    init(id: UUID = UUID(),
+         kind: Kind,
+         points: [CLLocationCoordinate2D],
+         strokeColor: UIColor,
+         isDashed: Bool = false,
+         fillColor: UIColor? = nil) {
+        self.id = id
+        self.kind = kind
+        self.points = points
+        self.strokeColor = strokeColor
+        self.isDashed = isDashed
+        self.fillColor = fillColor
+    }
+
+    static func == (lhs: MarkupShape, rhs: MarkupShape) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
 // MARK: - MapCanvas (UIKit MapKit wrapper)
 struct MapCanvas: UIViewRepresentable {
     @Binding var poles: [Pole]
@@ -294,6 +326,11 @@ struct MapsView: View {
     @State private var regionSetNonce = 0
 
     @State private var poles: [Pole] = []
+    @State private var markups: [MarkupShape] = []
+    @State private var selectedMarkupColor: UIColor = .systemRed
+    @State private var selectedMarkupKind: MarkupShape.Kind = .line
+    @State private var selectedMarkupIsDashed: Bool = false
+    @State private var selectedMarkupFillColor: UIColor? = nil
     @State private var totalDistance: Double = 0
     @State private var showingHelp = false
     @State private var selectedPole: Pole?
@@ -365,9 +402,10 @@ struct MapsView: View {
             }
             .onChange(of: poles) { _ in
                 recalculateDistance()
-                if sessionID != nil && !isApplyingRemoteUpdate {
-                    pushSessionPoles()
-                }
+                pushSessionStateIfNeeded()
+            }
+            .onChange(of: markups) { _ in
+                pushSessionStateIfNeeded()
             }
             .sheet(isPresented: $showShareSheet) {
                 if let url = pdfURL {
@@ -989,7 +1027,8 @@ struct MapsView: View {
             "createdBy": currentUserID,
             "createdAt": FieldValue.serverTimestamp(),
             "updatedAt": FieldValue.serverTimestamp(),
-            "poles": serializePoles(poles)
+            "poles": serializePoles(poles),
+            "markups": serializeMarkups(markups)
         ]
         doc.setData(payload) { err in
             guard err == nil else { return }
@@ -1021,6 +1060,9 @@ struct MapsView: View {
         self.sessionID = nil
         self.isHost = false
         self.participantsOnline = 0
+        self.markups.removeAll()
+        self.poles.removeAll()
+        self.totalDistance = 0
     }
 
     private func setupSessionListeners(for code: String) {
@@ -1028,13 +1070,15 @@ struct MapsView: View {
         self.sessionListener = db.collection("routeSessions").document(code)
             .addSnapshotListener { snap, _ in
                 guard let data = snap?.data() else { return }
-                if let items = data["poles"] as? [[String: Any]] {
-                    let remote = self.deserializePoles(items)
-                    self.isApplyingRemoteUpdate = true
-                    self.poles = remote
-                    self.recalculateDistance()
-                    DispatchQueue.main.async { self.isApplyingRemoteUpdate = false }
-                }
+                let poleItems = data["poles"] as? [[String: Any]] ?? []
+                let markupItems = data["markups"] as? [[String: Any]] ?? []
+                let remotePoles = self.deserializePoles(poleItems)
+                let remoteMarkups = self.deserializeMarkups(markupItems)
+                self.isApplyingRemoteUpdate = true
+                self.poles = remotePoles
+                self.markups = remoteMarkups
+                self.recalculateDistance()
+                DispatchQueue.main.async { self.isApplyingRemoteUpdate = false }
             }
         self.presenceListener = db.collection("routeSessions").document(code)
             .collection("participants")
@@ -1055,11 +1099,18 @@ struct MapsView: View {
         ], merge: true)
     }
 
-    private func pushSessionPoles() {
+    private func pushSessionStateIfNeeded() {
+        if sessionID != nil && !isApplyingRemoteUpdate {
+            pushSessionState()
+        }
+    }
+
+    private func pushSessionState() {
         guard let code = sessionID else { return }
         let db = Firestore.firestore()
         db.collection("routeSessions").document(code).setData([
             "poles": serializePoles(poles),
+            "markups": serializeMarkups(markups),
             "updatedAt": FieldValue.serverTimestamp()
         ], merge: true)
     }
@@ -1075,6 +1126,22 @@ struct MapsView: View {
                 "footageFeet": $0.footageFeet as Any,
                 "notes": $0.notes
             ].compactMapValues { $0 }
+        }
+    }
+
+    private func serializeMarkups(_ markups: [MarkupShape]) -> [[String: Any]] {
+        markups.map { shape in
+            var dict: [String: Any] = [
+                "id": shape.id.uuidString,
+                "kind": shape.kind.rawValue,
+                "points": shape.points.map { ["lat": $0.latitude, "lng": $0.longitude] },
+                "color": hexString(from: shape.strokeColor),
+                "isDashed": shape.isDashed
+            ]
+            if let fill = shape.fillColor {
+                dict["fillColor"] = hexString(from: fill)
+            }
+            return dict
         }
     }
 
@@ -1098,6 +1165,109 @@ struct MapsView: View {
             if let notes = dict["notes"] as? String { p.notes = notes }
             return p
         }
+    }
+
+    private func deserializeMarkups(_ items: [[String: Any]]) -> [MarkupShape] {
+        items.compactMap { dict in
+            let identifier: UUID = {
+                if let idString = dict["id"] as? String, let uuid = UUID(uuidString: idString) {
+                    return uuid
+                }
+                return UUID()
+            }()
+
+            let kind: MarkupShape.Kind = {
+                if let raw = dict["kind"] as? String, let kind = MarkupShape.Kind(rawValue: raw) {
+                    return kind
+                }
+                return .freehand
+            }()
+
+            let pointDictionaries = dict["points"] as? [[String: Any]] ?? []
+            let coords = pointDictionaries.compactMap { entry -> CLLocationCoordinate2D? in
+                guard let lat = entry["lat"] as? CLLocationDegrees,
+                      let lng = entry["lng"] as? CLLocationDegrees else { return nil }
+                return CLLocationCoordinate2D(latitude: lat, longitude: lng)
+            }
+
+            let strokeColor: UIColor = {
+                if let hex = dict["color"] as? String, let color = color(fromHex: hex) {
+                    return color
+                }
+                return .systemRed
+            }()
+
+            let fillColor: UIColor? = {
+                guard let hex = dict["fillColor"] as? String else { return nil }
+                return color(fromHex: hex)
+            }()
+
+            let isDashed = dict["isDashed"] as? Bool ?? false
+
+            return MarkupShape(
+                id: identifier,
+                kind: kind,
+                points: coords,
+                strokeColor: strokeColor,
+                isDashed: isDashed,
+                fillColor: fillColor
+            )
+        }
+    }
+
+    private func hexString(from color: UIColor) -> String {
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+
+        if !color.getRed(&r, green: &g, blue: &b, alpha: &a),
+           let converted = color.cgColor.converted(
+            to: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+            intent: .defaultIntent,
+            options: nil
+           ),
+           let components = converted.components {
+            switch components.count {
+            case 4:
+                r = components[0]; g = components[1]; b = components[2]; a = components[3]
+            case 2:
+                r = components[0]; g = components[0]; b = components[0]; a = components[1]
+            default:
+                break
+            }
+        }
+
+        let clamp: (CGFloat) -> CGFloat = { min(max($0, 0), 1) }
+        let red = Int(round(clamp(r) * 255))
+        let green = Int(round(clamp(g) * 255))
+        let blue = Int(round(clamp(b) * 255))
+        let alpha = Int(round(clamp(a) * 255))
+        return String(format: "#%02X%02X%02X%02X", red, green, blue, alpha)
+    }
+
+    private func color(fromHex hex: String) -> UIColor? {
+        var cleaned = hex.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if cleaned.hasPrefix("#") { cleaned.removeFirst() }
+        guard cleaned.count == 6 || cleaned.count == 8 else { return nil }
+
+        var value: UInt64 = 0
+        guard Scanner(string: cleaned).scanHexInt64(&value) else { return nil }
+
+        let r, g, b, a: CGFloat
+        if cleaned.count == 6 {
+            r = CGFloat((value & 0xFF0000) >> 16) / 255.0
+            g = CGFloat((value & 0x00FF00) >> 8) / 255.0
+            b = CGFloat(value & 0x0000FF) / 255.0
+            a = 1.0
+        } else {
+            r = CGFloat((value & 0xFF000000) >> 24) / 255.0
+            g = CGFloat((value & 0x00FF0000) >> 16) / 255.0
+            b = CGFloat((value & 0x0000FF00) >> 8) / 255.0
+            a = CGFloat(value & 0x000000FF) / 255.0
+        }
+
+        return UIColor(red: r, green: g, blue: b, alpha: a)
     }
 
     private func generateSessionCode() -> String {
