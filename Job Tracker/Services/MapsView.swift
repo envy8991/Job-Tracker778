@@ -136,6 +136,7 @@ struct MarkupShape: Identifiable, Hashable {
     let id: UUID
     var kind: Kind
     var points: [CLLocationCoordinate2D]
+    var lineWidth: CGFloat
     var strokeColor: UIColor
     var isDashed: Bool
     var fillColor: UIColor?
@@ -143,12 +144,14 @@ struct MarkupShape: Identifiable, Hashable {
     init(id: UUID = UUID(),
          kind: Kind,
          points: [CLLocationCoordinate2D],
+         lineWidth: CGFloat,
          strokeColor: UIColor,
          isDashed: Bool = false,
          fillColor: UIColor? = nil) {
         self.id = id
         self.kind = kind
         self.points = points
+        self.lineWidth = lineWidth
         self.strokeColor = strokeColor
         self.isDashed = isDashed
         self.fillColor = fillColor
@@ -190,6 +193,7 @@ struct RouteLegendEntry: Identifiable, Hashable {
 // MARK: - MapCanvas (UIKit MapKit wrapper)
 struct MapCanvas: UIViewRepresentable {
     @Binding var poles: [Pole]
+    @Binding var markups: [MarkupShape]
     @Binding var region: MKCoordinateRegion
     @Binding var showUserLocation: Bool
     @Binding var markupTool: MapMarkupTool
@@ -203,7 +207,11 @@ struct MapCanvas: UIViewRepresentable {
 
     let isInteractionEnabled: Bool
     let mapType: MKMapType
-    let onTap: (CLLocationCoordinate2D) -> Void
+    let isMarkupInProgress: () -> Bool
+    let onBeginMarkup: (CLLocationCoordinate2D) -> Void
+    let onContinueMarkup: (CLLocationCoordinate2D) -> Void
+    let onFinishMarkup: () -> Void
+    let onAddPole: (CLLocationCoordinate2D) -> Void
     let onInsertPole: (Int, CLLocationCoordinate2D) -> Void
     let canInsert: () -> Bool
     let onSelectPole: (Pole) -> Void
@@ -224,6 +232,8 @@ struct MapCanvas: UIViewRepresentable {
         // Long-press insert
         let long = UILongPressGestureRecognizer(target: context.coordinator,
                                                 action: #selector(Coordinator.handleLong(_:)))
+        long.minimumPressDuration = 0.15
+        long.allowableMovement = 30
         context.coordinator.longPressGesture = long
         mv.addGestureRecognizer(long)
 
@@ -248,8 +258,8 @@ struct MapCanvas: UIViewRepresentable {
 
     func updateUIView(_ mv: MKMapView, context: Context) {
         context.coordinator.parent = self
-        context.coordinator.tapGesture?.isEnabled = markupTool == .draw
-        context.coordinator.longPressGesture?.isEnabled = markupTool == .draw
+        context.coordinator.tapGesture?.isEnabled = true
+        context.coordinator.longPressGesture?.isEnabled = true
         if mv.mapType != mapType { mv.mapType = mapType }
 
         // Apply region ONLY when a new nonce is provided (programmatic change).
@@ -266,6 +276,7 @@ struct MapCanvas: UIViewRepresentable {
         mv.isRotateEnabled = isInteractionEnabled
 
         context.coordinator.syncPoles(poles, on: mv)
+        context.coordinator.syncMarkups(markups, on: mv)
     }
 
     // MARK: - Coordinator
@@ -279,6 +290,8 @@ struct MapCanvas: UIViewRepresentable {
         init(parent: MapCanvas) { self.parent = parent }
 
         private var routeOverlay: MKPolyline?
+        private var markupOverlayCache: [UUID: (overlay: MKOverlay, shape: MarkupShape)] = [:]
+        private var overlayShapeLookup: [ObjectIdentifier: MarkupShape] = [:]
 
         private final class PoleAnnotation: MKPointAnnotation {
             let poleID: UUID
@@ -290,20 +303,49 @@ struct MapCanvas: UIViewRepresentable {
         }
 
         @objc func handleTap(_ gr: UITapGestureRecognizer) {
-            guard parent.markupTool == .draw else { return }
             let mapView = gr.view as! MKMapView
             let coord = mapView.convert(gr.location(in: mapView), toCoordinateFrom: mapView)
-            parent.onTap(coord)
+
+            if parent.markupTool == .draw {
+                if parent.isMarkupInProgress() {
+                    parent.onContinueMarkup(coord)
+                } else {
+                    parent.onBeginMarkup(coord)
+                }
+            } else {
+                parent.onAddPole(coord)
+            }
         }
 
         @objc func handleLong(_ gr: UILongPressGestureRecognizer) {
-            guard gr.state == .began else { return }
-            guard parent.markupTool == .draw else { return }
             let map = gr.view as! MKMapView
             let coord = map.convert(gr.location(in: map), toCoordinateFrom: map)
-            let insertIdx = max(0, parent.poles.count - 1)
-            guard parent.canInsert() else { return }
-            parent.onInsertPole(insertIdx, coord)
+
+            if parent.markupTool == .draw {
+                switch gr.state {
+                case .began:
+                    if parent.isMarkupInProgress() {
+                        parent.onContinueMarkup(coord)
+                    } else {
+                        parent.onBeginMarkup(coord)
+                    }
+                case .changed:
+                    parent.onContinueMarkup(coord)
+                case .ended, .cancelled, .failed:
+                    if gr.state != .cancelled && gr.state != .failed {
+                        parent.onContinueMarkup(coord)
+                    }
+                    if parent.isMarkupInProgress() {
+                        parent.onFinishMarkup()
+                    }
+                default:
+                    break
+                }
+            } else if gr.state == .began {
+                guard parent.canInsert() else { return }
+                let insertIdx = max(0, parent.poles.count - 1)
+                parent.onInsertPole(insertIdx, coord)
+            }
         }
 
         func syncPoles(_ poles: [Pole], on map: MKMapView) {
@@ -328,6 +370,47 @@ struct MapCanvas: UIViewRepresentable {
             map.addOverlay(polyline)
         }
 
+        func syncMarkups(_ markups: [MarkupShape], on map: MKMapView) {
+            let validShapes = markups.filter { shape in
+                switch shape.kind {
+                case .polygon:
+                    return shape.points.count >= 3
+                case .line, .freehand:
+                    return shape.points.count >= 2
+                }
+            }
+
+            let incomingIDs = Set(validShapes.map(\.id))
+            for (id, entry) in markupOverlayCache where !incomingIDs.contains(id) {
+                map.removeOverlay(entry.overlay)
+                overlayShapeLookup.removeValue(forKey: ObjectIdentifier(entry.overlay))
+                markupOverlayCache.removeValue(forKey: id)
+            }
+
+            for shape in validShapes {
+                if let existing = markupOverlayCache[shape.id] {
+                    if !shapesEquivalent(existing.shape, shape) {
+                        map.removeOverlay(existing.overlay)
+                        overlayShapeLookup.removeValue(forKey: ObjectIdentifier(existing.overlay))
+                        if let overlay = makeOverlay(for: shape) {
+                            markupOverlayCache[shape.id] = (overlay, shape)
+                            overlayShapeLookup[ObjectIdentifier(overlay)] = shape
+                            map.addOverlay(overlay)
+                        } else {
+                            markupOverlayCache.removeValue(forKey: shape.id)
+                        }
+                    } else {
+                        markupOverlayCache[shape.id] = (existing.overlay, shape)
+                        overlayShapeLookup[ObjectIdentifier(existing.overlay)] = shape
+                    }
+                } else if let overlay = makeOverlay(for: shape) {
+                    markupOverlayCache[shape.id] = (overlay, shape)
+                    overlayShapeLookup[ObjectIdentifier(overlay)] = shape
+                    map.addOverlay(overlay)
+                }
+            }
+        }
+
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let routeOverlay,
                let polyline = overlay as? MKPolyline,
@@ -340,42 +423,87 @@ struct MapCanvas: UIViewRepresentable {
                 return renderer
             }
 
+            if let shape = overlayShapeLookup[ObjectIdentifier(overlay)] {
+                if let polyline = overlay as? MKPolyline {
+                    return configuredPolylineRenderer(polyline, for: shape)
+                } else if let polygon = overlay as? MKPolygon {
+                    return configuredPolygonRenderer(polygon, for: shape)
+                }
+            }
+
             return MKOverlayRenderer(overlay: overlay)
         }
 
-        private func configuredPolylineRenderer(_ polyline: MKPolyline) -> MKPolylineRenderer {
+        private func configuredPolylineRenderer(_ polyline: MKPolyline, for shape: MarkupShape) -> MKPolylineRenderer {
             let renderer = MKPolylineRenderer(polyline: polyline)
-            renderer.strokeColor = currentStrokeColor()
-            renderer.lineWidth = currentLineWidth()
-            renderer.lineDashPattern = currentDashPattern()
+            renderer.strokeColor = shape.strokeColor
+            let width = max(shape.lineWidth, 1)
+            renderer.lineWidth = width
+            renderer.lineDashPattern = dashPattern(for: width, dashed: shape.isDashed)
             renderer.lineJoin = .round
             renderer.lineCap = .round
             return renderer
         }
 
-        private func configuredPolygonRenderer(_ polygon: MKPolygon) -> MKPolygonRenderer {
+        private func configuredPolygonRenderer(_ polygon: MKPolygon, for shape: MarkupShape) -> MKPolygonRenderer {
             let renderer = MKPolygonRenderer(polygon: polygon)
-            renderer.strokeColor = currentStrokeColor()
-            renderer.lineWidth = currentLineWidth()
-            renderer.lineDashPattern = currentDashPattern()
+            renderer.strokeColor = shape.strokeColor
+            let width = max(shape.lineWidth, 1)
+            renderer.lineWidth = width
+            renderer.lineDashPattern = dashPattern(for: width, dashed: shape.isDashed)
             renderer.lineJoin = .round
             renderer.lineCap = .round
-            renderer.fillColor = currentStrokeColor().withAlphaComponent(0.15)
+            if let fill = shape.fillColor {
+                renderer.fillColor = fill
+            } else {
+                renderer.fillColor = shape.strokeColor.withAlphaComponent(0.15)
+            }
             return renderer
         }
 
-        private func currentStrokeColor() -> UIColor {
-            UIColor(parent.strokeColor)
-        }
-
-        private func currentLineWidth() -> CGFloat {
-            max(parent.lineWidth, 1)
-        }
-
-        private func currentDashPattern() -> [NSNumber]? {
-            guard parent.isDashed else { return nil }
-            let base = Double(max(parent.lineWidth, 1))
+        private func dashPattern(for width: CGFloat, dashed: Bool) -> [NSNumber]? {
+            guard dashed else { return nil }
+            let base = Double(max(width, 1))
             return [NSNumber(value: base * 3.0), NSNumber(value: base * 1.5)]
+        }
+
+        private func makeOverlay(for shape: MarkupShape) -> MKOverlay? {
+            switch shape.kind {
+            case .polygon:
+                guard shape.points.count >= 3 else { return nil }
+                return MKPolygon(coordinates: shape.points, count: shape.points.count)
+            case .line, .freehand:
+                guard shape.points.count >= 2 else { return nil }
+                return MKPolyline(coordinates: shape.points, count: shape.points.count)
+            }
+        }
+
+        private func shapesEquivalent(_ lhs: MarkupShape, _ rhs: MarkupShape) -> Bool {
+            guard lhs.kind == rhs.kind,
+                  lhs.points.count == rhs.points.count,
+                  abs(lhs.lineWidth - rhs.lineWidth) < 0.0001,
+                  lhs.isDashed == rhs.isDashed,
+                  colorsEqual(lhs.strokeColor, rhs.strokeColor),
+                  colorsEqual(lhs.fillColor, rhs.fillColor) else {
+                return false
+            }
+            for (a, b) in zip(lhs.points, rhs.points) {
+                if abs(a.latitude - b.latitude) > 0.000001 || abs(a.longitude - b.longitude) > 0.000001 {
+                    return false
+                }
+            }
+            return true
+        }
+
+        private func colorsEqual(_ lhs: UIColor?, _ rhs: UIColor?) -> Bool {
+            switch (lhs, rhs) {
+            case (nil, nil):
+                return true
+            case let (l?, r?):
+                return l.isEqual(r)
+            default:
+                return false
+            }
         }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
@@ -442,6 +570,7 @@ struct MapsView: View {
 
     @State private var poles: [Pole] = []
     @State private var markups: [MarkupShape] = []
+    @State private var activeMarkupPoints: [CLLocationCoordinate2D] = []
     @State private var selectedMarkupColor: UIColor = .systemRed
     @State private var selectedMarkupKind: MarkupShape.Kind = .line
     @State private var selectedMarkupIsDashed: Bool = false
@@ -524,6 +653,7 @@ struct MapsView: View {
             ZStack {
                 MapCanvas(
                     poles: $poles,
+                    markups: $markups,
                     region: $region,
                     showUserLocation: $showUserLocation,
                     markupTool: $activeMarkupTool,
@@ -534,15 +664,19 @@ struct MapsView: View {
                     regionNonce: regionSetNonce,
                     isInteractionEnabled: activeMarkupTool == .pointer,
                     mapType: mapTypes[mapTypeIndex],
-                    onTap: { coord in
-                        guard activeMarkupTool == .draw else { return }
+                    isMarkupInProgress: { !activeMarkupPoints.isEmpty },
+                    onBeginMarkup: { coordinate in beginMarkup(at: coordinate) },
+                    onContinueMarkup: { coordinate in appendMarkupPoint(coordinate) },
+                    onFinishMarkup: { finalizeMarkup() },
+                    onAddPole: { coord in
+                        guard activeMarkupTool == .pointer else { return }
                         addPole(coord)
                     },
                     onInsertPole: { index, coord in
-                        guard activeMarkupTool == .draw else { return }
+                        guard activeMarkupTool == .pointer else { return }
                         insertPole(at: index, coord)
                     },
-                    canInsert: { activeMarkupTool == .draw },
+                    canInsert: { activeMarkupTool == .pointer },
                     onSelectPole: { selectedPole = $0 }
                 )
                 .ignoresSafeArea()
@@ -559,6 +693,11 @@ struct MapsView: View {
             }
             .onChange(of: markups) { _ in
                 pushSessionStateIfNeeded()
+            }
+            .onChange(of: activeMarkupTool) { tool in
+                if tool != .draw {
+                    activeMarkupPoints.removeAll()
+                }
             }
             .sheet(isPresented: $showShareSheet) {
                 if let url = pdfURL {
@@ -644,6 +783,65 @@ struct MapsView: View {
 
     private func insertPole(at idx: Int, _ coord: CLLocationCoordinate2D) {
         poles.insert(Pole(coordinate: coord), at: idx)
+    }
+
+    private func beginMarkup(at coordinate: CLLocationCoordinate2D) {
+        guard activeMarkupTool == .draw else { return }
+        activeMarkupPoints = [coordinate]
+    }
+
+    private func appendMarkupPoint(_ coordinate: CLLocationCoordinate2D) {
+        guard activeMarkupTool == .draw else { return }
+        if activeMarkupPoints.isEmpty {
+            activeMarkupPoints.append(coordinate)
+            return
+        }
+        if let last = activeMarkupPoints.last {
+            let lastPoint = MKMapPoint(last)
+            let nextPoint = MKMapPoint(coordinate)
+            if lastPoint.distance(to: nextPoint) < 0.25 { return }
+        }
+        activeMarkupPoints.append(coordinate)
+    }
+
+    private func finalizeMarkup() {
+        guard activeMarkupTool == .draw else { return }
+        let kind = markupKind(for: activeMarkupShape)
+        let minimumCount = kind == .polygon ? 3 : 2
+        guard activeMarkupPoints.count >= minimumCount else {
+            activeMarkupPoints.removeAll()
+            return
+        }
+
+        let stroke = UIColor(selectedStrokeColor)
+        let fillColor: UIColor? = {
+            guard kind == .polygon else { return nil }
+            if let fill = selectedMarkupFillColor {
+                return fill
+            }
+            return stroke.withAlphaComponent(0.2)
+        }()
+
+        let shape = MarkupShape(
+            kind: kind,
+            points: activeMarkupPoints,
+            lineWidth: selectedLineWidth,
+            strokeColor: stroke,
+            isDashed: isUndergroundRun,
+            fillColor: fillColor
+        )
+
+        markups.append(shape)
+        activeMarkupPoints.removeAll()
+    }
+
+    private func markupKind(for selection: MapMarkupShape) -> MarkupShape.Kind {
+        switch selection {
+        case .line:
+            return .line
+        case .polygon:
+            return .polygon
+        }
     }
 
     private func recalculateDistance() {
@@ -1367,6 +1565,7 @@ struct MapsView: View {
                 "id": shape.id.uuidString,
                 "kind": shape.kind.rawValue,
                 "points": shape.points.map { ["lat": $0.latitude, "lng": $0.longitude] },
+                "lineWidth": Double(shape.lineWidth),
                 "color": hexString(from: shape.strokeColor),
                 "isDashed": shape.isDashed
             ]
@@ -1422,6 +1621,13 @@ struct MapsView: View {
                 return CLLocationCoordinate2D(latitude: lat, longitude: lng)
             }
 
+            let lineWidth: CGFloat = {
+                if let value = dict["lineWidth"] as? Double { return CGFloat(value) }
+                if let value = dict["lineWidth"] as? CGFloat { return value }
+                if let value = dict["lineWidth"] as? NSNumber { return CGFloat(truncating: value) }
+                return 4
+            }()
+
             let strokeColor: UIColor = {
                 if let hex = dict["color"] as? String, let color = color(fromHex: hex) {
                     return color
@@ -1440,6 +1646,7 @@ struct MapsView: View {
                 id: identifier,
                 kind: kind,
                 points: coords,
+                lineWidth: lineWidth,
                 strokeColor: strokeColor,
                 isDashed: isDashed,
                 fillColor: fillColor
