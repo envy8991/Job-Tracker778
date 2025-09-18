@@ -296,19 +296,35 @@ struct SupervisorDashboardView: View {
             }
 
             HStack(spacing: 12) {
-                DatePicker(
-                    "From",
-                    selection: Binding(get: { dateRange.start }, set: { dateRange = DateInterval(start: $0, end: dateRange.end) }),
-                    displayedComponents: .date
-                )
-                .labelsHidden()
-                DatePicker(
-                    "To",
-                    selection: Binding(get: { dateRange.end }, set: { dateRange = DateInterval(start: dateRange.start, end: $0) }),
-                    displayedComponents: .date
-                )
-                .labelsHidden()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("From")
+                        .font(.footnote)
+                        .foregroundColor(.white.opacity(0.8))
+                    DatePicker(
+                        "From",
+                        selection: Binding(get: { dateRange.start }, set: { dateRange = DateInterval(start: $0, end: dateRange.end) }),
+                        displayedComponents: .date
+                    )
+                    .labelsHidden()
+                    .accessibilityLabel("From")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("To")
+                        .font(.footnote)
+                        .foregroundColor(.white.opacity(0.8))
+                    DatePicker(
+                        "To",
+                        selection: Binding(get: { dateRange.end }, set: { dateRange = DateInterval(start: dateRange.start, end: $0) }),
+                        displayedComponents: .date
+                    )
+                    .labelsHidden()
+                    .accessibilityLabel("To")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(.top, 4)
         }
         .padding(12)
         .background(Color.black.opacity(0.25))
