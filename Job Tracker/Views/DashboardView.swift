@@ -105,6 +105,7 @@ struct DashboardView: View {
     }
     @State private var activeSheet: ActiveSheet?
     @State private var shareItems: [Any] = []
+    @State private var isPreparingDailyShare = false
 
     // Sync banner state (offline/online uploads)
     @State private var syncTotal: Int = 0
@@ -352,7 +353,7 @@ struct DashboardView: View {
                 case .share:
                     ActivityView(
                         activityItems: shareItems,
-                        subject: "Jobs for \(formattedDate(selectedDate))"
+                        subject: shareSubject()
                     )
                 case .createJob:
                     CreateJobView()
@@ -486,26 +487,24 @@ extension DashboardView {
             .frame(maxWidth: .infinity)
 
             Button {
-                guard jobsViewModel.hasLoadedInitialJobs else {
-                    importToastIsError = true
-                    importToastMessage = "Jobs are still loading…"
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
-                        showImportToast = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            showImportToast = false
-                        }
-                    }
-                    return
-                }
-                prepareShareItems()
+                Task { await handleDailyShareTap() }
             } label: {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.headline)
-                    .padding(10)
-                    .background(.ultraThinMaterial, in: Circle())
+                ZStack {
+                    if isPreparingDailyShare {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.headline)
+                    }
+                }
+                .frame(width: 24, height: 24)
+                .padding(10)
+                .background(.ultraThinMaterial, in: Circle())
             }
+            .disabled(isPreparingDailyShare)
+            .accessibilityLabel("Share \(shareSubject())")
+            .accessibilityHint("Creates a summary for the selected day")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -520,6 +519,49 @@ extension DashboardView {
 }
 
 // MARK: - Sharing Helpers
+
+fileprivate final class DailyJobsSummaryItemSource: NSObject, UIActivityItemSource {
+    private let textProvider: () -> String
+    private let fallbackProvider: () -> String
+    private let subjectProvider: () -> String
+
+    init(textProvider: @escaping () -> String,
+         fallbackProvider: @escaping () -> String,
+         subjectProvider: @escaping () -> String) {
+        self.textProvider = textProvider
+        self.fallbackProvider = fallbackProvider
+        self.subjectProvider = subjectProvider
+        super.init()
+    }
+
+    private func resolvedText() -> NSString {
+        let trimmed = textProvider().trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            return NSString(string: trimmed)
+        }
+        let fallback = fallbackProvider().trimmingCharacters(in: .whitespacesAndNewlines)
+        if fallback.isEmpty {
+            return NSString(string: " ")
+        }
+        return NSString(string: fallback)
+    }
+
+    func activityViewControllerPlaceholderItem(_ activityViewController: UIActivityViewController) -> Any {
+        resolvedText()
+    }
+
+    func activityViewController(_ activityViewController: UIActivityViewController,
+                                itemForActivityType activityType: UIActivity.ActivityType?) -> Any? {
+        resolvedText()
+    }
+
+    func activityViewController(_ activityViewController: UIActivityViewController,
+                                subjectForActivityType activityType: UIActivity.ActivityType?) -> String {
+        let subject = subjectProvider().trimmingCharacters(in: .whitespacesAndNewlines)
+        return subject
+    }
+}
+
 extension DashboardView {
     /// Create a minimal deep link for a single job and present the system share sheet.
     private func shareJob(_ job: Job) async {
@@ -544,31 +586,82 @@ extension DashboardView {
             }
         }
     }
-    /// Build the items array for UIActivityViewController: summary text + any job images/links.
-    private func prepareShareItems(limitImages: Int = 20) {
-        guard jobsViewModel.hasLoadedInitialJobs else { return }
-        // Keep the same text summary you already had
-        let text = shareText()
-        var items: [Any] = [text]
+    private func handleDailyShareTap() async {
+        let hasLoaded = await MainActor.run { jobsViewModel.hasLoadedInitialJobs }
+        guard hasLoaded else {
+            await MainActor.run { showJobsStillLoadingToast() }
+            return
+        }
 
-        // Collect attachments from jobs included in the summary
-        let jobsForDay = filteredJobs().filter { $0.status.lowercased() != "pending" }
-        var imagesOrLinks: [Any] = []
-        for job in jobsForDay {
-            imagesOrLinks.append(contentsOf: shareableAttachments(for: job))
-            if imagesOrLinks.count >= limitImages { break }
+        let alreadyPreparing = await MainActor.run { isPreparingDailyShare }
+        guard !alreadyPreparing else { return }
+
+        await MainActor.run { isPreparingDailyShare = true }
+        defer { Task { await MainActor.run { isPreparingDailyShare = false } } }
+
+        await waitForLatestJobsData()
+
+        await MainActor.run {
+            presentDailyShareSheet()
         }
-        if !imagesOrLinks.isEmpty {
-            items.append(contentsOf: imagesOrLinks.prefix(limitImages))
+    }
+
+    private func waitForLatestJobsData(maxWait: TimeInterval = 1.0) async {
+        guard maxWait > 0 else { return }
+        let deadline = Date().addingTimeInterval(maxWait)
+        while Date() < deadline {
+            if Task.isCancelled { return }
+            let ready = await MainActor.run {
+                !filteredJobs().isEmpty || jobsViewModel.lastServerSync != nil
+            }
+            if ready { return }
+            try? await Task.sleep(nanoseconds: 80_000_000)
         }
-        // Ensure at least one string item for share sheet fallback
-        if items.isEmpty { items = [" "] }
-        // Store and present on next runloop tick to avoid first‑present race conditions with SwiftUI state changes
-        // Store and present on next runloop tick (plus tiny delay) to avoid first-present race conditions with SwiftUI state changes
+    }
+
+    @MainActor
+    private func presentDailyShareSheet(limitImages: Int = 20) {
+        let items = buildDailyShareItems(limitImages: limitImages)
         shareItems = items
         activeSheet = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             activeSheet = .share
+        }
+    }
+
+    @MainActor
+    private func buildDailyShareItems(limitImages: Int = 20) -> [Any] {
+        let summarySource = DailyJobsSummaryItemSource(
+            textProvider: { shareText() },
+            fallbackProvider: { shareEmptyFallbackText() },
+            subjectProvider: { shareSubject() }
+        )
+
+        var items: [Any] = [summarySource]
+
+        let jobsForDay = filteredJobs().filter { $0.status.lowercased() != "pending" }
+        var attachments: [Any] = []
+        for job in jobsForDay {
+            attachments.append(contentsOf: shareableAttachments(for: job))
+            if attachments.count >= limitImages { break }
+        }
+        if !attachments.isEmpty {
+            items.append(contentsOf: attachments.prefix(limitImages))
+        }
+        return items
+    }
+
+    @MainActor
+    private func showJobsStillLoadingToast() {
+        importToastIsError = true
+        importToastMessage = "Jobs are still loading…"
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
+            showImportToast = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                showImportToast = false
+            }
         }
     }
 
@@ -649,14 +742,22 @@ extension DashboardView {
 
 // MARK: - Helpers
 extension DashboardView {
+    private func shareSubject() -> String {
+        "Jobs for \(formattedDate(selectedDate))"
+    }
+
+    private func shareEmptyFallbackText() -> String {
+        "No jobs to share for \(formattedDate(selectedDate))."
+    }
+
     /// Compose share text for the selected date: "Jobs for Apr 29 2025:\n123 Main St – Done"
     private func shareText() -> String {
         let jobsForDay = filteredJobs().filter { $0.status.lowercased() != "pending" }
         guard !jobsForDay.isEmpty else {
-            return "No jobs to share for \(formattedDate(selectedDate))."
+            return shareEmptyFallbackText()
         }
 
-        let header = "Jobs for \(formattedDate(selectedDate)):"
+        let header = "\(shareSubject()):"
         let lines = jobsForDay.map { job in
             let address = houseNumberAndStreet(from: job.address)
             var entry = "\(address) – \(job.status)"
