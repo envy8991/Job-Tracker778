@@ -80,6 +80,31 @@ final class LocationFetcher: NSObject, ObservableObject, CLLocationManagerDelega
     }
 }
 
+// MARK: - Markup Configuration
+enum MapMarkupTool: String, CaseIterable {
+    case pointer
+    case draw
+
+    var displayName: String {
+        switch self {
+        case .pointer: return "Navigate"
+        case .draw: return "Draw"
+        }
+    }
+}
+
+enum MapMarkupShape: String, CaseIterable {
+    case line
+    case polygon
+
+    var displayName: String {
+        switch self {
+        case .line: return "Line"
+        case .polygon: return "Polygon"
+        }
+    }
+}
+
 // MARK: - Pole Model
 struct Pole: Identifiable, Hashable {
     let id: UUID
@@ -106,6 +131,11 @@ struct MapCanvas: UIViewRepresentable {
     @Binding var poles: [Pole]
     @Binding var region: MKCoordinateRegion
     @Binding var showUserLocation: Bool
+    @Binding var markupTool: MapMarkupTool
+    @Binding var markupShape: MapMarkupShape
+    @Binding var strokeColor: Color
+    @Binding var lineWidth: CGFloat
+    @Binding var isDashed: Bool
 
     // programmatic region change version (only apply when this changes)
     let regionNonce: Int
@@ -121,16 +151,19 @@ struct MapCanvas: UIViewRepresentable {
 
     func makeUIView(context: Context) -> MKMapView {
         let mv = MKMapView()
+        context.coordinator.parent = self
         mv.delegate = context.coordinator
         mv.register(MKMarkerAnnotationView.self,
                     forAnnotationViewWithReuseIdentifier: "pin")
         // Tap
         let tap = UITapGestureRecognizer(target: context.coordinator,
                                          action: #selector(Coordinator.handleTap(_:)))
+        context.coordinator.tapGesture = tap
         mv.addGestureRecognizer(tap)
         // Long-press insert
         let long = UILongPressGestureRecognizer(target: context.coordinator,
                                                 action: #selector(Coordinator.handleLong(_:)))
+        context.coordinator.longPressGesture = long
         mv.addGestureRecognizer(long)
 
         mv.mapType = mapType
@@ -153,6 +186,9 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func updateUIView(_ mv: MKMapView, context: Context) {
+        context.coordinator.parent = self
+        context.coordinator.tapGesture?.isEnabled = markupTool == .draw
+        context.coordinator.longPressGesture?.isEnabled = markupTool == .draw
         if mv.mapType != mapType { mv.mapType = mapType }
 
         // Apply region ONLY when a new nonce is provided (programmatic change).
@@ -173,13 +209,15 @@ struct MapCanvas: UIViewRepresentable {
 
     // MARK: - Coordinator
     class Coordinator: NSObject, MKMapViewDelegate {
-        let parent: MapCanvas
+        var parent: MapCanvas
         var suppressRegionCallback = false
         var lastAppliedRegionNonce: Int = -1
+        weak var tapGesture: UITapGestureRecognizer?
+        weak var longPressGesture: UILongPressGestureRecognizer?
 
         init(parent: MapCanvas) { self.parent = parent }
 
-        private var routeOverlay: MKPolyline?
+        private var routeOverlay: MKOverlay?
 
         private final class PoleAnnotation: MKPointAnnotation {
             let poleID: UUID
@@ -191,6 +229,7 @@ struct MapCanvas: UIViewRepresentable {
         }
 
         @objc func handleTap(_ gr: UITapGestureRecognizer) {
+            guard parent.markupTool == .draw else { return }
             let mapView = gr.view as! MKMapView
             let coord = mapView.convert(gr.location(in: mapView), toCoordinateFrom: mapView)
             parent.onTap(coord)
@@ -198,6 +237,7 @@ struct MapCanvas: UIViewRepresentable {
 
         @objc func handleLong(_ gr: UILongPressGestureRecognizer) {
             guard gr.state == .began else { return }
+            guard parent.markupTool == .draw else { return }
             let map = gr.view as! MKMapView
             let coord = map.convert(gr.location(in: map), toCoordinateFrom: map)
             let insertIdx = max(0, parent.poles.count - 1)
@@ -213,22 +253,69 @@ struct MapCanvas: UIViewRepresentable {
 
             if let old = routeOverlay { map.removeOverlay(old) }
             routeOverlay = nil
-            if poles.count > 1 {
-                let coords = poles.map(\.coordinate)
-                let pl = MKPolyline(coordinates: coords, count: coords.count)
-                routeOverlay = pl
-                map.addOverlay(pl)
+
+            let coords = poles.map(\.coordinate)
+            guard coords.count > 1 else { return }
+
+            let overlay: MKOverlay
+            if parent.markupShape == .polygon, coords.count >= 3 {
+                overlay = MKPolygon(coordinates: coords, count: coords.count)
+            } else {
+                overlay = MKPolyline(coordinates: coords, count: coords.count)
             }
+            routeOverlay = overlay
+            map.addOverlay(overlay)
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            if let pl = overlay as? MKPolyline, pl === routeOverlay {
-                let r = MKPolylineRenderer(polyline: pl)
-                r.strokeColor = .systemOrange
-                r.lineWidth = 4
-                return r
+            guard let currentOverlay = routeOverlay else {
+                return MKOverlayRenderer(overlay: overlay)
             }
+
+            if let pl = overlay as? MKPolyline, let active = currentOverlay as? MKPolyline, pl === active {
+                return configuredPolylineRenderer(pl)
+            }
+
+            if let polygon = overlay as? MKPolygon, let active = currentOverlay as? MKPolygon, polygon === active {
+                return configuredPolygonRenderer(polygon)
+            }
+
             return MKOverlayRenderer(overlay: overlay)
+        }
+
+        private func configuredPolylineRenderer(_ polyline: MKPolyline) -> MKPolylineRenderer {
+            let renderer = MKPolylineRenderer(polyline: polyline)
+            renderer.strokeColor = currentStrokeColor()
+            renderer.lineWidth = currentLineWidth()
+            renderer.lineDashPattern = currentDashPattern()
+            renderer.lineJoin = .round
+            renderer.lineCap = .round
+            return renderer
+        }
+
+        private func configuredPolygonRenderer(_ polygon: MKPolygon) -> MKPolygonRenderer {
+            let renderer = MKPolygonRenderer(polygon: polygon)
+            renderer.strokeColor = currentStrokeColor()
+            renderer.lineWidth = currentLineWidth()
+            renderer.lineDashPattern = currentDashPattern()
+            renderer.lineJoin = .round
+            renderer.lineCap = .round
+            renderer.fillColor = currentStrokeColor().withAlphaComponent(0.15)
+            return renderer
+        }
+
+        private func currentStrokeColor() -> UIColor {
+            UIColor(parent.strokeColor)
+        }
+
+        private func currentLineWidth() -> CGFloat {
+            max(parent.lineWidth, 1)
+        }
+
+        private func currentDashPattern() -> [NSNumber]? {
+            guard parent.isDashed else { return nil }
+            let base = Double(max(parent.lineWidth, 1))
+            return [NSNumber(value: base * 3.0), NSNumber(value: base * 1.5)]
         }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
@@ -318,6 +405,33 @@ struct MapsView: View {
     @State private var showUserLocation = false
     @StateObject private var locationFetcher = LocationFetcher()
 
+    @State private var activeMarkupTool: MapMarkupTool = .pointer
+    @State private var activeMarkupShape: MapMarkupShape = .line
+    @State private var selectedStrokeColor: Color = .orange
+    @State private var selectedLineWidth: CGFloat = 4
+    @State private var isUndergroundRun = false
+
+    private struct MarkupColorOption: Identifiable {
+        let id: String
+        let color: Color
+        let accessibilityLabel: String
+    }
+
+    private let strokeColorOptions: [MarkupColorOption] = [
+        .init(id: "orange", color: .orange, accessibilityLabel: "Orange"),
+        .init(id: "blue", color: .blue, accessibilityLabel: "Blue"),
+        .init(id: "green", color: .green, accessibilityLabel: "Green"),
+        .init(id: "red", color: .red, accessibilityLabel: "Red"),
+        .init(id: "purple", color: .purple, accessibilityLabel: "Purple"),
+        .init(id: "yellow", color: .yellow, accessibilityLabel: "Yellow")
+    ]
+
+    private let strokeWidthOptions: [CGFloat] = [2, 4, 6, 8, 10]
+
+    private func isSelectedColor(_ option: MarkupColorOption) -> Bool {
+        UIColor(selectedStrokeColor).cgColor == UIColor(option.color).cgColor
+    }
+
     private func centerToDefaultAddress() {
         let req = MKLocalSearch.Request()
         req.naturalLanguageQuery = "1207 S College St, Trenton, TN 38382"
@@ -347,12 +461,23 @@ struct MapsView: View {
                     poles: $poles,
                     region: $region,
                     showUserLocation: $showUserLocation,
+                    markupTool: $activeMarkupTool,
+                    markupShape: $activeMarkupShape,
+                    strokeColor: $selectedStrokeColor,
+                    lineWidth: $selectedLineWidth,
+                    isDashed: $isUndergroundRun,
                     regionNonce: regionSetNonce,
-                    isInteractionEnabled: true,
+                    isInteractionEnabled: activeMarkupTool == .pointer,
                     mapType: mapTypes[mapTypeIndex],
-                    onTap: { coord in addPole(coord) },
-                    onInsertPole: insertPole,
-                    canInsert: { true },
+                    onTap: { coord in
+                        guard activeMarkupTool == .draw else { return }
+                        addPole(coord)
+                    },
+                    onInsertPole: { index, coord in
+                        guard activeMarkupTool == .draw else { return }
+                        insertPole(at: index, coord)
+                    },
+                    canInsert: { activeMarkupTool == .draw },
                     onSelectPole: { selectedPole = $0 }
                 )
                 .ignoresSafeArea()
@@ -511,8 +636,87 @@ struct MapsView: View {
     }
 
     @ViewBuilder
+    private var markupPalette: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            HStack(spacing: 8) {
+                Picker("Mode", selection: $activeMarkupTool) {
+                    ForEach(MapMarkupTool.allCases, id: \.self) { tool in
+                        Text(tool.displayName).tag(tool)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 200)
+
+                Picker("Shape", selection: $activeMarkupShape) {
+                    ForEach(MapMarkupShape.allCases, id: \.self) { shape in
+                        Text(shape.displayName).tag(shape)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 200)
+                .disabled(activeMarkupTool == .pointer)
+                .opacity(activeMarkupTool == .pointer ? 0.5 : 1)
+            }
+
+            HStack(spacing: 10) {
+                Label("Stroke", systemImage: "paintbrush.pointed")
+                    .labelStyle(.iconOnly)
+                    .foregroundColor(.secondary)
+
+                ForEach(strokeColorOptions) { option in
+                    Button {
+                        selectedStrokeColor = option.color
+                    } label: {
+                        Circle()
+                            .fill(option.color)
+                            .frame(width: 22, height: 22)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white, lineWidth: isSelectedColor(option) ? 3 : 1)
+                            )
+                            .shadow(radius: isSelectedColor(option) ? 3 : 0)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(option.accessibilityLabel))
+                }
+
+                Menu {
+                    ForEach(strokeWidthOptions, id: \.self) { width in
+                        Button {
+                            selectedLineWidth = width
+                        } label: {
+                            HStack {
+                                Text("\(Int(width)) pt")
+                                if selectedLineWidth == width {
+                                    Spacer()
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Label("\(Int(selectedLineWidth)) pt", systemImage: "line.3.horizontal.decrease.circle")
+                        .labelStyle(.titleAndIcon)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(.thinMaterial, in: Capsule())
+                }
+            }
+
+            Toggle(isOn: $isUndergroundRun) {
+                Label("Underground", systemImage: "waveform.path.dashed")
+            }
+            .toggleStyle(.switch)
+            .tint(.orange)
+        }
+        .padding(10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    @ViewBuilder
     private var controlOverlay: some View {
         VStack(alignment: .trailing, spacing: 8) {
+            markupPalette
             // Session banner + controls
             if let code = sessionID {
                 HStack(spacing: 8) {
