@@ -10,6 +10,9 @@ class JobsViewModel: ObservableObject {
     // Global search index: all jobs (used by JobSearchView to search across *everyone's* jobs)
     @Published var searchJobs: [Job] = []
 
+    // Track whether the initial snapshot for the current query has been received.
+    @Published var hasLoadedInitialJobs: Bool = false
+
     // NEW: robust sync state
     @Published var pendingWriteIDs: Set<String> = []   // which docs currently have local pending writes
     @Published var hasPendingWrites: Bool = false      // quick overall flag for UI
@@ -46,6 +49,8 @@ class JobsViewModel: ObservableObject {
     func fetchJobs(startDate: Date? = nil, endDate: Date? = nil) {
         listenerRegistration?.remove()
 
+        hasLoadedInitialJobs = false
+
         guard let me = currentUserID() else {
             // Not signed in – clear jobs and exit gracefully
             DispatchQueue.main.async {
@@ -53,6 +58,7 @@ class JobsViewModel: ObservableObject {
                 self.pendingWriteIDs = []
                 self.hasPendingWrites = false
                 self.lastServerSync = nil
+                self.hasLoadedInitialJobs = true
                 self.notifyJobsChanged()
             }
             return
@@ -74,9 +80,21 @@ class JobsViewModel: ObservableObject {
             guard let self = self else { return }
             if let error = error {
                 print("Error fetching jobs: \(error)")
+                DispatchQueue.main.async {
+                    if !self.hasLoadedInitialJobs {
+                        self.hasLoadedInitialJobs = true
+                    }
+                }
                 return
             }
-            guard let snapshot = snapshot else { return }
+            guard let snapshot = snapshot else {
+                DispatchQueue.main.async {
+                    if !self.hasLoadedInitialJobs {
+                        self.hasLoadedInitialJobs = true
+                    }
+                }
+                return
+            }
 
             var seen: Set<String> = []
             var pending: Set<String> = []
@@ -101,6 +119,10 @@ class JobsViewModel: ObservableObject {
 
                 if !snapshot.metadata.isFromCache && !self.hasPendingWrites {
                     self.lastServerSync = Date()
+                }
+
+                if !self.hasLoadedInitialJobs {
+                    self.hasLoadedInitialJobs = true
                 }
 
                 self.notifyJobsChanged()
