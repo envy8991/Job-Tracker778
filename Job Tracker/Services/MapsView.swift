@@ -101,6 +101,20 @@ struct Pole: Identifiable, Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
+struct RouteLegendEntry: Identifiable, Hashable {
+    let id: UUID
+    var title: String
+    var style: ShapeStyle
+    var representsArea: Bool
+
+    init(id: UUID = UUID(), title: String, style: ShapeStyle, representsArea: Bool = false) {
+        self.id = id
+        self.title = title
+        self.style = style
+        self.representsArea = representsArea
+    }
+}
+
 // MARK: - MapCanvas (UIKit MapKit wrapper)
 struct MapCanvas: UIViewRepresentable {
     @Binding var poles: [Pole]
@@ -294,6 +308,8 @@ struct MapsView: View {
     @State private var regionSetNonce = 0
 
     @State private var poles: [Pole] = []
+    @State private var markups: [MapShape] = []
+    @State private var markupLegendEntries: [RouteLegendEntry] = []
     @State private var totalDistance: Double = 0
     @State private var showingHelp = false
     @State private var selectedPole: Pole?
@@ -489,25 +505,128 @@ struct MapsView: View {
         options.region = region
         options.size = CGSize(width: 800, height: 800)
 
+        let currentPoles = poles
+        let currentMarkups = markups
+        let currentLegendEntries = markupLegendEntries
+        let currentDistance = totalDistance
+
         MKMapSnapshotter(options: options).start { snapshot, _ in
             guard let snapshot = snapshot else { return }
             let image = UIGraphicsImageRenderer(size: options.size).image { ctx in
                 snapshot.image.draw(at: .zero)
-                if poles.count > 1 {
-                    ctx.cgContext.setStrokeColor(UIColor.systemOrange.cgColor)
-                    ctx.cgContext.setLineWidth(4)
-                    let pts = poles.map(\.coordinate).map { snapshot.point(for: $0) }
-                    ctx.cgContext.addLines(between: pts)
-                    ctx.cgContext.strokePath()
+                let cgContext = ctx.cgContext
+
+                if currentPoles.count > 1 {
+                    cgContext.saveGState()
+                    cgContext.setStrokeColor(UIColor.systemOrange.cgColor)
+                    cgContext.setLineWidth(4)
+                    let pts = currentPoles.map(\.coordinate).map { snapshot.point(for: $0) }
+                    cgContext.addLines(between: pts)
+                    cgContext.strokePath()
+                    cgContext.restoreGState()
+                }
+
+                currentMarkups.forEach { markup in
+                    render(markup: markup, on: cgContext, snapshot: snapshot)
                 }
             }
+
             if let url = RoutePDFGenerator.generate(
-                poles: poles, mapImage: image, totalDistance: totalDistance
+                poles: currentPoles,
+                markups: currentMarkups,
+                mapImage: image,
+                totalDistance: currentDistance,
+                legendEntries: currentLegendEntries
             ) {
-                pdfURL = url
-                showShareSheet = true
+                DispatchQueue.main.async {
+                    pdfURL = url
+                    showShareSheet = true
+                }
             }
         }
+    }
+
+    private func render(markup: MapShape, on context: CGContext, snapshot: MKMapSnapshotter.Snapshot) {
+        let style = markup.style
+        let strokeWidth = max(style.width, 0.5)
+
+        context.saveGState()
+        defer { context.restoreGState() }
+
+        context.setStrokeColor(style.color.cgColor)
+        context.setLineWidth(strokeWidth)
+        context.setLineJoin(.round)
+        context.setLineCap(.round)
+
+        if style.dashed {
+            let dashLength = max(strokeWidth * 2, 1)
+            context.setLineDash(phase: 0, lengths: [dashLength, dashLength])
+        } else {
+            context.setLineDash(phase: 0, lengths: [])
+        }
+
+        switch markup.kind {
+        case .polyline(let coords):
+            let points = coords.map { snapshot.point(for: $0) }
+            guard points.count > 1 else { return }
+            context.addLines(between: points)
+            context.strokePath()
+
+        case .polygon(let coords):
+            let points = coords.map { snapshot.point(for: $0) }
+            guard let first = points.first else { return }
+            context.beginPath()
+            context.move(to: first)
+            for pt in points.dropFirst() {
+                context.addLine(to: pt)
+            }
+            context.closePath()
+            context.setFillColor(fillColor(for: style.color).cgColor)
+            context.drawPath(using: .fillStroke)
+
+        case .circle(let center, let radius):
+            let centerPoint = snapshot.point(for: center)
+            let edgeCoord = offsetCoordinate(center, metersEast: radius, metersNorth: 0)
+            let edgePoint = snapshot.point(for: edgeCoord)
+            let radiusPixels = hypot(edgePoint.x - centerPoint.x, edgePoint.y - centerPoint.y)
+            let rect = CGRect(x: centerPoint.x - radiusPixels,
+                              y: centerPoint.y - radiusPixels,
+                              width: radiusPixels * 2,
+                              height: radiusPixels * 2)
+            context.setFillColor(fillColor(for: style.color).cgColor)
+            context.addEllipse(in: rect)
+            context.drawPath(using: .fillStroke)
+
+        case .label(let coord, let text):
+            let point = snapshot.point(for: coord)
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 12, weight: .semibold),
+                .foregroundColor: style.color
+            ]
+            (text as NSString).draw(at: CGPoint(x: point.x + 4, y: point.y - 8), withAttributes: attributes)
+        }
+    }
+
+    private func offsetCoordinate(_ coordinate: CLLocationCoordinate2D,
+                                  metersEast east: CLLocationDistance,
+                                  metersNorth north: CLLocationDistance) -> CLLocationCoordinate2D {
+        let earthRadius = 6_378_137.0
+        let deltaLat = north / earthRadius
+        let deltaLon = east / (earthRadius * cos(coordinate.latitude * .pi / 180))
+        let newLat = coordinate.latitude + deltaLat * 180 / .pi
+        let newLon = coordinate.longitude + deltaLon * 180 / .pi
+        return CLLocationCoordinate2D(latitude: newLat, longitude: newLon)
+    }
+
+    private func fillColor(for color: UIColor) -> UIColor {
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        let resolved = color.resolvedColor(with: .current)
+        resolved.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let finalAlpha = min(max(a, 0.2), 0.6)
+        return UIColor(red: r, green: g, blue: b, alpha: finalAlpha)
     }
 
     @ViewBuilder
@@ -938,7 +1057,13 @@ struct MapsView: View {
 
     // MARK: - Route PDF Generator
     struct RoutePDFGenerator {
-        static func generate(poles: [Pole], mapImage: UIImage, totalDistance: Double) -> URL? {
+        static func generate(
+            poles: [Pole],
+            markups: [MapShape],
+            mapImage: UIImage,
+            totalDistance: Double,
+            legendEntries: [RouteLegendEntry] = []
+        ) -> URL? {
             let pdfMeta = [
                 kCGPDFContextCreator: "Job Tracker",
                 kCGPDFContextAuthor:  "Route Mapper"
@@ -947,15 +1072,31 @@ struct MapsView: View {
                 .appendingPathComponent("Route_\(UUID().uuidString).pdf")
             UIGraphicsBeginPDFContextToFile(tmpURL.path, .zero, pdfMeta as [NSObject:AnyObject])
             UIGraphicsBeginPDFPage()
+
             let title = "Route Map"
             title.draw(at: CGPoint(x: 40, y: 40),
                        withAttributes: [.font: UIFont.boldSystemFont(ofSize: 24)])
-            mapImage.draw(in: CGRect(x: 40, y: 80, width: 500, height: 500))
-            var rowY = 600
-            "Pole | Assignment | CAN | Footage | Notes"
-                .draw(at: CGPoint(x: 40, y: rowY),
-                      withAttributes: [.font: UIFont.boldSystemFont(ofSize: 14)])
+
+            let mapRect = CGRect(x: 40, y: 80, width: 500, height: 500)
+            mapImage.draw(in: mapRect)
+
+            var rowY = Int(mapRect.maxY + 20)
+
+            if !legendEntries.isEmpty, let ctx = UIGraphicsGetCurrentContext() {
+                drawLegend(legendEntries, startY: &rowY, context: ctx)
+            }
+
+            let headerAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.boldSystemFont(ofSize: 14)
+            ]
+            let rowAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 12)
+            ]
+
+            ("Pole | Assignment | CAN | Footage | Notes" as NSString)
+                .draw(at: CGPoint(x: 40, y: CGFloat(rowY)), withAttributes: headerAttributes)
             rowY += 24
+
             for (i, pole) in poles.enumerated() {
                 let footageStr: String = {
                     if let ft = pole.footageFeet {
@@ -965,18 +1106,92 @@ struct MapsView: View {
                     }
                     return "—"
                 }()
-                let line = "\(i+1) | \(pole.assignment.isEmpty ? "—" : pole.assignment) | \(pole.canAtLocation ? "Yes" : "No") | \(footageStr) | \(pole.notes)"
-                line.draw(at: CGPoint(x: 40, y: rowY),
-                          withAttributes: [.font: UIFont.systemFont(ofSize: 12)])
+                let assignment = pole.assignment.isEmpty ? "—" : pole.assignment
+                let line = "\(i + 1) | \(assignment) | \(pole.canAtLocation ? "Yes" : "No") | \(footageStr) | \(pole.notes)"
+                (line as NSString).draw(at: CGPoint(x: 40, y: CGFloat(rowY)), withAttributes: rowAttributes)
                 rowY += 18
             }
+
             let len = LengthFormatter()
             len.unitStyle = .short
             let totalStr = "Total: \(len.string(fromMeters: totalDistance))"
-            totalStr.draw(at: CGPoint(x: 40, y: rowY+20),
-                          withAttributes: [.font: UIFont.boldSystemFont(ofSize: 14)])
+            let summaryAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.boldSystemFont(ofSize: 14)
+            ]
+            (totalStr as NSString).draw(at: CGPoint(x: 40, y: CGFloat(rowY + 20)), withAttributes: summaryAttributes)
+
+            if !markups.isEmpty {
+                let markupSummary = "Markup Shapes: \(markups.count)"
+                let markupAttributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 12),
+                    .foregroundColor: UIColor.secondaryLabel
+                ]
+                (markupSummary as NSString)
+                    .draw(at: CGPoint(x: 40, y: CGFloat(rowY + 40)), withAttributes: markupAttributes)
+            }
+
             UIGraphicsEndPDFContext()
             return tmpURL
+        }
+
+        private static func drawLegend(_ entries: [RouteLegendEntry], startY: inout Int, context: CGContext) {
+            let titleAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.boldSystemFont(ofSize: 14)
+            ]
+            ("Legend" as NSString).draw(at: CGPoint(x: 40, y: CGFloat(startY)), withAttributes: titleAttributes)
+            startY += 18
+
+            let labelAttributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 12),
+                .foregroundColor: UIColor.label
+            ]
+            let iconSize = CGSize(width: 40, height: 12)
+
+            for entry in entries {
+                let y = CGFloat(startY)
+                let iconRect = CGRect(x: 40, y: y, width: iconSize.width, height: iconSize.height)
+                context.saveGState()
+                let strokeWidth = max(entry.style.width, 0.5)
+                context.setLineWidth(strokeWidth)
+                context.setLineJoin(.round)
+                context.setLineCap(.round)
+                context.setStrokeColor(entry.style.color.cgColor)
+                if entry.style.dashed {
+                    let dash = max(strokeWidth * 2, 1)
+                    context.setLineDash(phase: 0, lengths: [dash, dash])
+                } else {
+                    context.setLineDash(phase: 0, lengths: [])
+                }
+
+                if entry.representsArea {
+                    context.setFillColor(fillColor(for: entry.style.color).cgColor)
+                    context.addRect(iconRect)
+                    context.drawPath(using: .fillStroke)
+                } else {
+                    let midY = iconRect.midY
+                    context.move(to: CGPoint(x: iconRect.minX, y: midY))
+                    context.addLine(to: CGPoint(x: iconRect.maxX, y: midY))
+                    context.strokePath()
+                }
+                context.restoreGState()
+
+                (entry.title as NSString)
+                    .draw(at: CGPoint(x: iconRect.maxX + 8, y: y - 2), withAttributes: labelAttributes)
+                startY += Int(iconSize.height + 8)
+            }
+
+            startY += 6
+        }
+
+        private static func fillColor(for color: UIColor) -> UIColor {
+            var r: CGFloat = 0
+            var g: CGFloat = 0
+            var b: CGFloat = 0
+            var a: CGFloat = 0
+            let resolved = color.resolvedColor(with: .current)
+            resolved.getRed(&r, green: &g, blue: &b, alpha: &a)
+            let finalAlpha = min(max(a, 0.2), 0.6)
+            return UIColor(red: r, green: g, blue: b, alpha: finalAlpha)
         }
     }
 
