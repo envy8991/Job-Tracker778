@@ -278,7 +278,7 @@ struct MapCanvas: UIViewRepresentable {
 
         init(parent: MapCanvas) { self.parent = parent }
 
-        private var routeOverlay: MKOverlay?
+        private var routeOverlay: MKPolyline?
 
         private final class PoleAnnotation: MKPointAnnotation {
             let poleID: UUID
@@ -312,33 +312,32 @@ struct MapCanvas: UIViewRepresentable {
             let anns = poles.map { PoleAnnotation(id: $0.id, coordinate: $0.coordinate) }
             map.addAnnotations(anns)
 
-            if let old = routeOverlay { map.removeOverlay(old) }
-            routeOverlay = nil
+            if let old = routeOverlay {
+                map.removeOverlay(old)
+                routeOverlay = nil
+            }
 
             let coords = poles.map(\.coordinate)
-            guard coords.count > 1 else { return }
-
-            let overlay: MKOverlay
-            if parent.markupShape == .polygon, coords.count >= 3 {
-                overlay = MKPolygon(coordinates: coords, count: coords.count)
-            } else {
-                overlay = MKPolyline(coordinates: coords, count: coords.count)
+            guard coords.count >= 2 else {
+                routeOverlay = nil
+                return
             }
-            routeOverlay = overlay
-            map.addOverlay(overlay)
+
+            let polyline = MKPolyline(coordinates: coords, count: coords.count)
+            routeOverlay = polyline
+            map.addOverlay(polyline)
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            guard let currentOverlay = routeOverlay else {
-                return MKOverlayRenderer(overlay: overlay)
-            }
-
-            if let pl = overlay as? MKPolyline, let active = currentOverlay as? MKPolyline, pl === active {
-                return configuredPolylineRenderer(pl)
-            }
-
-            if let polygon = overlay as? MKPolygon, let active = currentOverlay as? MKPolygon, polygon === active {
-                return configuredPolygonRenderer(polygon)
+            if let routeOverlay,
+               let polyline = overlay as? MKPolyline,
+               polyline === routeOverlay {
+                let renderer = MKPolylineRenderer(polyline: polyline)
+                renderer.strokeColor = .systemOrange
+                renderer.lineWidth = 4
+                renderer.lineJoin = .round
+                renderer.lineCap = .round
+                return renderer
             }
 
             return MKOverlayRenderer(overlay: overlay)
