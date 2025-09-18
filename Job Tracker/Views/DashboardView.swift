@@ -486,6 +486,19 @@ extension DashboardView {
             .frame(maxWidth: .infinity)
 
             Button {
+                guard jobsViewModel.hasLoadedInitialJobs else {
+                    importToastIsError = true
+                    importToastMessage = "Jobs are still loading…"
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
+                        showImportToast = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            showImportToast = false
+                        }
+                    }
+                    return
+                }
                 prepareShareItems()
             } label: {
                 Image(systemName: "square.and.arrow.up")
@@ -533,6 +546,7 @@ extension DashboardView {
     }
     /// Build the items array for UIActivityViewController: summary text + any job images/links.
     private func prepareShareItems(limitImages: Int = 20) {
+        guard jobsViewModel.hasLoadedInitialJobs else { return }
         // Keep the same text summary you already had
         let text = shareText()
         var items: [Any] = [text]
