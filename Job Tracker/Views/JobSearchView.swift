@@ -73,44 +73,23 @@ struct JobSearchView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                // Same gradient used app-wide
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.17254902, green: 0.24313726, blue: 0.3137255, opacity: 1),
-                        Color(red: 0.29803923, green: 0.6313726, blue: 0.6862745, opacity: 1)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+                JTGradients.background
+                    .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(spacing: 20) {
-                        // Title row
+                    VStack(spacing: JTSpacing.lg) {
                         Text("Search Jobs")
-                            .font(.largeTitle.bold())
+                            .font(JTTypography.screenTitle)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(JTColors.textPrimary)
 
-                        // Inline search bar (so the hamburger button never overlaps it)
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundStyle(.white.opacity(0.9))
-                            TextField("Address, #, status, user…", text: $searchText)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                        }
-                        .padding(12)
-                        .background(
-                            .ultraThinMaterial,
-                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        )
+                        JTTextField("Address, #, status, user…", text: $searchText, icon: "magnifyingglass")
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
 
-                        // Results/content
                         resultsContent
                     }
-                    .padding(16)
-                    
+                    .padding(JTSpacing.lg)
                 }
             }
         }
@@ -124,42 +103,44 @@ struct JobSearchView: View {
     @ViewBuilder
     private var resultsContent: some View {
         if searchText.isEmpty {
-            VStack(spacing: 16) {
+            VStack(spacing: JTSpacing.md) {
                 Spacer(minLength: 40)
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 42, weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.white.opacity(0.8))
+                    .foregroundStyle(JTColors.textSecondary)
                 Text("Search all jobs")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .font(JTTypography.title3)
+                    .foregroundStyle(JTColors.textPrimary)
                 Text("Type part of an address, job #, status (e.g. \"Completed\"), or the name of the person who added it — results include jobs from all users.")
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.white.opacity(0.9))
-                    .padding(.horizontal, 24)
+                    .font(JTTypography.body)
+                    .foregroundStyle(JTColors.textSecondary)
+                    .padding(.horizontal, JTSpacing.xl)
                 Spacer(minLength: 20)
             }
         } else if aggregatedResults.isEmpty {
-            VStack(spacing: 12) {
+            VStack(spacing: JTSpacing.sm) {
                 Spacer(minLength: 40)
                 Text("No jobs found for “\(searchText)”")
-                    .font(.headline)
-                    .foregroundStyle(.white)
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.textPrimary)
                 Text("Try fewer keywords, or search by street, city, job #, status, or creator name.")
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.white.opacity(0.9))
-                    .padding(.horizontal, 24)
+                    .font(JTTypography.body)
+                    .foregroundStyle(JTColors.textSecondary)
+                    .padding(.horizontal, JTSpacing.xl)
                 Spacer(minLength: 20)
             }
         } else {
-            LazyVStack(spacing: 14) {
+            LazyVStack(spacing: JTSpacing.md) {
                 ForEach(aggregatedResults) { agg in
                     NavigationLink {
                         AggregatedDetailView(aggregate: agg)
                             .environmentObject(usersViewModel)
                     } label: {
                         AggregatedJobCard(aggregate: agg)
-                            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .contentShape(JTShapes.roundedRectangle(cornerRadius: JTShapes.smallCardCornerRadius))
                     }
                     .buttonStyle(.plain)
                 }
@@ -210,33 +191,34 @@ private struct JobRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
                 Text(job.address)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .font(JTTypography.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(JTColors.textPrimary)
                     .lineLimit(2)
                 Spacer(minLength: 8)
                 if let num = job.jobNumber, !num.isEmpty {
                     Text("#\(num)")
-                        .font(.caption2.monospaced())
+                        .font(JTTypography.caption)
                         .padding(.vertical, 3)
                         .padding(.horizontal, 6)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .foregroundStyle(.white)
+                        .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
+                        .foregroundStyle(JTColors.textPrimary)
                 }
             }
 
             HStack(spacing: 10) {
                 Label(job.status, systemImage: "checkmark.seal")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.9))
+                    .font(JTTypography.caption)
+                    .foregroundStyle(JTColors.textSecondary)
                 Text(job.date, style: .date)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.9))
+                    .font(JTTypography.caption)
+                    .foregroundStyle(JTColors.textSecondary)
                 if let creator {
                     Text("·")
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(JTColors.textMuted)
                     Text("\(creator.firstName) \(creator.lastName)")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.8))
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
                 }
             }
         }
@@ -250,88 +232,80 @@ private struct AggregatedJobCard: View {
 
     private func statusColor(_ status: String) -> Color {
         switch status.lowercased() {
-        case "done", "completed": return Color.green.opacity(0.9)
-        case "pending": return Color.yellow.opacity(0.9)
-        default: return Color.blue.opacity(0.9)
+        case "done", "completed": return JTColors.success
+        case "pending": return JTColors.warning
+        default: return JTColors.info
         }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Title
-            HStack(alignment: .firstTextBaseline) {
-                Text(aggregate.address)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                Spacer(minLength: 8)
-                if !aggregate.jobNumber.isEmpty {
-                    Text("#\(aggregate.jobNumber)")
-                        .font(.caption2.monospaced())
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .foregroundStyle(.white)
+        GlassCard(cornerRadius: JTShapes.smallCardCornerRadius,
+                  strokeColor: JTColors.glassSoftStroke,
+                  shadow: JTShadow.none) {
+            VStack(alignment: .leading, spacing: JTSpacing.sm) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(aggregate.address)
+                        .font(JTTypography.headline)
+                        .foregroundStyle(JTColors.textPrimary)
+                        .lineLimit(2)
+                    Spacer(minLength: JTSpacing.sm)
+                    if !aggregate.jobNumber.isEmpty {
+                        Text("#\(aggregate.jobNumber)")
+                            .font(JTTypography.caption)
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 8)
+                            .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
+                            .foregroundStyle(JTColors.textPrimary)
+                    }
                 }
-            }
 
-            // Most recent line
-            if let recent = aggregate.jobs.first {
-                HStack(spacing: 10) {
-                    Label(recent.status, systemImage: "checkmark.seal")
-                        .font(.caption)
-                        .foregroundStyle(statusColor(recent.status))
-                    Text(recent.date, style: .date)
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.9))
+                if let recent = aggregate.jobs.first {
+                    HStack(spacing: JTSpacing.sm) {
+                        Label(recent.status, systemImage: "checkmark.seal")
+                            .font(JTTypography.caption)
+                            .foregroundStyle(statusColor(recent.status))
+                        Text(recent.date, style: .date)
+                            .font(JTTypography.caption)
+                            .foregroundStyle(JTColors.textSecondary)
+                    }
                 }
-            }
 
-            // Creators (unique)
-            if !aggregate.creators.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(aggregate.creators, id: \.id) { u in
-                            Text("\(u.firstName) \(u.lastName)")
-                                .font(.caption2)
-                                .padding(.vertical, 4)
-                                .padding(.horizontal, 8)
-                                .background(Color.white.opacity(0.12), in: Capsule())
-                                .foregroundStyle(.white)
+                if !aggregate.creators.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: JTSpacing.xs) {
+                            ForEach(aggregate.creators, id: \.id) { u in
+                                Text("\(u.firstName) \(u.lastName)")
+                                    .font(JTTypography.caption)
+                                    .padding(.vertical, 4)
+                                    .padding(.horizontal, 8)
+                                    .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
+                                    .foregroundStyle(JTColors.textPrimary)
+                            }
                         }
                     }
                 }
-            }
 
-            // If duplicates exist, show a tiny summary row
-            if aggregate.jobs.count > 1 {
-                HStack(spacing: 6) {
-                    Image(systemName: "square.stack.3d.down.right")
-                        .imageScale(.small)
-                        .foregroundStyle(.white.opacity(0.8))
-                    Text("\(aggregate.jobs.count) entries – latest shown")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.8))
+                if aggregate.jobs.count > 1 {
+                    HStack(spacing: JTSpacing.xs) {
+                        Image(systemName: "square.stack.3d.down.right")
+                            .imageScale(.small)
+                            .foregroundStyle(JTColors.textSecondary)
+                        Text("\(aggregate.jobs.count) entries – latest shown")
+                            .font(JTTypography.caption)
+                            .foregroundStyle(JTColors.textSecondary)
+                    }
                 }
             }
+            .padding(JTSpacing.md)
         }
         .overlay(
             HStack {
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .foregroundStyle(.white.opacity(0.6))
-                    .padding(.trailing, 10)
+                    .foregroundStyle(JTColors.textMuted)
+                    .padding(.trailing, JTSpacing.md)
             }
         )
-        .background(
-            .ultraThinMaterial,
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.06))
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -347,81 +321,69 @@ private struct AggregatedDetailView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.17254902, green: 0.24313726, blue: 0.3137255, opacity: 1),
-                    Color(red: 0.29803923, green: 0.6313726, blue: 0.6862745, opacity: 1)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            JTGradients.background
+                .ignoresSafeArea()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: JTSpacing.lg) {
                     // Header
                     VStack(alignment: .leading, spacing: 8) {
                         Text(aggregate.address)
-                            .font(.largeTitle.bold())
-                            .foregroundStyle(.white)
+                            .font(JTTypography.screenTitle)
+                            .foregroundStyle(JTColors.textPrimary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         if !aggregate.jobNumber.isEmpty {
                             Text("#\(aggregate.jobNumber)")
-                                .font(.caption.monospaced())
+                                .font(JTTypography.caption)
                                 .padding(.vertical, 4)
                                 .padding(.horizontal, 8)
-                                .background(.ultraThinMaterial, in: Capsule())
-                                .foregroundStyle(.white)
+                                .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
+                                .foregroundStyle(JTColors.textPrimary)
                         }
 
                         if !aggregate.creators.isEmpty {
-                            HStack(spacing: 6) {
+                            HStack(spacing: JTSpacing.xs) {
                                 Image(systemName: "person.2")
-                                    .foregroundStyle(.white.opacity(0.9))
+                                    .foregroundStyle(JTColors.textSecondary)
                                 Text("\(aggregate.creators.count) contributor\(aggregate.creators.count == 1 ? "" : "s")")
-                                    .foregroundStyle(.white.opacity(0.9))
-                                    .font(.subheadline)
+                                    .foregroundStyle(JTColors.textSecondary)
+                                    .font(JTTypography.subheadline)
                             }
                         }
                     }
 
                     // Timeline of all entries (newest first)
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: JTSpacing.md) {
                         ForEach(aggregate.jobs, id: \.id) { job in
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack(alignment: .firstTextBaseline) {
-                                    Text(job.status)
-                                        .font(.headline)
-                                        .foregroundStyle(.white)
-                                    Spacer()
-                                    Text(job.date, style: .date)
-                                        .font(.caption)
-                                        .foregroundStyle(.white.opacity(0.8))
-                                }
-
-                                if let u = creator(for: job) {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "person.crop.circle")
-                                        Text("\(u.firstName) \(u.lastName)")
+                            GlassCard(cornerRadius: JTShapes.smallCardCornerRadius,
+                                      strokeColor: JTColors.glassSoftStroke,
+                                      shadow: JTShadow.none) {
+                                VStack(alignment: .leading, spacing: JTSpacing.sm) {
+                                    HStack(alignment: .firstTextBaseline) {
+                                        Text(job.status)
+                                            .font(JTTypography.headline)
+                                            .foregroundStyle(JTColors.textPrimary)
+                                        Spacer()
+                                        Text(job.date, style: .date)
+                                            .font(JTTypography.caption)
+                                            .foregroundStyle(JTColors.textSecondary)
                                     }
-                                    .font(.caption)
-                                    .foregroundStyle(.white.opacity(0.9))
-                                }
 
-                                // You can add more fields here if your Job model has them (e.g., notes, photos)
-                                // Example (safe-guarded):
-                                // if let notes = job.notes, !notes.isEmpty { Text(notes) ... }
+                                    if let u = creator(for: job) {
+                                        HStack(spacing: JTSpacing.xs) {
+                                            Image(systemName: "person.crop.circle")
+                                            Text("\(u.firstName) \(u.lastName)")
+                                        }
+                                        .font(JTTypography.caption)
+                                        .foregroundStyle(JTColors.textSecondary)
+                                    }
+                                }
+                                .padding(JTSpacing.md)
                             }
-                            .padding(12)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.white.opacity(0.06))
-                            )
                         }
                     }
                 }
-                .padding(16)
+                .padding(JTSpacing.lg)
             }
         }
         .navigationBarTitleDisplayMode(.inline)

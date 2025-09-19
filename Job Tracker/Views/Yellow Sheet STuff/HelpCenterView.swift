@@ -8,27 +8,6 @@ import CoreLocation   // for distance / CLLocation
 import SwiftUI
 import UIKit // for UIImage in share attachments
 
-// Local glass card style to avoid relying on fileprivate symbols from other files
-private struct HelpGlassCard: ViewModifier {
-    var cornerRadius: CGFloat = 14
-    func body(content: Content) -> some View {
-        content
-            .background(
-                .ultraThinMaterial,
-                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
-            )
-    }
-}
-private extension View {
-    func helpGlassCard(cornerRadius: CGFloat = 14) -> some View {
-        modifier(HelpGlassCard(cornerRadius: cornerRadius))
-    }
-}
-
 // MARK: – Help Center
 struct HelpCenterView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
@@ -175,84 +154,61 @@ struct HelpCenterView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // Match your app’s gradient
-            LinearGradient(
-                colors: [Color(red: 0.10, green: 0.14, blue: 0.18),
-                         Color(red: 0.20, green: 0.45, blue: 0.55)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            JTGradients.background
+                .ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 16) {
-                    // Header + search
-                    VStack(spacing: 10) {
+                VStack(spacing: JTSpacing.lg) {
+                    VStack(alignment: .leading, spacing: JTSpacing.sm) {
                         Text("Help Center")
-                            .font(.largeTitle.bold())
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .foregroundStyle(.white)
+                            .font(JTTypography.screenTitle)
+                            .foregroundStyle(JTColors.textPrimary)
 
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                            TextField("Search help…", text: $query)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                        }
-                        .padding(12)
-                        .background(.ultraThinMaterial,
-                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        JTTextField("Search help…", text: $query, icon: "magnifyingglass")
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
                     }
 
-                   
-
-                    // Adaptive grid (great on iPad)
-                    let columns = [GridItem(.adaptive(minimum: 280), spacing: 12)]
-                    LazyVGrid(columns: columns, spacing: 12) {
+                    let columns = [GridItem(.adaptive(minimum: 280), spacing: JTSpacing.md)]
+                    LazyVGrid(columns: columns, spacing: JTSpacing.md) {
                         ForEach(filteredTopics) { topic in
                             Button { selectedTopic = topic } label: {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Label(topic.title, systemImage: topic.icon)
-                                        .font(.headline)
-                                        .foregroundStyle(.white)
-                                    Text(topic.summary)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.white.opacity(0.85))
-                                        .fixedSize(horizontal: false, vertical: true)
+                                GlassCard(cornerRadius: JTShapes.largeCardCornerRadius) {
+                                    VStack(alignment: .leading, spacing: JTSpacing.sm) {
+                                        Label(topic.title, systemImage: topic.icon)
+                                            .font(JTTypography.headline)
+                                            .foregroundStyle(JTColors.textPrimary)
+                                        Text(topic.summary)
+                                            .font(JTTypography.subheadline)
+                                            .foregroundStyle(JTColors.textSecondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(JTSpacing.md)
                                 }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(14)
                             }
                             .buttonStyle(.plain)
-                            .helpGlassCard(cornerRadius: 16)
                         }
                     }
 
-                    // Support block
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Need more help?")
-                            .font(.title3.bold())
-                            .foregroundStyle(.white)
-                        Text("Tap a topic for step‑by‑step instructions. Remember: jobs marked **In Progress** or **Done** are auto‑included in **Timesheets** and **Yellow Sheet** for the appropriate week.")
-                            .foregroundStyle(.white.opacity(0.8))
+                    GlassCard(cornerRadius: JTShapes.largeCardCornerRadius) {
+                        VStack(alignment: .leading, spacing: JTSpacing.md) {
+                            Text("Need more help?")
+                                .font(JTTypography.title3)
+                                .foregroundStyle(JTColors.textPrimary)
+                            Text("Tap a topic for step‑by‑step instructions. Remember: jobs marked **In Progress** or **Done** are auto‑included in **Timesheets** and **Yellow Sheet** for the appropriate week.")
+                                .foregroundStyle(JTColors.textSecondary)
 
-                        HStack(spacing: 12) {
-                            Button {
+                            JTPrimaryButton("Email Support", systemImage: "envelope.fill") {
                                 if let url = URL(string: "mailto:support@example.com") {
                                     UIApplication.shared.open(url)
                                 }
-                            } label: {
-                                Label("Email Support", systemImage: "envelope.fill")
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
                             }
-                            .helpGlassCard(cornerRadius: 14)
-
-                            
                         }
+                        .padding(JTSpacing.lg)
                     }
                 }
-                .padding(16)
+                .padding(JTSpacing.lg)
             }
         }
         .sheet(isPresented: $showingCreateJob) {
@@ -277,11 +233,11 @@ struct HelpCenterView: View {
         var body: some View {
             NavigationView {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: JTSpacing.md) {
                         Label(topic.title, systemImage: topic.icon)
                             .font(.title2.bold())
                         ForEach(topic.bullets, id: \.self) { line in
-                            HStack(alignment: .top, spacing: 8) {
+                            HStack(alignment: .top, spacing: JTSpacing.sm) {
                                 Image(systemName: "checkmark.circle")
                                     .imageScale(.small)
                                     .foregroundStyle(.green)
@@ -290,19 +246,14 @@ struct HelpCenterView: View {
                             }
                         }
                         if let action = topic.action {
-                            Button {
+                            JTPrimaryButton("Try it now", systemImage: "arrow.right.circle.fill") {
                                 action()
                                 dismiss()
-                            } label: {
-                                Label("Try it now", systemImage: "arrow.right.circle.fill")
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
                             }
-                            .helpGlassCard(cornerRadius: 14)
-                            .padding(.top, 8)
+                            .padding(.top, JTSpacing.md)
                         }
                     }
-                    .padding()
+                    .padding(JTSpacing.lg)
                 }
                 .navigationTitle("Guide")
                 .toolbar {
