@@ -45,7 +45,6 @@ struct DashboardWeekdayPicker: View {
     )
     .padding()
     .background(JTGradients.background.ignoresSafeArea())
-    .previewDevice(PreviewDevice(rawValue: "iPhone 15 Pro"))
 }
 
 #Preview("Weekday Picker – iPad") {
@@ -57,5 +56,4 @@ struct DashboardWeekdayPicker: View {
     .padding()
     .frame(maxWidth: 600)
     .background(JTGradients.background.ignoresSafeArea())
-    .previewDevice(PreviewDevice(rawValue: "iPad Pro (11-inch) (4th generation)"))
 }

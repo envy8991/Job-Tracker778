@@ -50,15 +50,12 @@ private struct DashboardDatePickerSheetPreviewContainer: View {
 
 #Preview("Date Picker Sheet") {
     DashboardDatePickerSheetPreviewContainer()
-        .previewDevice(PreviewDevice(rawValue: "iPhone 15 Pro"))
 }
 
 #Preview("Daily Share Sheet") {
     DashboardDailyShareSheet(items: [NSString(string: "Jobs for May 1, 2025" )], subject: "Jobs for May 1, 2025")
-        .previewDevice(PreviewDevice(rawValue: "iPad Pro (11-inch) (4th generation)"))
 }
 
 #Preview("Job Share Sheet") {
     DashboardJobShareSheet(url: URL(string: "https://example.com/job")!, subject: "Job link for May 1, 2025")
-        .previewDevice(PreviewDevice(rawValue: "iPhone 15 Pro"))
 }

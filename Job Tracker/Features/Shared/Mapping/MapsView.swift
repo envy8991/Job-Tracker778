@@ -1413,8 +1413,8 @@ struct MapsView: View {
                 get: { pendingMarkupDeletion != nil },
                 set: { newValue in if !newValue { pendingMarkupDeletion = nil } }
             ),
-            presenting: pendingMarkupDeletion,
-            titleVisibility: .visible
+            titleVisibility: .visible,
+            presenting: pendingMarkupDeletion
         ) { action in
             Button(action.confirmButtonTitle, role: .destructive) {
                 performMarkupDeletion(action)

@@ -415,7 +415,7 @@ class FirebaseService {
         db.runTransaction({ txn, errorPointer in
             do {
                 let snap = try txn.getDocument(ref)
-                guard var data = snap.data() else {
+                guard let data = snap.data() else {
                     throw NSError(domain: "FirebaseService", code: 404, userInfo: [NSLocalizedDescriptionKey: "Job not found"])
                 }
                 var participants = data["participants"] as? [String] ?? []

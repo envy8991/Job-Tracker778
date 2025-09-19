@@ -104,13 +104,11 @@ struct WaterWave: Shape {
     DashboardSyncBanner(done: 2, total: 5, inFlight: 1, phase: 0.3)
         .padding(.vertical)
         .background(JTGradients.background.ignoresSafeArea())
-        .previewDevice(PreviewDevice(rawValue: "iPhone 15 Pro"))
 }
 
 #Preview("Sync Banner – Complete") {
     DashboardSyncBanner(done: 5, total: 5, inFlight: 0, phase: 0.9)
         .padding(.vertical)
         .background(JTGradients.background.ignoresSafeArea())
-        .previewDevice(PreviewDevice(rawValue: "iPad Pro (11-inch) (4th generation)"))
         .frame(maxWidth: 600)
 }

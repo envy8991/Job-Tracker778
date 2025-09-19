@@ -384,11 +384,9 @@ private struct DashboardJobSectionsPreviewContainer: View {
 
 #Preview("Job Sections – iPhone") {
     DashboardJobSectionsPreviewContainer()
-        .previewDevice(PreviewDevice(rawValue: "iPhone 15 Pro"))
 }
 
 #Preview("Job Sections – iPad") {
     DashboardJobSectionsPreviewContainer()
-        .previewDevice(PreviewDevice(rawValue: "iPad Pro (11-inch) (4th generation)"))
         .frame(maxWidth: 820)
 }
