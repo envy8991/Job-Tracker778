@@ -131,6 +131,17 @@ struct MarkupShape: Identifiable, Hashable {
         case line
         case polygon
         case freehand
+
+        var displayName: String {
+            switch self {
+            case .line:
+                return "Line"
+            case .polygon:
+                return "Polygon"
+            case .freehand:
+                return "Freehand"
+            }
+        }
     }
 
     let id: UUID
@@ -194,6 +205,7 @@ struct RouteLegendEntry: Identifiable, Hashable {
 struct MapCanvas: UIViewRepresentable {
     @Binding var poles: [Pole]
     @Binding var markups: [MarkupShape]
+    @Binding var selectedMarkupID: MarkupShape.ID?
     @Binding var activeMarkupPoints: [CLLocationCoordinate2D]
     @Binding var region: MKCoordinateRegion
     @Binding var showUserLocation: Bool
@@ -222,6 +234,7 @@ struct MapCanvas: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let mv = MKMapView()
         context.coordinator.parent = self
+        context.coordinator.selectedMarkupID = selectedMarkupID
         mv.delegate = context.coordinator
         mv.register(MKMarkerAnnotationView.self,
                     forAnnotationViewWithReuseIdentifier: "pin")
@@ -255,11 +268,13 @@ struct MapCanvas: UIViewRepresentable {
         mv.showsCompass = true
         mv.camera.heading = 0
         context.coordinator.syncInProgressMarkup(on: mv)
+        context.coordinator.applySelectionHighlight(on: mv)
         return mv
     }
 
     func updateUIView(_ mv: MKMapView, context: Context) {
         context.coordinator.parent = self
+        context.coordinator.selectedMarkupID = selectedMarkupID
         context.coordinator.tapGesture?.isEnabled = true
         context.coordinator.longPressGesture?.isEnabled = true
         if mv.mapType != mapType { mv.mapType = mapType }
@@ -279,12 +294,14 @@ struct MapCanvas: UIViewRepresentable {
 
         context.coordinator.syncPoles(poles, on: mv)
         context.coordinator.syncMarkups(markups, on: mv)
+        context.coordinator.applySelectionHighlight(on: mv)
         context.coordinator.syncInProgressMarkup(on: mv)
     }
 
     // MARK: - Coordinator
     class Coordinator: NSObject, MKMapViewDelegate {
         var parent: MapCanvas
+        var selectedMarkupID: MarkupShape.ID?
         var suppressRegionCallback = false
         var lastAppliedRegionNonce: Int = -1
         weak var tapGesture: UITapGestureRecognizer?
@@ -297,6 +314,126 @@ struct MapCanvas: UIViewRepresentable {
         private var inProgressMarkupPoints: [CLLocationCoordinate2D] = []
         private var markupOverlayCache: [UUID: (overlay: MKOverlay, shape: MarkupShape)] = [:]
         private var overlayShapeLookup: [ObjectIdentifier: MarkupShape] = [:]
+
+        private protocol HighlightableMarkupRenderer {
+            func updateAppearance(with shape: MarkupShape, highlighted: Bool)
+        }
+
+        private final class MarkupPolylineRenderer: MKPolylineRenderer, HighlightableMarkupRenderer {
+            private var shape: MarkupShape
+            private var isHighlighted: Bool
+
+            init(polyline: MKPolyline, shape: MarkupShape, highlighted: Bool) {
+                self.shape = shape
+                self.isHighlighted = highlighted
+                super.init(polyline: polyline)
+                applyBaseAppearance()
+            }
+
+            required init?(coder: NSCoder) {
+                fatalError("init(coder:) has not been implemented")
+            }
+
+            func updateAppearance(with shape: MarkupShape, highlighted: Bool) {
+                self.shape = shape
+                self.isHighlighted = highlighted
+                applyBaseAppearance()
+                setNeedsDisplay()
+            }
+
+            private func applyBaseAppearance() {
+                strokeColor = shape.strokeColor
+                let width = max(shape.lineWidth, 1)
+                lineWidth = width
+                lineDashPattern = dashPattern(for: width, dashed: shape.isDashed)
+                lineJoin = .round
+                lineCap = .round
+            }
+
+            private func dashPattern(for width: CGFloat, dashed: Bool) -> [NSNumber]? {
+                guard dashed else { return nil }
+                let base = Double(max(width, 1))
+                return [NSNumber(value: base * 3.0), NSNumber(value: base * 1.5)]
+            }
+
+            override func draw(_ mapRect: MKMapRect, zoomScale: MKZoomScale, in context: CGContext) {
+                if isHighlighted {
+                    let originalStroke = strokeColor
+                    let originalWidth = lineWidth
+                    let originalDash = lineDashPattern
+                    strokeColor = UIColor.systemYellow.withAlphaComponent(0.85)
+                    lineWidth = max(originalWidth + 6, originalWidth * 1.6)
+                    lineDashPattern = nil
+                    super.draw(mapRect, zoomScale: zoomScale, in: context)
+                    strokeColor = originalStroke
+                    lineWidth = originalWidth
+                    lineDashPattern = originalDash
+                }
+                super.draw(mapRect, zoomScale: zoomScale, in: context)
+            }
+        }
+
+        private final class MarkupPolygonRenderer: MKPolygonRenderer, HighlightableMarkupRenderer {
+            private var shape: MarkupShape
+            private var isHighlighted: Bool
+
+            init(polygon: MKPolygon, shape: MarkupShape, highlighted: Bool) {
+                self.shape = shape
+                self.isHighlighted = highlighted
+                super.init(polygon: polygon)
+                applyBaseAppearance()
+            }
+
+            required init?(coder: NSCoder) {
+                fatalError("init(coder:) has not been implemented")
+            }
+
+            func updateAppearance(with shape: MarkupShape, highlighted: Bool) {
+                self.shape = shape
+                self.isHighlighted = highlighted
+                applyBaseAppearance()
+                setNeedsDisplay()
+            }
+
+            private func applyBaseAppearance() {
+                strokeColor = shape.strokeColor
+                let width = max(shape.lineWidth, 1)
+                lineWidth = width
+                lineDashPattern = dashPattern(for: width, dashed: shape.isDashed)
+                lineJoin = .round
+                lineCap = .round
+                if let fill = shape.fillColor {
+                    fillColor = fill
+                } else {
+                    fillColor = shape.strokeColor.withAlphaComponent(0.15)
+                }
+            }
+
+            private func dashPattern(for width: CGFloat, dashed: Bool) -> [NSNumber]? {
+                guard dashed else { return nil }
+                let base = Double(max(width, 1))
+                return [NSNumber(value: base * 3.0), NSNumber(value: base * 1.5)]
+            }
+
+            override func draw(_ mapRect: MKMapRect, zoomScale: MKZoomScale, in context: CGContext) {
+                if isHighlighted {
+                    let originalStroke = strokeColor
+                    let originalWidth = lineWidth
+                    let originalDash = lineDashPattern
+                    let originalFill = fillColor
+                    strokeColor = UIColor.systemYellow.withAlphaComponent(0.85)
+                    lineWidth = max(originalWidth + 6, originalWidth * 1.6)
+                    lineDashPattern = nil
+                    fillColor = nil
+                    super.draw(mapRect, zoomScale: zoomScale, in: context)
+                    strokeColor = originalStroke
+                    lineWidth = originalWidth
+                    lineDashPattern = originalDash
+                    fillColor = originalFill
+                }
+                super.draw(mapRect, zoomScale: zoomScale, in: context)
+            }
+        }
 
         private final class PoleAnnotation: MKPointAnnotation {
             let poleID: UUID
@@ -419,6 +556,14 @@ struct MapCanvas: UIViewRepresentable {
                     map.addOverlay(overlay)
                 }
             }
+            applySelectionHighlight(on: map)
+        }
+
+        func applySelectionHighlight(on map: MKMapView) {
+            for (id, entry) in markupOverlayCache {
+                guard let renderer = map.renderer(for: entry.overlay) as? HighlightableMarkupRenderer else { continue }
+                renderer.updateAppearance(with: entry.shape, highlighted: id == selectedMarkupID)
+            }
         }
 
         func syncInProgressMarkup(on map: MKMapView) {
@@ -495,30 +640,15 @@ struct MapCanvas: UIViewRepresentable {
         }
 
         private func configuredPolylineRenderer(_ polyline: MKPolyline, for shape: MarkupShape) -> MKPolylineRenderer {
-            let renderer = MKPolylineRenderer(polyline: polyline)
-            renderer.strokeColor = shape.strokeColor
-            let width = max(shape.lineWidth, 1)
-            renderer.lineWidth = width
-            renderer.lineDashPattern = dashPattern(for: width, dashed: shape.isDashed)
-            renderer.lineJoin = .round
-            renderer.lineCap = .round
-            return renderer
+            return MarkupPolylineRenderer(polyline: polyline,
+                                          shape: shape,
+                                          highlighted: shape.id == selectedMarkupID)
         }
 
         private func configuredPolygonRenderer(_ polygon: MKPolygon, for shape: MarkupShape) -> MKPolygonRenderer {
-            let renderer = MKPolygonRenderer(polygon: polygon)
-            renderer.strokeColor = shape.strokeColor
-            let width = max(shape.lineWidth, 1)
-            renderer.lineWidth = width
-            renderer.lineDashPattern = dashPattern(for: width, dashed: shape.isDashed)
-            renderer.lineJoin = .round
-            renderer.lineCap = .round
-            if let fill = shape.fillColor {
-                renderer.fillColor = fill
-            } else {
-                renderer.fillColor = shape.strokeColor.withAlphaComponent(0.15)
-            }
-            return renderer
+            return MarkupPolygonRenderer(polygon: polygon,
+                                         shape: shape,
+                                         highlighted: shape.id == selectedMarkupID)
         }
 
         private func dashPattern(for width: CGFloat, dashed: Bool) -> [NSNumber]? {
@@ -631,6 +761,7 @@ struct MapsView: View {
     @State private var poles: [Pole] = []
     @State private var markups: [MarkupShape] = []
     @State private var activeMarkupPoints: [CLLocationCoordinate2D] = []
+    @State private var selectedMarkupID: MarkupShape.ID? = nil
     @State private var selectedMarkupColor: UIColor = .systemRed
     @State private var selectedMarkupKind: MarkupShape.Kind = .line
     @State private var selectedMarkupIsDashed: Bool = false
@@ -654,6 +785,7 @@ struct MapsView: View {
     @State private var sessionListener: ListenerRegistration? = nil
     @State private var presenceListener: ListenerRegistration? = nil
     @State private var isApplyingRemoteUpdate = false
+    @State private var pendingMarkupDeletion: MarkupDeletionAction? = nil
 
     @State private var didSetInitialRegion = false
     @State private var showUserLocation = false
@@ -664,6 +796,53 @@ struct MapsView: View {
     @State private var selectedStrokeColor: Color = .orange
     @State private var selectedLineWidth: CGFloat = 4
     @State private var isUndergroundRun = false
+
+    private enum MarkupDeletionAction: Identifiable {
+        case removeLast
+        case clearAll
+        case deleteSelected
+
+        var id: Int {
+            switch self {
+            case .removeLast: return 0
+            case .clearAll: return 1
+            case .deleteSelected: return 2
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .removeLast:
+                return "Remove last markup?"
+            case .clearAll:
+                return "Clear all markups?"
+            case .deleteSelected:
+                return "Delete selected markup?"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .removeLast:
+                return "The most recent shape will be removed from the map."
+            case .clearAll:
+                return "All markups will be removed for every collaborator."
+            case .deleteSelected:
+                return "The highlighted shape will be removed from the map."
+            }
+        }
+
+        var confirmButtonTitle: String {
+            switch self {
+            case .removeLast:
+                return "Remove"
+            case .clearAll:
+                return "Clear"
+            case .deleteSelected:
+                return "Delete"
+            }
+        }
+    }
 
     private struct MarkupColorOption: Identifiable {
         let id: String
@@ -684,6 +863,23 @@ struct MapsView: View {
 
     private func isSelectedColor(_ option: MarkupColorOption) -> Bool {
         UIColor(selectedStrokeColor).cgColor == UIColor(option.color).cgColor
+    }
+
+    private var selectedMarkup: MarkupShape? {
+        guard let id = selectedMarkupID else { return nil }
+        return markups.first(where: { $0.id == id })
+    }
+
+    private func markupLabel(for shape: MarkupShape, index: Int) -> String {
+        "\(shape.kind.displayName) \(index + 1)"
+    }
+
+    private var selectedMarkupLabel: String {
+        if let id = selectedMarkupID,
+           let index = markups.firstIndex(where: { $0.id == id }) {
+            return markupLabel(for: markups[index], index: index)
+        }
+        return "Select shape"
     }
 
     private func centerToDefaultAddress() {
@@ -714,6 +910,7 @@ struct MapsView: View {
                 MapCanvas(
                     poles: $poles,
                     markups: $markups,
+                    selectedMarkupID: $selectedMarkupID,
                     activeMarkupPoints: $activeMarkupPoints,
                     region: $region,
                     showUserLocation: $showUserLocation,
@@ -752,7 +949,11 @@ struct MapsView: View {
                 recalculateDistance()
                 pushSessionStateIfNeeded()
             }
-            .onChange(of: markups) { _ in
+            .onChange(of: markups) { newValue in
+                if let selectedID = selectedMarkupID,
+                   !newValue.contains(where: { $0.id == selectedID }) {
+                    selectedMarkupID = nil
+                }
                 pushSessionStateIfNeeded()
             }
             .onChange(of: activeMarkupTool) { tool in
@@ -896,6 +1097,25 @@ struct MapsView: View {
         activeMarkupPoints.removeAll()
     }
 
+    private func performMarkupDeletion(_ action: MarkupDeletionAction) {
+        switch action {
+        case .removeLast:
+            guard !markups.isEmpty else { return }
+            if let lastID = markups.last?.id, lastID == selectedMarkupID {
+                selectedMarkupID = nil
+            }
+            markups.removeLast()
+        case .clearAll:
+            markups.removeAll()
+            selectedMarkupID = nil
+        case .deleteSelected:
+            guard let id = selectedMarkupID,
+                  let index = markups.firstIndex(where: { $0.id == id }) else { return }
+            markups.remove(at: index)
+            selectedMarkupID = nil
+        }
+    }
+
     private func markupKind(for selection: MapMarkupShape) -> MarkupShape.Kind {
         switch selection {
         case .line:
@@ -1033,9 +1253,90 @@ struct MapsView: View {
             }
             .toggleStyle(.switch)
             .tint(.orange)
+
+            if !markups.isEmpty {
+                Divider().padding(.top, 4)
+
+                HStack(spacing: 10) {
+                    Menu {
+                        ForEach(Array(markups.enumerated()), id: \.element.id) { index, shape in
+                            Button {
+                                selectedMarkupID = shape.id
+                            } label: {
+                                HStack {
+                                    Text(markupLabel(for: shape, index: index))
+                                    if selectedMarkupID == shape.id {
+                                        Spacer()
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                        if selectedMarkupID != nil {
+                            Divider()
+                            Button("Deselect") { selectedMarkupID = nil }
+                        }
+                    } label: {
+                        Label(selectedMarkupLabel, systemImage: "scribble.variable")
+                            .labelStyle(.titleAndIcon)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(.thinMaterial, in: Capsule())
+                    }
+
+                    Spacer(minLength: 0)
+
+                    Button {
+                        pendingMarkupDeletion = .removeLast
+                    } label: {
+                        Image(systemName: "arrow.uturn.backward")
+                            .padding(6)
+                    }
+                    .background(.ultraThinMaterial, in: Circle())
+                    .accessibilityLabel(Text("Remove most recent markup"))
+
+                    Button {
+                        pendingMarkupDeletion = .deleteSelected
+                    } label: {
+                        Image(systemName: "trash.circle")
+                            .padding(6)
+                    }
+                    .background(.ultraThinMaterial, in: Circle())
+                    .accessibilityLabel(Text("Delete selected markup"))
+                    .disabled(selectedMarkupID == nil)
+
+                    Button {
+                        pendingMarkupDeletion = .clearAll
+                    } label: {
+                        Image(systemName: "trash.slash")
+                            .padding(6)
+                    }
+                    .background(.ultraThinMaterial, in: Circle())
+                    .accessibilityLabel(Text("Clear all markups"))
+                }
+            }
         }
         .padding(10)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .confirmationDialog(
+            pendingMarkupDeletion?.title ?? "",
+            isPresented: Binding(
+                get: { pendingMarkupDeletion != nil },
+                set: { newValue in if !newValue { pendingMarkupDeletion = nil } }
+            ),
+            presenting: pendingMarkupDeletion,
+            titleVisibility: .visible
+        ) { action in
+            Button(action.confirmButtonTitle, role: .destructive) {
+                performMarkupDeletion(action)
+                pendingMarkupDeletion = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingMarkupDeletion = nil
+            }
+        } message: { action in
+            Text(action.message)
+        }
     }
 
     @ViewBuilder
@@ -1551,6 +1852,7 @@ struct MapsView: View {
         self.sessionID = nil
         self.isHost = false
         self.participantsOnline = 0
+        self.selectedMarkupID = nil
         self.markups.removeAll()
         self.poles.removeAll()
         self.totalDistance = 0
