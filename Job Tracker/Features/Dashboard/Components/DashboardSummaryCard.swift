@@ -80,11 +80,9 @@ private struct DashboardSummaryCardPreviewContainer: View {
 
 #Preview("Summary – iPhone 15 Pro") {
     DashboardSummaryCardPreviewContainer()
-        .previewDevice(PreviewDevice(rawValue: "iPhone 15 Pro"))
 }
 
 #Preview("Summary – iPad Pro 11") {
     DashboardSummaryCardPreviewContainer()
-        .previewDevice(PreviewDevice(rawValue: "iPad Pro (11-inch) (4th generation)"))
         .frame(maxWidth: 700)
 }

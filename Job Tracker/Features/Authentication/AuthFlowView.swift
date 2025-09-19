@@ -304,7 +304,7 @@ private struct AuthLoginForm: View {
     }
 
     private func state(for error: String?, text: String) -> JTInputState {
-        if let error, hasAttemptedSubmit {
+        if hasAttemptedSubmit && error != nil {
             return .error
         }
         if hasAttemptedSubmit && !text.isEmpty {
@@ -489,7 +489,7 @@ private struct AuthSignUpForm: View {
     }
 
     private func state(for error: String?, text: String) -> JTInputState {
-        if let error, hasAttemptedSubmit {
+        if hasAttemptedSubmit && error != nil {
             return .error
         }
         if hasAttemptedSubmit && !text.isEmpty {
@@ -568,7 +568,7 @@ private struct PasswordResetForm: View {
     }
 
     private var state: JTInputState {
-        if let emailError, hasAttemptedSubmit {
+        if hasAttemptedSubmit && emailError != nil {
             return .error
         }
         if hasAttemptedSubmit && !email.isEmpty {

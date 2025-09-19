@@ -73,11 +73,9 @@ private struct DashboardHeaderToolbarPreviewContainer: View {
 
 #Preview("Header – iPhone 15 Pro") {
     DashboardHeaderToolbarPreviewContainer(isPreparingShare: false)
-        .previewDevice(PreviewDevice(rawValue: "iPhone 15 Pro"))
 }
 
 #Preview("Header – iPad Pro 11") {
     DashboardHeaderToolbarPreviewContainer(isPreparingShare: true)
-        .previewDevice(PreviewDevice(rawValue: "iPad Pro (11-inch) (4th generation)"))
         .frame(maxWidth: 600)
 }

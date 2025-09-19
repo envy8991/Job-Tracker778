@@ -432,12 +432,16 @@ final class DashboardViewModel: ObservableObject {
 
     private func formatDistance(_ meters: CLLocationDistance) -> String {
         guard meters.isFinite else { return "" }
-        let usesMetric = Locale.current.usesMetricSystem
-        if !usesMetric {
+        switch Locale.current.measurementSystem {
+        case .us:
             let miles = meters / 1609.344
             if miles < 0.1 { return "<0.1 mi" }
             return String(format: "%.1f mi", miles)
-        } else {
+        case .metric, .uk:
+            if meters < 1000 { return "\(Int(meters.rounded())) m" }
+            let kilometers = meters / 1000
+            return String(format: "%.1f km", kilometers)
+        @unknown default:
             if meters < 1000 { return "\(Int(meters.rounded())) m" }
             let kilometers = meters / 1000
             return String(format: "%.1f km", kilometers)
