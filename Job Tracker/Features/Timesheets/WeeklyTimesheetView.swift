@@ -14,9 +14,10 @@ struct WorkerHours: Identifiable, Hashable {
 }
 
 struct WeeklyTimesheetView: View {
-    // Clearance so the floating hamburger/side-menu button never overlaps the first content row
-    private let menuClearanceTop: CGFloat = 76
+    // Top padding to provide breathing room above the week picker and action buttons.
+    private let topContentPadding: CGFloat = 20
     @EnvironmentObject var authViewModel: AuthViewModel
+    @EnvironmentObject private var navigation: AppNavigationViewModel
     // Use an independent view model for timesheet jobs.
     @StateObject private var timesheetJobsVM = TimesheetJobsViewModel()
     @StateObject private var timesheetVM = TimesheetViewModel()
@@ -150,10 +151,18 @@ struct WeeklyTimesheetView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        
+
                         // Minimal week picker.
                         minimalWeekPicker
-                        
+
+                        // Global quick actions placed below the week picker to avoid overlaps.
+                        ShellActionButtons(
+                            onShowMenu: { navigation.isPrimaryMenuPresented = true },
+                            onOpenHelp: { navigation.navigate(to: .helpCenter) },
+                            horizontalPadding: 0,
+                            topPadding: 0
+                        )
+
                         // Timesheet header.
                         timesheetHeader
                         
@@ -185,8 +194,8 @@ struct WeeklyTimesheetView: View {
                         
                         Spacer().frame(height: 100)
                     }
-                    // Push content below the floating hamburger button
-                    .padding(.top, menuClearanceTop)
+                    // Provide consistent spacing above the week picker and action buttons
+                    .padding(.top, topContentPadding)
                     .padding()
                 }
                 .scrollIndicators(.hidden)
