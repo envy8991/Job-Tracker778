@@ -773,6 +773,7 @@ struct MapsView: View {
     @State private var pdfURL: URL?
     @State private var mapTypeIndex = 0
     @State private var showDeleteOptions = false
+    @State private var isFullScreen = false
     private let mapTypes: [MKMapType] = [.hybrid, .standard, .mutedStandard] // default imagery
     // Private session (invite-only)
     @State private var sessionID: String? = nil
@@ -939,10 +940,18 @@ struct MapsView: View {
                 )
                 .ignoresSafeArea()
                 .safeAreaInset(edge: .top) {
-                    searchBar
-                        .padding(.horizontal, 12)
-                        .padding(.top, 60)
-                        .zIndex(1)
+                    HStack(alignment: .top, spacing: 12) {
+                        if !isFullScreen {
+                            searchBar
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+                        Spacer(minLength: 0)
+                        fullScreenToggleButton
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, isFullScreen ? 24 : 60)
+                    .zIndex(1)
                 }
             }
             .onChange(of: poles) { _ in
@@ -1019,6 +1028,9 @@ struct MapsView: View {
             }
 
             controlOverlay
+                .opacity(isFullScreen ? 0 : 1)
+                .allowsHitTesting(!isFullScreen)
+                .accessibilityHidden(isFullScreen)
         }
         .navigationTitle("Route Mapper")
         .sheet(isPresented: $showingHelp) { RouteMapperHelp() }
@@ -1150,6 +1162,17 @@ struct MapsView: View {
                 region.span = MKCoordinateSpan(latitudeDelta: 0.004, longitudeDelta: 0.004)
                 regionSetNonce &+= 1
             }
+        }
+    }
+
+    private func toggleFullScreen() {
+        let newValue = !isFullScreen
+        if newValue {
+            isSearchFocused = false
+            showSuggestions = false
+        }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            isFullScreen = newValue
         }
     }
 
@@ -1476,6 +1499,17 @@ struct MapsView: View {
             }
         }
         .padding()
+    }
+
+    private var fullScreenToggleButton: some View {
+        Button(action: toggleFullScreen) {
+            Image(systemName: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                .font(.title3)
+                .padding(10)
+        }
+        .background(.ultraThinMaterial, in: Circle())
+        .accessibilityLabel(Text(isFullScreen ? "Exit full screen" : "Enter full screen"))
+        .accessibilityHint(Text("Toggle map controls visibility"))
     }
     
     
