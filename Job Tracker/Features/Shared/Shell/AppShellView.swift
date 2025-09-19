@@ -86,9 +86,7 @@ private struct AppShellDetailView: View {
             YellowSheetView()
         case .maps:
             MapsView()
-        case .search:
-            JobSearchView()
-        case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter:
+        case .more, .search, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter:
             MoreTabView()
         }
     }
