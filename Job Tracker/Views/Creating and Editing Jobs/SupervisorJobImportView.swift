@@ -365,6 +365,48 @@ final class JobSheetParser {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
+        let rosterNames = users
+            .map { "\($0.firstName) \($0.lastName)" }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        let fallbackAssigneeNames = [
+            "Brandon",
+            "Chris",
+            "Hunter",
+            "Justin",
+            "Nate",
+            "Rick",
+            "Trey",
+            "Will"
+        ]
+
+        let displayAssigneeNames: [String]
+        if rosterNames.isEmpty {
+            displayAssigneeNames = fallbackAssigneeNames
+        } else {
+            displayAssigneeNames = Array(Set(rosterNames)).sorted()
+        }
+
+        let limitedAssigneeNames = Array(displayAssigneeNames.prefix(12))
+
+        let formattedAssigneeNames: String
+        if let onlyName = limitedAssigneeNames.first, limitedAssigneeNames.count == 1 {
+            formattedAssigneeNames = onlyName
+        } else if limitedAssigneeNames.count >= 2, let last = limitedAssigneeNames.last {
+            let head = limitedAssigneeNames.dropLast().joined(separator: ", ")
+            formattedAssigneeNames = head.isEmpty ? last : "\(head), and \(last)"
+        } else {
+            formattedAssigneeNames = ""
+        }
+
+        let assigneeGuidance: String
+        if formattedAssigneeNames.isEmpty {
+            assigneeGuidance = "Capture the text exactly as written, even if it's only a first name, initials, or multiple names."
+        } else {
+            assigneeGuidance = "Expect names such as \(formattedAssigneeNames). Capture the text exactly as written, even if it's only a first name, initials, or multiple names."
+        }
+
         let systemPrompt = """
         You extract structured job information from construction job sheets. Always reply with strictly valid JSON.
         """
@@ -376,7 +418,14 @@ final class JobSheetParser {
         - "assigneeName": the person's name responsible for the job, or null.
         - "notes": any additional notes or description, or null.
         - "rawText": the original text snippet for this job entry, or null.
-        Use null instead of empty strings when data is missing. Respond with JSON only (no explanations, markdown, or extra text). Return [] if no jobs are present.
+        Use null instead of empty strings when data is missing.
+        The sheet is a table where each row describes one job. Follow these cues when extracting fields:
+        - Column 5 (header "JOB #") contains the job number for that row. Read the string from this cell exactly as written (including values like "12345", "12345 ask Rick", "ask Rick", or "?"). Only use null when the cell is blank or illegible.
+        Supervisors provided examples of acceptable job-number formats: 5-digit IDs such as "12345", annotated strings like "12345 ask Rick", and placeholders like "ask Rick" or "?" when the number is pending. Treat these literally as the jobNumber value when present.
+        - Column 9 (header "ADDRESS" / "LOCATION") contains the full job address. Use the entire text from this column, including unit numbers or landmarks that appear there.
+        - The rightmost column lists the assigned worker name(s). \(assigneeGuidance)
+        When populating "rawText", capture the clearest full-line snippet for that row so supervisors can audit the entry later.
+        Respond with JSON only (no explanations, markdown, or extra text). Return [] if no jobs are present.
         """
 
         let body: [String: Any] = [
