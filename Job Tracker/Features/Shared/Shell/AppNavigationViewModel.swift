@@ -58,7 +58,7 @@ final class AppNavigationViewModel: ObservableObject {
             case .timesheets:  return .timesheets
             case .yellowSheet: return .yellowSheet
             case .maps:        return .maps
-            case .search:      return .search
+            case .search:      return .more
             case .more,
                  .profile,
                  .findPartner,
@@ -72,7 +72,7 @@ final class AppNavigationViewModel: ObservableObject {
 
         var isMoreStackDestination: Bool {
             switch self {
-            case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter:
+            case .search, .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter:
                 return true
             default:
                 return false
@@ -85,7 +85,6 @@ final class AppNavigationViewModel: ObservableObject {
         case timesheets
         case yellowSheet
         case maps
-        case search
         case more
 
         var id: String { rawValue }
@@ -96,7 +95,6 @@ final class AppNavigationViewModel: ObservableObject {
             case .timesheets:  return .timesheets
             case .yellowSheet: return .yellowSheet
             case .maps:        return .maps
-            case .search:      return .search
             case .more:        return .more
             }
         }
@@ -130,9 +128,6 @@ final class AppNavigationViewModel: ObservableObject {
             morePath.removeAll()
         case .maps:
             activeDestination = .maps
-            morePath.removeAll()
-        case .search:
-            activeDestination = .search
             morePath.removeAll()
         case .more:
             if !activeDestination.isMoreStackDestination {

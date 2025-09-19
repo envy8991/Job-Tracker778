@@ -1,7 +1,10 @@
 import SwiftUI
+import UIKit
 
 struct MainTabView: View {
     @EnvironmentObject private var navigation: AppNavigationViewModel
+
+    private static var hasConfiguredAppearance = false
 
     private var menuPresentation: Binding<Bool> {
         Binding(
@@ -10,18 +13,64 @@ struct MainTabView: View {
         )
     }
 
+    init() {
+        MainTabView.configureTabBarAppearance()
+    }
+
     var body: some View {
-        PrimaryTabContainer()
-            .safeAreaInset(edge: .top) {
-                ShellActionButtons(
+        ZStack {
+            JTGradients.background
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                ShellActionBar(
                     onShowMenu: { navigation.isPrimaryMenuPresented = true },
                     onOpenHelp: { navigation.navigate(to: .helpCenter) }
                 )
+
+                PrimaryTabContainer()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .sheet(isPresented: menuPresentation) {
-                PrimaryDestinationMenu()
-                    .presentationDetents([.medium, .large])
-            }
+        }
+        .sheet(isPresented: menuPresentation) {
+            PrimaryDestinationMenu()
+                .presentationDetents([.medium, .large])
+        }
+    }
+
+    private static func configureTabBarAppearance() {
+        guard !hasConfiguredAppearance else { return }
+
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .systemChromeMaterialDark)
+        appearance.backgroundColor = UIColor(JTColors.backgroundTop.opacity(0.92))
+        appearance.shadowColor = UIColor.black.withAlphaComponent(0.25)
+
+        let selectedColor = UIColor(JTColors.accent)
+        let unselectedColor = UIColor(JTColors.textMuted)
+
+        let layouts = [
+            appearance.stackedLayoutAppearance,
+            appearance.inlineLayoutAppearance,
+            appearance.compactInlineLayoutAppearance
+        ]
+
+        layouts.forEach { layout in
+            layout.selected.iconColor = selectedColor
+            layout.selected.titleTextAttributes = [.foregroundColor: selectedColor]
+            layout.normal.iconColor = unselectedColor
+            layout.normal.titleTextAttributes = [.foregroundColor: unselectedColor]
+        }
+
+        let tabBarAppearance = UITabBar.appearance()
+        tabBarAppearance.standardAppearance = appearance
+        tabBarAppearance.scrollEdgeAppearance = appearance
+        tabBarAppearance.tintColor = selectedColor
+        tabBarAppearance.unselectedItemTintColor = unselectedColor
+        tabBarAppearance.isTranslucent = false
+
+        hasConfiguredAppearance = true
     }
 }
 
@@ -67,13 +116,6 @@ private struct PrimaryTabContainer: View {
                           systemImage: AppNavigationViewModel.PrimaryDestination.maps.systemImage)
                 }
 
-            JobSearchView()
-                .tag(AppNavigationViewModel.PrimaryDestination.search)
-                .tabItem {
-                    Label(AppNavigationViewModel.PrimaryDestination.search.title,
-                          systemImage: AppNavigationViewModel.PrimaryDestination.search.systemImage)
-                }
-
             MoreTabView()
                 .tag(AppNavigationViewModel.PrimaryDestination.more)
                 .tabItem {
@@ -81,6 +123,8 @@ private struct PrimaryTabContainer: View {
                           systemImage: AppNavigationViewModel.PrimaryDestination.more.systemImage)
                 }
         }
+        .tint(JTColors.accent)
+        .background(Color.clear)
     }
 }
 
@@ -96,15 +140,6 @@ struct MoreTabView: View {
         )
     }
 
-    private let backgroundGradient = LinearGradient(
-        colors: [
-            Color(red: 0.10, green: 0.14, blue: 0.18),
-            Color(red: 0.20, green: 0.45, blue: 0.55)
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-
     var body: some View {
         NavigationStack(path: morePathBinding) {
             MoreMenuList()
@@ -114,7 +149,7 @@ struct MoreTabView: View {
                     MoreDestinationView(destination: destination)
                 }
         }
-        .background(backgroundGradient.ignoresSafeArea())
+        .background(JTGradients.background.ignoresSafeArea())
         .onAppear {
             if !navigation.activeDestination.isMoreStackDestination {
                 navigation.navigate(to: .more)
@@ -124,7 +159,6 @@ struct MoreTabView: View {
 }
 
 private struct MoreMenuList: View {
-    @EnvironmentObject private var navigation: AppNavigationViewModel
     @EnvironmentObject private var authViewModel: AuthViewModel
 
     var body: some View {
@@ -141,6 +175,12 @@ private struct MoreMenuList: View {
             Section("Team") {
                 NavigationLink(value: AppNavigationViewModel.Destination.findPartner) {
                     Label("Find a Partner", systemImage: AppNavigationViewModel.Destination.findPartner.systemImage)
+                }
+            }
+
+            Section("Jobs") {
+                NavigationLink(value: AppNavigationViewModel.Destination.search) {
+                    Label("Job Search", systemImage: AppNavigationViewModel.Destination.search.systemImage)
                 }
             }
 
@@ -168,15 +208,8 @@ private struct MoreMenuList: View {
         }
         .scrollContentBackground(.hidden)
         .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 0.10, green: 0.14, blue: 0.18),
-                    Color(red: 0.20, green: 0.45, blue: 0.55)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            JTGradients.background
+                .ignoresSafeArea()
         )
         .listStyle(.insetGrouped)
     }
@@ -192,6 +225,8 @@ private struct MoreDestinationView: View {
             ProfileView()
         case .findPartner:
             FindPartnerView()
+        case .search:
+            JobSearchView()
         case .supervisor:
             SupervisorDashboardView()
         case .admin:
@@ -208,25 +243,47 @@ private struct MoreDestinationView: View {
     }
 }
 
-// MARK: - Action buttons & menu
+// MARK: - Action bar & menu
 
-private struct ShellActionButtons: View {
+private struct ShellActionBar: View {
+    @Environment(\.safeAreaInsets) private var safeAreaInsets
+
     var onShowMenu: () -> Void
     var onOpenHelp: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            RoundedActionButton(icon: "line.3.horizontal", label: "Menu", action: onShowMenu)
-            Spacer()
-            RoundedActionButton(icon: "questionmark.circle", label: "Help", action: onOpenHelp)
+        VStack(spacing: 0) {
+            HStack(spacing: JTSpacing.md) {
+                ShellActionButton(icon: "line.3.horizontal", label: "Menu", action: onShowMenu)
+                Spacer(minLength: JTSpacing.sm)
+                ShellActionButton(icon: "questionmark.circle", label: "Help", action: onOpenHelp)
+            }
+            .padding(.horizontal, JTSpacing.xl)
+            .padding(.top, safeAreaInsets.top + JTSpacing.md)
+            .padding(.bottom, JTSpacing.md)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .background(Color.clear)
+        .background(.ultraThinMaterial)
+        .background(
+            LinearGradient(
+                colors: [
+                    JTColors.backgroundTop.opacity(0.95),
+                    JTColors.backgroundTop.opacity(0.7)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .overlay(
+            Rectangle()
+                .fill(Color.white.opacity(0.12))
+                .frame(height: 1),
+            alignment: .bottom
+        )
+        .jtShadow(JTElevations.raised)
     }
 }
 
-private struct RoundedActionButton: View {
+private struct ShellActionButton: View {
     let icon: String
     let label: String
     let action: () -> Void
@@ -234,21 +291,16 @@ private struct RoundedActionButton: View {
     var body: some View {
         Button(action: action) {
             Label(label, systemImage: icon)
-                .font(.subheadline.bold())
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            Capsule()
-                                .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                        )
-                )
+                .font(JTTypography.button)
+                .labelStyle(.titleAndIcon)
+                .padding(.horizontal, JTSpacing.lg)
+                .padding(.vertical, JTSpacing.sm)
+                .foregroundStyle(JTColors.textPrimary)
+                .jtGlassBackground(shape: Capsule())
+                .jtShadow(JTElevations.button)
         }
         .buttonStyle(.plain)
-        .shadow(color: Color.black.opacity(0.18), radius: 12, x: 0, y: 6)
+        .contentShape(Capsule())
     }
 }
 
@@ -270,7 +322,7 @@ private struct PrimaryDestinationMenu: View {
                                 Spacer()
                                 if navigation.activeDestination.primaryDestination == destination.primaryDestination {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.blue)
+                                        .foregroundStyle(JTColors.accent)
                                 }
                             }
                             .padding(.vertical, 4)
@@ -305,5 +357,35 @@ struct AdminPanelView: View {
         }
         .padding()
         .navigationTitle("Admin")
+    }
+}
+
+struct FindPartnerView: View {
+    var body: some View {
+        Text("Find Partner")
+            .navigationTitle("Find Partner")
+    }
+}
+
+struct SupervisorDashboardView: View {
+    @EnvironmentObject var authViewModel: AuthViewModel
+
+    var body: some View {
+        Text("Supervisor Dashboard")
+            .navigationTitle("Supervisor")
+    }
+}
+
+struct ProfileView: View {
+    var body: some View {
+        Text("Profile")
+            .navigationTitle("Profile")
+    }
+}
+
+struct SettingsView: View {
+    var body: some View {
+        Text("Settings")
+            .navigationTitle("Settings")
     }
 }
