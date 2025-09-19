@@ -330,6 +330,16 @@ struct MapCanvas: UIViewRepresentable {
                 applyBaseAppearance()
             }
 
+            override init(overlay: MKOverlay) {
+                self.shape = MarkupShape(kind: .line,
+                                         points: [],
+                                         lineWidth: 1,
+                                         strokeColor: .clear)
+                self.isHighlighted = false
+                super.init(overlay: overlay)
+                applyBaseAppearance()
+            }
+
             required init?(coder: NSCoder) {
                 fatalError("init(coder:) has not been implemented")
             }
@@ -381,6 +391,16 @@ struct MapCanvas: UIViewRepresentable {
                 self.shape = shape
                 self.isHighlighted = highlighted
                 super.init(polygon: polygon)
+                applyBaseAppearance()
+            }
+
+            override init(overlay: MKOverlay) {
+                self.shape = MarkupShape(kind: .polygon,
+                                         points: [],
+                                         lineWidth: 1,
+                                         strokeColor: .clear)
+                self.isHighlighted = false
+                super.init(overlay: overlay)
                 applyBaseAppearance()
             }
 
