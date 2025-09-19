@@ -368,8 +368,47 @@ final class JobSheetParser {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
-        let rosterNames = users
-            .map { "\($0.firstName) \($0.lastName)" }
+        let rosterEntries: [[String: Any]] = users.map { user in
+            let trimmedFirst = user.firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedLast = user.lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let displayNameComponents = [trimmedFirst, trimmedLast].filter { !$0.isEmpty }
+            let displayName = displayNameComponents.joined(separator: " ")
+            let normalizedPosition = user.normalizedPosition.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            var aliasSet = Set<String>()
+            if !trimmedFirst.isEmpty { aliasSet.insert(trimmedFirst) }
+            if !trimmedLast.isEmpty { aliasSet.insert(trimmedLast) }
+            if !displayName.isEmpty { aliasSet.insert(displayName) }
+            if !normalizedPosition.isEmpty {
+                aliasSet.insert(normalizedPosition)
+                if !trimmedFirst.isEmpty {
+                    aliasSet.insert("\(trimmedFirst) \(normalizedPosition)")
+                }
+                if !displayName.isEmpty {
+                    aliasSet.insert("\(displayName) (\(normalizedPosition))")
+                }
+            }
+
+            var entry: [String: Any] = ["id": user.id]
+            if !displayName.isEmpty {
+                entry["displayName"] = displayName
+            }
+            if !normalizedPosition.isEmpty {
+                entry["position"] = normalizedPosition
+            }
+
+            let aliases = aliasSet
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            if !aliases.isEmpty {
+                entry["aliases"] = Array(Set(aliases)).sorted()
+            }
+
+            return entry
+        }
+
+        let rosterNames = rosterEntries
+            .compactMap { $0["displayName"] as? String }
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
@@ -419,9 +458,11 @@ final class JobSheetParser {
         - "address": the job address as a string (required).
         - "jobNumber": a string job number or null if not shown.
         - "assigneeName": the person's name responsible for the job, or null.
+        - "assigneeId": the worker's roster id string when a match exists, or null.
         - "notes": any additional notes or description, or null.
         - "rawText": the original text snippet for this job entry, or null.
         Use null instead of empty strings when data is missing.
+        You will receive a "Known worker roster" JSON snippet describing each worker (id, displayName, aliases, position). When the sheet lists an assignee whose text matches any roster displayName or alias (case-insensitive and ignoring punctuation), set "assigneeId" to that worker's id and still capture the literal sheet text in "assigneeName". Use null when no roster entry matches.
         The sheet is a table where each row describes one job. Follow these cues when extracting fields:
         - Column 5 (header "JOB #") contains the job number for that row. Read the string from this cell exactly as written (including values like "12345", "12345 ask Rick", "ask Rick", or "?"). Only use null when the cell is blank or illegible.
         Supervisors provided examples of acceptable job-number formats: 5-digit IDs such as "12345", annotated strings like "12345 ask Rick", and placeholders like "ask Rick" or "?" when the number is pending. Treat these literally as the jobNumber value when present.
@@ -458,6 +499,22 @@ final class JobSheetParser {
             ]
         ]
 
+        let rosterMessage: String?
+        if !rosterEntries.isEmpty,
+           let rosterData = try? JSONSerialization.data(withJSONObject: rosterEntries, options: [.sortedKeys]),
+           let rosterText = String(data: rosterData, encoding: .utf8),
+           !rosterText.isEmpty {
+            rosterMessage = "Known worker roster (JSON):\n\(rosterText)"
+        } else {
+            rosterMessage = nil
+        }
+
+        var userContent: [[String: Any]] = [["type": "text", "text": extractionPrompt]]
+        if let rosterMessage {
+            userContent.append(["type": "text", "text": rosterMessage])
+        }
+        userContent.append(["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(base64)"]])
+
         let body: [String: Any] = [
             "model": "gpt-4o-mini",
             "response_format": responseSchema,
@@ -468,10 +525,7 @@ final class JobSheetParser {
                 ],
                 [
                     "role": "user",
-                    "content": [
-                        ["type": "text", "text": extractionPrompt],
-                        ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(base64)"]]
-                    ]
+                    "content": userContent
                 ]
             ]
         ]
