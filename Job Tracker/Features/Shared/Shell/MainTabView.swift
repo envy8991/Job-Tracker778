@@ -67,13 +67,6 @@ private struct PrimaryTabContainer: View {
                           systemImage: AppNavigationViewModel.PrimaryDestination.maps.systemImage)
                 }
 
-            JobSearchView()
-                .tag(AppNavigationViewModel.PrimaryDestination.search)
-                .tabItem {
-                    Label(AppNavigationViewModel.PrimaryDestination.search.title,
-                          systemImage: AppNavigationViewModel.PrimaryDestination.search.systemImage)
-                }
-
             MoreTabView()
                 .tag(AppNavigationViewModel.PrimaryDestination.more)
                 .tabItem {
@@ -144,6 +137,12 @@ private struct MoreMenuList: View {
                 }
             }
 
+            Section("Resources") {
+                NavigationLink(value: AppNavigationViewModel.Destination.search) {
+                    Label("Job Search", systemImage: AppNavigationViewModel.Destination.search.systemImage)
+                }
+            }
+
             if authViewModel.isSupervisorFlag {
                 Section("Supervisor") {
                     NavigationLink(value: AppNavigationViewModel.Destination.supervisor) {
@@ -190,6 +189,8 @@ private struct MoreDestinationView: View {
         switch destination {
         case .profile:
             ProfileView()
+        case .search:
+            JobSearchView()
         case .findPartner:
             FindPartnerView()
         case .supervisor:
