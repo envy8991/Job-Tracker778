@@ -347,9 +347,9 @@ private struct DashboardJobSectionsPreviewContainer: View {
             address: "123 Main Street, Springfield, IL",
             date: today,
             status: "Pending",
+            notes: "Call ahead",
             assignments: "12.3.2",
-            materialsUsed: "Coax, Splitter",
-            notes: "Call ahead"
+            materialsUsed: "Coax, Splitter"
         )
         let done = Job(
             id: "2",
