@@ -194,6 +194,7 @@ struct RouteLegendEntry: Identifiable, Hashable {
 struct MapCanvas: UIViewRepresentable {
     @Binding var poles: [Pole]
     @Binding var markups: [MarkupShape]
+    @Binding var activeMarkupPoints: [CLLocationCoordinate2D]
     @Binding var region: MKCoordinateRegion
     @Binding var showUserLocation: Bool
     @Binding var markupTool: MapMarkupTool
@@ -253,6 +254,7 @@ struct MapCanvas: UIViewRepresentable {
         mv.isPitchEnabled = false
         mv.showsCompass = true
         mv.camera.heading = 0
+        context.coordinator.syncInProgressMarkup(on: mv)
         return mv
     }
 
@@ -277,6 +279,7 @@ struct MapCanvas: UIViewRepresentable {
 
         context.coordinator.syncPoles(poles, on: mv)
         context.coordinator.syncMarkups(markups, on: mv)
+        context.coordinator.syncInProgressMarkup(on: mv)
     }
 
     // MARK: - Coordinator
@@ -290,6 +293,8 @@ struct MapCanvas: UIViewRepresentable {
         init(parent: MapCanvas) { self.parent = parent }
 
         private var routeOverlay: MKPolyline?
+        private var inProgressMarkupOverlay: MKPolyline?
+        private var inProgressMarkupPoints: [CLLocationCoordinate2D] = []
         private var markupOverlayCache: [UUID: (overlay: MKOverlay, shape: MarkupShape)] = [:]
         private var overlayShapeLookup: [ObjectIdentifier: MarkupShape] = [:]
 
@@ -312,6 +317,7 @@ struct MapCanvas: UIViewRepresentable {
                 } else {
                     parent.onBeginMarkup(coord)
                 }
+                syncInProgressMarkup(on: mapView)
             } else {
                 parent.onAddPole(coord)
             }
@@ -329,15 +335,19 @@ struct MapCanvas: UIViewRepresentable {
                     } else {
                         parent.onBeginMarkup(coord)
                     }
+                    syncInProgressMarkup(on: map)
                 case .changed:
                     parent.onContinueMarkup(coord)
+                    syncInProgressMarkup(on: map)
                 case .ended, .cancelled, .failed:
                     if gr.state != .cancelled && gr.state != .failed {
                         parent.onContinueMarkup(coord)
                     }
+                    syncInProgressMarkup(on: map)
                     if parent.isMarkupInProgress() {
                         parent.onFinishMarkup()
                     }
+                    removeInProgressMarkupOverlay(from: map)
                 default:
                     break
                 }
@@ -411,6 +421,43 @@ struct MapCanvas: UIViewRepresentable {
             }
         }
 
+        func syncInProgressMarkup(on map: MKMapView) {
+            let points = parent.activeMarkupPoints
+            guard points.count >= 2 else {
+                removeInProgressMarkupOverlay(from: map)
+                return
+            }
+
+            if points.count == inProgressMarkupPoints.count {
+                var matches = true
+                for (lhs, rhs) in zip(points, inProgressMarkupPoints) {
+                    if abs(lhs.latitude - rhs.latitude) > 0.000001 ||
+                        abs(lhs.longitude - rhs.longitude) > 0.000001 {
+                        matches = false
+                        break
+                    }
+                }
+                if matches { return }
+            }
+
+            if let overlay = inProgressMarkupOverlay {
+                map.removeOverlay(overlay)
+            }
+
+            let polyline = MKPolyline(coordinates: points, count: points.count)
+            inProgressMarkupOverlay = polyline
+            inProgressMarkupPoints = points
+            map.addOverlay(polyline)
+        }
+
+        private func removeInProgressMarkupOverlay(from map: MKMapView) {
+            if let overlay = inProgressMarkupOverlay {
+                map.removeOverlay(overlay)
+            }
+            inProgressMarkupOverlay = nil
+            inProgressMarkupPoints = []
+        }
+
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let routeOverlay,
                let polyline = overlay as? MKPolyline,
@@ -418,6 +465,19 @@ struct MapCanvas: UIViewRepresentable {
                 let renderer = MKPolylineRenderer(polyline: polyline)
                 renderer.strokeColor = .systemOrange
                 renderer.lineWidth = 4
+                renderer.lineJoin = .round
+                renderer.lineCap = .round
+                return renderer
+            }
+
+            if let inProgress = inProgressMarkupOverlay,
+               let polyline = overlay as? MKPolyline,
+               polyline === inProgress {
+                let renderer = MKPolylineRenderer(polyline: polyline)
+                renderer.strokeColor = UIColor(parent.strokeColor)
+                let width = max(parent.lineWidth, 1)
+                renderer.lineWidth = width
+                renderer.lineDashPattern = dashPattern(for: width, dashed: parent.isDashed)
                 renderer.lineJoin = .round
                 renderer.lineCap = .round
                 return renderer
@@ -654,6 +714,7 @@ struct MapsView: View {
                 MapCanvas(
                     poles: $poles,
                     markups: $markups,
+                    activeMarkupPoints: $activeMarkupPoints,
                     region: $region,
                     showUserLocation: $showUserLocation,
                     markupTool: $activeMarkupTool,
