@@ -441,7 +441,7 @@ final class DashboardViewModel: ObservableObject {
             if meters < 1000 { return "\(Int(meters.rounded())) m" }
             let kilometers = meters / 1000
             return String(format: "%.1f km", kilometers)
-        @unknown default:
+        default:
             if meters < 1000 { return "\(Int(meters.rounded())) m" }
             let kilometers = meters / 1000
             return String(format: "%.1f km", kilometers)
