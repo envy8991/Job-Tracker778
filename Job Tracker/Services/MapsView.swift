@@ -1163,12 +1163,61 @@ struct MapsView: View {
             guard let snapshot = snapshot else { return }
             let image = UIGraphicsImageRenderer(size: options.size).image { ctx in
                 snapshot.image.draw(at: .zero)
+                let cg = ctx.cgContext
+
+                func dashPattern(for width: CGFloat, dashed: Bool) -> [CGFloat] {
+                    guard dashed else { return [] }
+                    let base = max(width, 1)
+                    return [base * 3.0, base * 1.5]
+                }
+
                 if poles.count > 1 {
-                    ctx.cgContext.setStrokeColor(UIColor.systemOrange.cgColor)
-                    ctx.cgContext.setLineWidth(4)
+                    cg.setStrokeColor(UIColor.systemOrange.cgColor)
+                    cg.setLineWidth(4)
                     let pts = poles.map(\.coordinate).map { snapshot.point(for: $0) }
-                    ctx.cgContext.addLines(between: pts)
-                    ctx.cgContext.strokePath()
+                    cg.addLines(between: pts)
+                    cg.strokePath()
+                }
+
+                for markup in markups {
+                    let screenPoints = markup.points.map { snapshot.point(for: $0) }
+
+                    switch markup.kind {
+                    case .polygon:
+                        guard screenPoints.count >= 3 else { continue }
+                        let path = CGMutablePath()
+                        path.addLines(between: screenPoints)
+                        path.closeSubpath()
+
+                        let lineWidth = max(markup.lineWidth, 1)
+                        cg.saveGState()
+                        cg.setLineJoin(.round)
+                        cg.setLineCap(.round)
+                        cg.setLineWidth(lineWidth)
+                        cg.setStrokeColor(markup.strokeColor.cgColor)
+                        cg.setLineDash(phase: 0, lengths: dashPattern(for: lineWidth, dashed: markup.isDashed))
+                        let fillColor = (markup.fillColor ?? markup.strokeColor.withAlphaComponent(0.15)).cgColor
+                        cg.setFillColor(fillColor)
+                        cg.addPath(path)
+                        cg.drawPath(using: .fillStroke)
+                        cg.restoreGState()
+
+                    case .line, .freehand:
+                        guard screenPoints.count >= 2 else { continue }
+                        let path = CGMutablePath()
+                        path.addLines(between: screenPoints)
+
+                        let lineWidth = max(markup.lineWidth, 1)
+                        cg.saveGState()
+                        cg.setLineJoin(.round)
+                        cg.setLineCap(.round)
+                        cg.setLineWidth(lineWidth)
+                        cg.setStrokeColor(markup.strokeColor.cgColor)
+                        cg.setLineDash(phase: 0, lengths: dashPattern(for: lineWidth, dashed: markup.isDashed))
+                        cg.addPath(path)
+                        cg.strokePath()
+                        cg.restoreGState()
+                    }
                 }
             }
             if let url = RoutePDFGenerator.generate(
