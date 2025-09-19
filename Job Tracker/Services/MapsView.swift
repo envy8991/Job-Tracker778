@@ -787,6 +787,8 @@ struct MapsView: View {
     @State private var presenceListener: ListenerRegistration? = nil
     @State private var isApplyingRemoteUpdate = false
     @State private var pendingMarkupDeletion: MarkupDeletionAction? = nil
+    @State private var isMarkupDrawerOpen = true
+    @State private var markupDrawerWasOpenBeforeFullScreen = true
 
     @State private var didSetInitialRegion = false
     @State private var showUserLocation = false
@@ -1170,9 +1172,17 @@ struct MapsView: View {
         if newValue {
             isSearchFocused = false
             showSuggestions = false
+            markupDrawerWasOpenBeforeFullScreen = isMarkupDrawerOpen
         }
         withAnimation(.easeInOut(duration: 0.25)) {
             isFullScreen = newValue
+        }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            if newValue {
+                isMarkupDrawerOpen = false
+            } else {
+                isMarkupDrawerOpen = markupDrawerWasOpenBeforeFullScreen
+            }
         }
     }
 
@@ -1254,6 +1264,13 @@ struct MapsView: View {
 
     @ViewBuilder
     private var markupPalette: some View {
+        MarkupPaletteDrawer(isOpen: $isMarkupDrawerOpen) {
+            markupPaletteContent
+        }
+    }
+
+    @ViewBuilder
+    private var markupPaletteContent: some View {
         VStack(alignment: .trailing, spacing: 8) {
             HStack(spacing: 8) {
                 Picker("Mode", selection: $activeMarkupTool) {
@@ -1408,6 +1425,47 @@ struct MapsView: View {
             }
         } message: { action in
             Text(action.message)
+        }
+    }
+
+    private struct MarkupPaletteDrawer<Content: View>: View {
+        @Binding var isOpen: Bool
+        private let content: Content
+
+        init(isOpen: Binding<Bool>, @ViewBuilder content: () -> Content) {
+            _isOpen = isOpen
+            self.content = content()
+        }
+
+        var body: some View {
+            HStack(alignment: .top, spacing: 8) {
+                if isOpen {
+                    content
+                        .transition(
+                            .move(edge: .trailing)
+                                .combined(with: .opacity)
+                        )
+                }
+
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        isOpen.toggle()
+                    }
+                } label: {
+                    Image(systemName: isOpen ? "chevron.forward" : "chevron.backward")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 32, height: 44)
+                        .foregroundColor(.primary)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .shadow(radius: 2)
+                }
+                .accessibilityLabel(Text(isOpen ? "Hide markup controls" : "Show markup controls"))
+                .accessibilityHint(Text("Toggles the markup palette"))
+                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isOpen)
         }
     }
 
