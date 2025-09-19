@@ -12,30 +12,6 @@ private let settingsGradient = LinearGradient(
     endPoint: .bottomTrailing
 )
 
-// A reusable frosted "glass" container that matches the iOS-26 vibe used elsewhere.
-// Pure SwiftUI (iOS 16+) — no external helpers required.
-private struct GlassCard<Content: View>: View {
-    let content: Content
-    init(@ViewBuilder content: () -> Content) { self.content = content() }
-
-    var body: some View {
-        content
-            .padding(16)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.28),
-                            Color.white.opacity(0.06)
-                        ],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    ), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.25), radius: 18, x: 0, y: 8)
-    }
-}
-
 // Lightweight section header label used inside cards
 private struct SectionHeader: View {
     let title: String
@@ -118,6 +94,7 @@ struct SettingsView: View {
                                 .accessibilityHint("Closest-first or farthest-first.")
                             }
                         }
+                        .padding(16)
                     }
                     .padding(.horizontal, 16)
 
@@ -128,6 +105,7 @@ struct SettingsView: View {
                             Toggle("Notify me on arrival (today only)", isOn: $arrivalAlertsEnabledToday)
                                 .toggleStyle(.switch)
                         }
+                        .padding(16)
                     }
                     .padding(.horizontal, 16)
 
@@ -155,6 +133,7 @@ struct SettingsView: View {
                                 : "Using Apple Maps for address suggestions."
                             )
                         }
+                        .padding(16)
                     }
                     .padding(.horizontal, 16)
 
@@ -226,6 +205,7 @@ struct SettingsView: View {
                                     .foregroundColor(.red)
                             }
                         }
+                        .padding(16)
                     }
                     .padding(.horizontal, 16)
 
@@ -243,6 +223,7 @@ struct SettingsView: View {
                             }
                             .font(.callout.weight(.semibold))
                         }
+                        .padding(16)
                     }
                     .padding(.horizontal, 16)
 
@@ -258,6 +239,7 @@ struct SettingsView: View {
                                     .accessibilityLabel("App version \(Bundle.main.appVersionReadable)")
                             }
                         }
+                        .padding(16)
                     }
                     .padding(.horizontal, 16)
 
