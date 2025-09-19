@@ -445,7 +445,10 @@ struct MapCanvas: UIViewRepresentable {
         }
 
         @objc func handleTap(_ gr: UITapGestureRecognizer) {
-            let mapView = gr.view as! MKMapView
+            guard gr.state == .ended,
+                  let mapView = gr.view as? MKMapView else {
+                return
+            }
             let coord = mapView.convert(gr.location(in: mapView), toCoordinateFrom: mapView)
 
             if parent.markupTool == .draw {
@@ -461,7 +464,7 @@ struct MapCanvas: UIViewRepresentable {
         }
 
         @objc func handleLong(_ gr: UILongPressGestureRecognizer) {
-            let map = gr.view as! MKMapView
+            guard let map = gr.view as? MKMapView else { return }
             let coord = map.convert(gr.location(in: map), toCoordinateFrom: map)
 
             if parent.markupTool == .draw {
@@ -698,7 +701,9 @@ struct MapCanvas: UIViewRepresentable {
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             guard let ann = annotation as? PoleAnnotation else { return nil }
-            let view = mapView.dequeueReusableAnnotationView(withIdentifier: "pin", for: ann) as! MKMarkerAnnotationView
+            guard let view = mapView.dequeueReusableAnnotationView(withIdentifier: "pin", for: ann) as? MKMarkerAnnotationView else {
+                return nil
+            }
             view.isDraggable = true
             view.canShowCallout = true
             view.rightCalloutAccessoryView = UIButton(type: .close)
