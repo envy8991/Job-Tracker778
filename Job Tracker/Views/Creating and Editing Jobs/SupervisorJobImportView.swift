@@ -350,7 +350,10 @@ final class JobSheetParser {
     }
 
     func parse(image: UIImage, users: [AppUser]) async throws -> [ParsedEntry] {
-        guard let jpegData = image.jpegData(compressionQuality: 0.8) else { return [] }
+        let preparedImage = image.aiFixingOrientationAndResizingIfNeeded(maxDimension: 2048) ?? image
+        // The 2048 px cap keeps these 0.8-quality JPEGs around 3–4 MB (≈5 MB once base64-encoded), well under OpenAI's 20 MB
+        // per-image upload limit while preserving legible job text.
+        guard let jpegData = preparedImage.jpegData(compressionQuality: 0.8) else { return [] }
         guard
             let apiKey = Bundle.main.infoDictionary?["OPENAI_API_KEY"] as? String,
             !apiKey.isEmpty
