@@ -13,10 +13,12 @@ struct MainTabView: View {
     var body: some View {
         PrimaryTabContainer()
             .safeAreaInset(edge: .top) {
-                ShellActionButtons(
-                    onShowMenu: { navigation.isPrimaryMenuPresented = true },
-                    onOpenHelp: { navigation.navigate(to: .helpCenter) }
-                )
+                if navigation.selectedPrimary != .timesheets {
+                    ShellActionButtons(
+                        onShowMenu: { navigation.isPrimaryMenuPresented = true },
+                        onOpenHelp: { navigation.navigate(to: .helpCenter) }
+                    )
+                }
             }
             .sheet(isPresented: menuPresentation) {
                 PrimaryDestinationMenu()
@@ -210,9 +212,11 @@ private struct MoreDestinationView: View {
 
 // MARK: - Action buttons & menu
 
-private struct ShellActionButtons: View {
+struct ShellActionButtons: View {
     var onShowMenu: () -> Void
     var onOpenHelp: () -> Void
+    var horizontalPadding: CGFloat = 16
+    var topPadding: CGFloat = 12
 
     var body: some View {
         HStack(spacing: 12) {
@@ -220,13 +224,13 @@ private struct ShellActionButtons: View {
             Spacer()
             RoundedActionButton(icon: "questionmark.circle", label: "Help", action: onOpenHelp)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
+        .padding(.horizontal, horizontalPadding)
+        .padding(.top, topPadding)
         .background(Color.clear)
     }
 }
 
-private struct RoundedActionButton: View {
+struct RoundedActionButton: View {
     let icon: String
     let label: String
     let action: () -> Void
