@@ -1,0 +1,140 @@
+import SwiftUI
+
+private struct JTGlassBackgroundModifier<S: Shape>: ViewModifier {
+    let shape: S
+    let strokeColor: Color
+    let strokeWidth: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial, in: shape)
+            .overlay(shape.stroke(strokeColor, lineWidth: strokeWidth))
+            .clipShape(shape)
+    }
+}
+
+public extension View {
+    func jtGlassBackground(cornerRadius: CGFloat = JTShapes.cardCornerRadius,
+                           strokeColor: Color = JTColors.glassStroke,
+                           strokeWidth: CGFloat = 1) -> some View {
+        jtGlassBackground(
+            shape: JTShapes.roundedRectangle(cornerRadius: cornerRadius),
+            strokeColor: strokeColor,
+            strokeWidth: strokeWidth
+        )
+    }
+
+    func jtGlassBackground<S: Shape>(shape: S,
+                                     strokeColor: Color = JTColors.glassStroke,
+                                     strokeWidth: CGFloat = 1) -> some View {
+        modifier(JTGlassBackgroundModifier(shape: shape, strokeColor: strokeColor, strokeWidth: strokeWidth))
+    }
+}
+
+/// Glass-morphism surface used for dashboard cards and detail panels.
+struct GlassCard<Content: View>: View {
+    private let cornerRadius: CGFloat
+    private let strokeColor: Color
+    private let strokeWidth: CGFloat
+    private let shadow: JTShadow
+    private let content: () -> Content
+
+    init(cornerRadius: CGFloat = JTShapes.cardCornerRadius,
+         strokeColor: Color = JTColors.glassStroke,
+         strokeWidth: CGFloat = 1,
+         shadow: JTShadow = JTElevations.card,
+         @ViewBuilder content: @escaping () -> Content) {
+        self.cornerRadius = cornerRadius
+        self.strokeColor = strokeColor
+        self.strokeWidth = strokeWidth
+        self.shadow = shadow
+        self.content = content
+    }
+
+    var body: some View {
+        content()
+            .jtGlassBackground(cornerRadius: cornerRadius, strokeColor: strokeColor, strokeWidth: strokeWidth)
+            .jtShadow(shadow)
+    }
+}
+
+/// A filled button that represents the primary call to action on a screen.
+struct JTPrimaryButton: View {
+    let title: String
+    var systemImage: String?
+    var action: () -> Void
+
+    init(_ title: String, systemImage: String? = nil, action: @escaping () -> Void) {
+        self.title = title
+        self.systemImage = systemImage
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: JTSpacing.sm) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                }
+                Text(title)
+            }
+            .font(JTTypography.button)
+        }
+        .buttonStyle(.jtPrimary)
+    }
+}
+
+private struct JTPrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(JTColors.onAccent)
+            .padding(.vertical, JTSpacing.md)
+            .padding(.horizontal, JTSpacing.lg)
+            .frame(maxWidth: .infinity)
+            .background(JTColors.accent, in: JTShapes.roundedRectangle(cornerRadius: JTShapes.buttonCornerRadius))
+            .jtShadow(JTElevations.button)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.88 : 1)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
+extension ButtonStyle where Self == JTPrimaryButtonStyle {
+    static var jtPrimary: JTPrimaryButtonStyle { JTPrimaryButtonStyle() }
+}
+
+/// Text input that sits on top of the glass surface styling.
+struct JTTextField: View {
+    private let title: String
+    @Binding private var text: String
+    private let icon: String?
+    private let isSecure: Bool
+
+    init(_ title: String, text: Binding<String>, icon: String? = nil, isSecure: Bool = false) {
+        self.title = title
+        self._text = text
+        self.icon = icon
+        self.isSecure = isSecure
+    }
+
+    var body: some View {
+        HStack(spacing: JTSpacing.sm) {
+            if let icon {
+                Image(systemName: icon)
+                    .foregroundStyle(JTColors.textMuted)
+            }
+            Group {
+                if isSecure {
+                    SecureField(title, text: $text)
+                } else {
+                    TextField(title, text: $text)
+                }
+            }
+            .foregroundStyle(JTColors.textPrimary)
+        }
+        .padding(.vertical, JTSpacing.md)
+        .padding(.horizontal, JTSpacing.lg)
+        .jtGlassBackground(cornerRadius: JTShapes.fieldCornerRadius)
+        .tint(JTColors.accent)
+    }
+}

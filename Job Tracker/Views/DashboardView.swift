@@ -4,33 +4,6 @@ import CoreLocation   // for distance / CLLocation
 import SwiftUI
 import UIKit // for UIImage in share attachments
 
-// MARK: – Glass utilities (file-scoped)
-fileprivate struct GlassStroke: View {
-    var cornerRadius: CGFloat = 16
-    var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
-    }
-}
-
-fileprivate struct GlassBackground: View {
-    var cornerRadius: CGFloat = 16
-    var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(.ultraThinMaterial)
-    }
-}
-
-fileprivate extension View {
-    func glassCard(cornerRadius: CGFloat = 16, shadow: CGFloat = 10) -> some View {
-        self
-            .background(GlassBackground(cornerRadius: cornerRadius))
-            .overlay(GlassStroke(cornerRadius: cornerRadius))
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(color: Color.black.opacity(0.20), radius: shadow, x: 0, y: 6)
-    }
-}
-
 struct DashboardView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var jobsViewModel: JobsViewModel
@@ -83,15 +56,6 @@ struct DashboardView: View {
         "Custom"          // opens manual entry
     ]
 
-    // MARK: – Shared Gradient
-    private static let topColor  = Color(red: 0.1725, green: 0.2431, blue: 0.3137)
-    private static let bottomColor = Color(red: 0.2980, green: 0.6314, blue: 0.6863)
-    private static let appGradient = LinearGradient(
-        gradient: Gradient(colors: [topColor, bottomColor]),
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-    
     // For animated transitions
     @Namespace private var animation
     
@@ -149,20 +113,11 @@ struct DashboardView: View {
                 .padding(.top, 4)
 
             // Full-width Create Job button
-            Button {
+            JTPrimaryButton("Create Job", systemImage: "plus") {
                 activeSheet = .createJob
-            } label: {
-                Label("Create Job", systemImage: "plus")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor)
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .shadow(radius: 4)
             }
             .padding(.horizontal)
-            .padding(.top, 6)
+            .padding(.top, JTSpacing.sm)
 
             // Job list grouped into Not Completed and Completed sections.
             let allJobs = filteredJobs()
@@ -287,9 +242,9 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Self.appGradient
+                JTGradients.background
                     .ignoresSafeArea()
-                
+
                 mainContent
             }
             .overlay(alignment: .top) {
@@ -901,125 +856,126 @@ struct JobCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // TITLE ROW
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "mappin.and.ellipse")
-                    .font(.callout)
-                    .foregroundColor(.white.opacity(0.9))
-                Text(job.address)
-                    .font(.headline.weight(.semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(2)
-                    .truncationMode(.tail)
-                Spacer(minLength: 6)
-            }
-
-            // SUBTITLE ROW: date + distance + HERE
-            HStack(spacing: 8) {
-                Text(job.date, style: .date)
-                    .font(.footnote)
-                    .foregroundColor(.white.opacity(0.8))
-
-                if let d = distanceString, !d.isEmpty {
-                    Text("• \(d)")
-                        .font(.footnote)
-                        .foregroundColor(.white.opacity(0.8))
-                        .accessibilityLabel("Distance \(d)")
+        GlassCard(cornerRadius: JTShapes.cardCornerRadius) {
+            VStack(alignment: .leading, spacing: 10) {
+                // TITLE ROW
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.callout)
+                        .foregroundStyle(JTColors.textSecondary)
+                    Text(job.address)
+                        .font(JTTypography.headline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(JTColors.textPrimary)
+                        .lineLimit(2)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 6)
                 }
 
-                if isHere {
-                    Text("Here")
-                        .font(.caption2).bold()
-                        .padding(.horizontal, 6).padding(.vertical, 4)
-                        .background(Color.green)
-                        .foregroundColor(.white)
-                        .clipShape(Capsule())
-                        .accessibilityLabel("You are here")
+                // SUBTITLE ROW: date + distance + HERE
+                HStack(spacing: 8) {
+                    Text(job.date, style: .date)
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+
+                    if let d = distanceString, !d.isEmpty {
+                        Text("• \(d)")
+                            .font(JTTypography.caption)
+                            .foregroundStyle(JTColors.textSecondary)
+                            .accessibilityLabel("Distance \(d)")
+                    }
+
+                    if isHere {
+                        Text("Here")
+                            .font(JTTypography.caption)
+                            .fontWeight(.bold)
+                            .padding(.horizontal, 6).padding(.vertical, 4)
+                            .background(JTColors.success)
+                            .foregroundStyle(JTColors.textPrimary)
+                            .clipShape(Capsule())
+                            .accessibilityLabel("You are here")
+                    }
+
+                    Spacer()
                 }
 
-                Spacer()
-            }
-
-            // OPTIONAL FIELDS
-            if let assignments = job.assignments?.trimmedNonEmpty {
-                KeyValueRow(key: "Assignment:", value: assignments)
-            }
-            if let materials = job.materialsUsed?.trimmedNonEmpty {
-                KeyValueRow(key: "Materials:", value: materials, lineLimit: 2)
-            }
-            if let notes = job.notes?.trimmedNonEmpty {
-                KeyValueRow(key: "Notes:", value: notes, lineLimit: 2)
-            }
-
-            // STATUS + ACTIONS
-            HStack(spacing: 10) {
-                Text("Status:")
-                    .foregroundColor(.white)
-
-                Button {
-                    showStatusDialog = true
-                } label: {
-                    Text(job.status)
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(statusBackground(for: job.status))
-                        .foregroundColor(.white)
-                        .clipShape(Capsule())
+                // OPTIONAL FIELDS
+                if let assignments = job.assignments?.trimmedNonEmpty {
+                    KeyValueRow(key: "Assignment:", value: assignments)
                 }
-                .confirmationDialog("Change Status",
-                                    isPresented: $showStatusDialog,
-                                    titleVisibility: .visible) {
-                    ForEach(statusOptions, id: \.self) { option in
-                        if option == "Custom" {
-                            Button("Custom…") { showCustomStatusEntry = true }
-                        } else {
-                            Button(option) { onStatusChange(option) }
+                if let materials = job.materialsUsed?.trimmedNonEmpty {
+                    KeyValueRow(key: "Materials:", value: materials, lineLimit: 2)
+                }
+                if let notes = job.notes?.trimmedNonEmpty {
+                    KeyValueRow(key: "Notes:", value: notes, lineLimit: 2)
+                }
+
+                // STATUS + ACTIONS
+                HStack(spacing: 10) {
+                    Text("Status:")
+                        .foregroundStyle(JTColors.textPrimary)
+
+                    Button {
+                        showStatusDialog = true
+                    } label: {
+                        Text(job.status)
+                            .font(JTTypography.subheadline)
+                            .fontWeight(.semibold)
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(statusBackground(for: job.status))
+                            .foregroundStyle(JTColors.textPrimary)
+                            .clipShape(Capsule())
+                    }
+                    .confirmationDialog("Change Status",
+                                        isPresented: $showStatusDialog,
+                                        titleVisibility: .visible) {
+                        ForEach(statusOptions, id: \.self) { option in
+                            if option == "Custom" {
+                                Button("Custom…") { showCustomStatusEntry = true }
+                            } else {
+                                Button(option) { onStatusChange(option) }
+                            }
                         }
                     }
-                }
 
-                Spacer()
+                    Spacer()
 
-                // Quick actions
-                Button(action: onMapTap) {
-                    Image(systemName: "map")
-                        .imageScale(.medium)
-                        .foregroundColor(.white)
-                        .padding(8)
-                        .background(Color.white.opacity(0.18))
-                        .clipShape(Circle())
-                }
-                .accessibilityLabel("Directions")
-                Button(action: onShare) {
-                    Image(systemName: "square.and.arrow.up")
-                        .imageScale(.medium)
-                        .foregroundColor(.white)
-                        .padding(8)
-                        .background(Color.white.opacity(0.18))
-                        .clipShape(Circle())
-                }
-                Button {
-                    showDeleteConfirm = true
+                    // Quick actions
+                    Button(action: onMapTap) {
+                        Image(systemName: "map")
+                            .imageScale(.medium)
+                            .foregroundStyle(JTColors.textPrimary)
+                            .padding(8)
+                            .jtGlassBackground(shape: Circle(), strokeColor: JTColors.glassSoftStroke)
+                    }
+                    .accessibilityLabel("Directions")
+                    Button(action: onShare) {
+                        Image(systemName: "square.and.arrow.up")
+                            .imageScale(.medium)
+                            .foregroundStyle(JTColors.textPrimary)
+                            .padding(8)
+                            .jtGlassBackground(shape: Circle(), strokeColor: JTColors.glassSoftStroke)
+                    }
+                    Button {
+                        showDeleteConfirm = true
 #if canImport(UIKit)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
 #endif
-                } label: {
-                    Image(systemName: "trash")
-                        .imageScale(.medium)
-                        .foregroundColor(.red)
-                        .padding(8)
-                        .background(Color.white.opacity(0.10))
-                        .clipShape(Circle())
+                    } label: {
+                        Image(systemName: "trash")
+                            .imageScale(.medium)
+                            .foregroundColor(.red)
+                            .padding(8)
+                            .jtGlassBackground(shape: Circle(), strokeColor: JTColors.glassSoftStroke)
+                    }
+                }
+                .alert("Delete this job?", isPresented: $showDeleteConfirm) {
+                    Button("Delete", role: .destructive) { onDelete() }
+                    Button("Cancel", role: .cancel) { }
                 }
             }
-            .alert("Delete this job?", isPresented: $showDeleteConfirm) {
-                Button("Delete", role: .destructive) { onDelete() }
-                Button("Cancel", role: .cancel) { }
-            }
+            .padding()
         }
-        .padding()
-        .glassCard(cornerRadius: 16, shadow: 12)
         .padding(.horizontal, 4)
         // Swipe actions (keeps your buttons too)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -1042,10 +998,10 @@ struct JobCard: View {
 
     private func statusBackground(for status: String) -> Color {
         let s = status.lowercased()
-        if s == "done" { return Color.green.opacity(0.6) }
-        if s == "pending" { return Color.gray.opacity(0.35) }
-        if s.contains("needs") { return Color.orange.opacity(0.6) }
-        return Color.white.opacity(0.12)
+        if s == "done" { return JTColors.success.opacity(0.7) }
+        if s == "pending" { return JTColors.warning.opacity(0.6) }
+        if s.contains("needs") { return JTColors.info.opacity(0.6) }
+        return JTColors.glassHighlight
     }
 
     private func houseNumber(_ full: String) -> String {
@@ -1065,11 +1021,11 @@ private struct KeyValueRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 6) {
             Text(key)
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.85))
+                .font(JTTypography.caption)
+                .foregroundStyle(JTColors.textSecondary)
             Text(value)
-                .font(.caption)
-                .foregroundColor(.white)
+                .font(JTTypography.caption)
+                .foregroundStyle(JTColors.textPrimary)
                 .lineLimit(lineLimit)
                 .truncationMode(.tail)
         }
@@ -1205,23 +1161,25 @@ private struct SummaryCard: View {
     let completed: Int
 
     var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Today")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.8))
-                Text(formatted(date))
-                    .font(.title3.weight(.semibold))
+        GlassCard(cornerRadius: JTShapes.largeCardCornerRadius) {
+            HStack(spacing: JTSpacing.md) {
+                VStack(alignment: .leading, spacing: JTSpacing.xs) {
+                    Text("Today")
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+                    Text(formatted(date))
+                        .font(JTTypography.title3)
+                        .foregroundStyle(JTColors.textPrimary)
+                }
+
+                Spacer()
+
+                MetricPill(title: "Total", value: total)
+                MetricPill(title: "Pending", value: pending)
+                MetricPill(title: "Done", value: completed)
             }
-
-            Spacer()
-
-            MetricPill(title: "Total", value: total)
-            MetricPill(title: "Pending", value: pending)
-            MetricPill(title: "Done", value: completed)
+            .padding(JTSpacing.lg)
         }
-        .padding(16)
-        .glassCard(cornerRadius: 18, shadow: 10)
     }
 
     private func formatted(_ d: Date) -> String {
@@ -1236,15 +1194,15 @@ private struct SummaryCard: View {
         var body: some View {
             VStack(spacing: 4) {
                 Text(title)
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.85))
+                    .font(JTTypography.caption)
+                    .foregroundStyle(JTColors.textSecondary)
                 Text("\(value)")
-                    .font(.headline.weight(.semibold))
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.textPrimary)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 1))
+            .padding(.horizontal, JTSpacing.sm)
+            .padding(.vertical, JTSpacing.xs)
+            .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassStroke)
         }
     }
 }
