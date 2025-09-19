@@ -24,6 +24,7 @@ enum JTColors {
     static let success = Color.green.opacity(0.9)
     static let warning = Color.yellow.opacity(0.9)
     static let info = Color.blue.opacity(0.9)
+    static let error = Color(red: 0.96, green: 0.33, blue: 0.33)
 }
 
 /// Gradients that compose reusable backgrounds.

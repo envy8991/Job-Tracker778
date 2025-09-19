@@ -8,7 +8,7 @@ recreating colors or glass effects in individual views.
 
 | Area | Type | Notes |
 | --- | --- | --- |
-| Colors | `JTColors` | Brand gradient stops (`backgroundTop`, `backgroundBottom`), semantic text colors, and glass strokes. Use `JTGradients.background` for full-screen backgrounds. |
+| Colors | `JTColors` | Brand gradient stops (`backgroundTop`, `backgroundBottom`), semantic text colors, and glass strokes. Use `JTGradients.background` for full-screen backgrounds. Includes semantic accents such as `success`, `warning`, `info`, and `error`. |
 | Typography | `JTTypography` | Preconfigured fonts for screen titles, headlines, captions, and buttons. |
 | Spacing | `JTSpacing` | Baseline spacing units (`xs`–`xxl`). Multiply these rather than inventing ad-hoc constants. |
 | Shapes | `JTShapes` | Corner radii for cards, buttons, fields, and helper factories such as `roundedRectangle(cornerRadius:)`. |
@@ -22,7 +22,7 @@ recreating colors or glass effects in individual views.
 ## Components
 
 * `JTPrimaryButton` renders the primary call to action. Provide the label text (and optionally a SF Symbol) and the tap action.
-* `JTTextField` renders a material-backed text input. Supply the placeholder and `Binding<String>`, plus `icon` or `isSecure` as needed.
+* `JTTextField` renders a material-backed text input. Supply the placeholder and `Binding<String>`, plus optional `icon`, secure entry, and a `JTInputState` for validation feedback. Inline helper or error messaging is supported through the `supportingText` parameter, and secure fields expose a built-in visibility toggle for accessibility.
 
 These components already consume the tokens above. Compose them together whenever you are building new flows so typography, spacing, and color stay aligned with the rest of the experience.
 

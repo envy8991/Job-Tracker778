@@ -104,37 +104,129 @@ extension ButtonStyle where Self == JTPrimaryButtonStyle {
 }
 
 /// Text input that sits on top of the glass surface styling.
+enum JTInputState: Equatable {
+    case neutral
+    case success
+    case error
+
+    func strokeColor(isFocused: Bool) -> Color {
+        switch self {
+        case .neutral:
+            return isFocused ? JTColors.accent : JTColors.glassStroke
+        case .success:
+            return JTColors.success
+        case .error:
+            return JTColors.error
+        }
+    }
+
+    func iconColor(isFocused: Bool) -> Color {
+        switch self {
+        case .neutral:
+            return isFocused ? JTColors.accent : JTColors.textMuted
+        case .success:
+            return JTColors.success
+        case .error:
+            return JTColors.error
+        }
+    }
+
+    var supportingTextColor: Color {
+        switch self {
+        case .neutral:
+            return JTColors.textMuted
+        case .success:
+            return JTColors.success
+        case .error:
+            return JTColors.error
+        }
+    }
+}
+
+/// Glass-backed text field that supports icons, inline messaging, and password reveals.
 struct JTTextField: View {
     private let title: String
     @Binding private var text: String
     private let icon: String?
     private let isSecure: Bool
+    private let allowsSecureToggle: Bool
+    private let state: JTInputState
+    private let supportingText: String?
+    private let customAccessibilityLabel: String?
 
-    init(_ title: String, text: Binding<String>, icon: String? = nil, isSecure: Bool = false) {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isPasswordVisible = false
+    @FocusState private var isFocused: Bool
+
+    init(_ title: String,
+         text: Binding<String>,
+         icon: String? = nil,
+         isSecure: Bool = false,
+         allowsSecureToggle: Bool = true,
+         state: JTInputState = .neutral,
+         supportingText: String? = nil,
+         accessibilityLabel: String? = nil) {
         self.title = title
         self._text = text
         self.icon = icon
         self.isSecure = isSecure
+        self.allowsSecureToggle = allowsSecureToggle
+        self.state = state
+        self.supportingText = supportingText
+        self.customAccessibilityLabel = accessibilityLabel
     }
 
+    private var usesSecureEntry: Bool { isSecure && !isPasswordVisible }
+    private var fieldAccessibilityLabel: String { customAccessibilityLabel ?? title }
+
     var body: some View {
-        HStack(spacing: JTSpacing.sm) {
-            if let icon {
-                Image(systemName: icon)
-                    .foregroundStyle(JTColors.textMuted)
-            }
-            Group {
-                if isSecure {
-                    SecureField(title, text: $text)
-                } else {
-                    TextField(title, text: $text)
+        VStack(alignment: .leading, spacing: JTSpacing.xs) {
+            HStack(spacing: JTSpacing.sm) {
+                if let icon {
+                    Image(systemName: icon)
+                        .foregroundStyle(state.iconColor(isFocused: isFocused))
+                        .accessibilityHidden(true)
+                }
+
+                Group {
+                    if usesSecureEntry {
+                        SecureField(title, text: $text)
+                    } else {
+                        TextField(title, text: $text)
+                    }
+                }
+                .font(JTTypography.body)
+                .foregroundStyle(JTColors.textPrimary)
+                .focused($isFocused)
+                .accessibilityLabel(fieldAccessibilityLabel)
+
+                if isSecure, allowsSecureToggle {
+                    Button(action: { isPasswordVisible.toggle() }) {
+                        Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(state.iconColor(isFocused: isFocused))
+                    .accessibilityLabel(isPasswordVisible ? "Hide password" : "Show password")
+                    .accessibilityHint("Double tap to toggle password visibility")
                 }
             }
-            .foregroundStyle(JTColors.textPrimary)
+            .padding(.vertical, JTSpacing.md)
+            .padding(.horizontal, JTSpacing.lg)
+            .jtGlassBackground(cornerRadius: JTShapes.fieldCornerRadius,
+                               strokeColor: state.strokeColor(isFocused: isFocused),
+                               strokeWidth: 1.2)
+            .tint(JTColors.accent)
+
+            if let supportingText, !supportingText.isEmpty {
+                Text(supportingText)
+                    .font(JTTypography.caption)
+                    .foregroundStyle(state.supportingTextColor)
+                    .accessibilityLabel(supportingText)
+            }
         }
-        .padding(.vertical, JTSpacing.md)
-        .padding(.horizontal, JTSpacing.lg)
-        .jtGlassBackground(cornerRadius: JTShapes.fieldCornerRadius)
-        .tint(JTColors.accent)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: isFocused)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: state)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: supportingText)
     }
 }

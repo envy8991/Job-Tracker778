@@ -80,7 +80,13 @@ class FirebaseService {
     func signOutUser() throws {
         try auth.signOut()
     }
-    
+
+    func sendPasswordReset(to email: String, completion: @escaping (Error?) -> Void) {
+        auth.sendPasswordReset(withEmail: email) { error in
+            completion(error)
+        }
+    }
+
     func currentUserID() -> String? {
         return auth.currentUser?.uid
     }
