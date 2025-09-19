@@ -110,8 +110,7 @@ struct JobSearchView: View {
                         resultsContent
                     }
                     .padding(16)
-                    // Keep content below the floating hamburger (matches HelpCenterView)
-                    .hamburgerClearance(72)
+                    
                 }
             }
         }
@@ -423,21 +422,8 @@ private struct AggregatedDetailView: View {
                     }
                 }
                 .padding(16)
-                .hamburgerClearance(72)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-// MARK: - Hamburger Clearance
-
-extension View {
-    /// Adds invisible top space so the floating hamburger button doesn’t cover content.
-    /// Adjust the height if you change the button size/position.
-    func hamburgerClearance(_ height: CGFloat = 64) -> some View {
-        self.safeAreaInset(edge: .top) {
-            Color.clear.frame(height: height)
-        }
     }
 }

@@ -34,8 +34,7 @@ struct HelpCenterView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var usersViewModel: UsersViewModel
     @EnvironmentObject var jobsViewModel: JobsViewModel
-
-    var onNavigate: ((MenuDestination) -> Void)?
+    @EnvironmentObject var navigation: AppNavigationViewModel
 
     @State private var query: String = ""
     @State private var showingCreateJob = false
@@ -88,7 +87,7 @@ struct HelpCenterView: View {
                     "Once a status is changed to any status besides pending they get added to your Timesheet/YellowSheet automatically.",
                     "Change a status anytime from **Dashboard** or **tapping the job itself on the dashboard** to update instantly."
                 ],
-                action: { onNavigate?(.dashboard) }
+                action: { navigation.navigate(to: .dashboard) }
             ),
             HelpTopic(
                 title: "Dashboard",
@@ -101,7 +100,7 @@ struct HelpCenterView: View {
                     "Tap **share** to send job details and attached photos.",
                     "Use the date picker to jump to another day."
                 ],
-                action: { onNavigate?(.dashboard) }
+                action: { navigation.navigate(to: .dashboard) }
             ),
             HelpTopic(
                 title: "Timesheets",
@@ -113,7 +112,7 @@ struct HelpCenterView: View {
                     "Your past timesheets are also always accessible here. just simpy change the week..",
                     "Use **Print** to AirPrint or **Share** to send/save the PDF."
                 ],
-                action: { onNavigate?(.timesheets) }
+                action: { navigation.navigate(to: .timesheets) }
             ),
             HelpTopic(
                 title: "Yellow Sheet",
@@ -125,7 +124,7 @@ struct HelpCenterView: View {
                     "Shows any job with statuses that aren’t set to Pending)."
                     
                 ],
-                action: { onNavigate?(.yellowSheets) }
+                action: { navigation.navigate(to: .yellowSheet) }
             ),
             
             HelpTopic(
@@ -137,7 +136,7 @@ struct HelpCenterView: View {
                     "Long‑press to insert between points; drag to adjust; tap a pin for details.",
                     "Tap **share** to export a PDF of your route."
                 ],
-                action: { onNavigate?(.maps) }
+                action: { navigation.navigate(to: .maps) }
             ),
             HelpTopic(
                 title: "Find a Partner",
@@ -148,7 +147,7 @@ struct HelpCenterView: View {
                     "When paired, everything you do will work together allowing you to easily update jobs, this feature is useful for timesheets when one person  isn’t here.",
                     "Unpair anytime from the Partner screen."
                 ],
-                action: { onNavigate?(.findPartner) }
+                action: { navigation.navigate(to: .findPartner) }
             ),
             HelpTopic(
                 title: "Account & Settings",
@@ -159,7 +158,7 @@ struct HelpCenterView: View {
                     "Enable **arrival notifications** for today’s route.",
                     "Manage account and sign out from here."
                 ],
-                action: { onNavigate?(.settings) }
+                action: { navigation.navigate(to: .settings) }
             )
         ]
     }
@@ -254,14 +253,13 @@ struct HelpCenterView: View {
                     }
                 }
                 .padding(16)
-                .hamburgerClearance(72)   // keeps content clear of the floating menu button
             }
         }
         .sheet(isPresented: $showingCreateJob) {
             NavigationStack { CreateJobView() }
         }
         .sheet(item: $selectedTopic) { topic in
-            TopicDetailSheet(topic: topic, onNavigate: onNavigate)
+            TopicDetailSheet(topic: topic)
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .navigationBar)
@@ -270,12 +268,10 @@ struct HelpCenterView: View {
     // Topic detail sheet
     fileprivate struct TopicDetailSheet: View {
         fileprivate let topic: HelpTopic
-        var onNavigate: ((MenuDestination) -> Void)?
         @Environment(\.dismiss) private var dismiss
 
-        fileprivate init(topic: HelpTopic, onNavigate: ((MenuDestination) -> Void)? = nil) {
+        fileprivate init(topic: HelpTopic) {
             self.topic = topic
-            self.onNavigate = onNavigate
         }
 
         var body: some View {

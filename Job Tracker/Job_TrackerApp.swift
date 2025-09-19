@@ -42,6 +42,7 @@ struct JobTrackerApp: App {
     @StateObject private var authViewModel  = JobTrackerApp.makeAuthVM()
     @StateObject private var jobsViewModel  = JobTrackerApp.makeJobsVM()
     @StateObject private var usersViewModel = JobTrackerApp.makeUsersVM()
+    @StateObject private var navigationViewModel = AppNavigationViewModel()
     @AppStorage("arrivalAlertsEnabledToday") private var arrivalAlertsEnabledToday = true
     @AppStorage("hasSeenTutorial") private var hasSeenTutorial: Bool = false
     @State private var showSplash: Bool = true
@@ -119,6 +120,7 @@ struct JobTrackerApp: App {
             .environmentObject(authViewModel)
             .environmentObject(jobsViewModel)
             .environmentObject(usersViewModel)
+            .environmentObject(navigationViewModel)
             .environmentObject(locationService)
             .preferredColorScheme(.dark)
             // Deep links

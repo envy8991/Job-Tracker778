@@ -1,346 +1,300 @@
-//
-//  MainTabView.swift
-//  Job Tracker
-//
-//  Updated  May 2025
-//
-
 import SwiftUI
 
-private let kMenuWidth: CGFloat = 300
-private let kHamburgerInsetHeight: CGFloat = 64 // reserves space below the floating hamburger
+struct MainTabView: View {
+    @EnvironmentObject private var navigation: AppNavigationViewModel
 
-// MARK: – Drawer destinations
-enum MenuDestination: CaseIterable {
-    case profile
-    case dashboard
-    case timesheets
-    case yellowSheets
-    case maps
-    case jobSearch
-    case findPartner   // NEW
-    case supervisor    // NEW
-    case admin         // NEW
-    case settings
-    case helpCenter
+    private var menuPresentation: Binding<Bool> {
+        Binding(
+            get: { navigation.isPrimaryMenuPresented },
+            set: { navigation.isPrimaryMenuPresented = $0 }
+        )
+    }
+
+    var body: some View {
+        PrimaryTabContainer()
+            .safeAreaInset(edge: .top) {
+                ShellActionButtons(
+                    onShowMenu: { navigation.isPrimaryMenuPresented = true },
+                    onOpenHelp: { navigation.navigate(to: .helpCenter) }
+                )
+            }
+            .sheet(isPresented: menuPresentation) {
+                PrimaryDestinationMenu()
+                    .presentationDetents([.medium, .large])
+            }
+    }
 }
 
-// MARK: – Root container
-struct MainTabView: View {
-    
-    // Drawer state
-    @State private var showMenu = false
-    @State private var selected: MenuDestination = .dashboard
-    
-    // Services
-    @StateObject private var locationService  = LocationService()
-   
-    
-    // Global view‑models provided higher in the hierarchy
-    @EnvironmentObject var usersViewModel: UsersViewModel
-    @EnvironmentObject var authViewModel:  AuthViewModel
-    
+// MARK: - Tab container
+
+private struct PrimaryTabContainer: View {
+    @EnvironmentObject private var navigation: AppNavigationViewModel
+
+    private var selection: Binding<AppNavigationViewModel.PrimaryDestination> {
+        Binding(
+            get: { navigation.selectedPrimary },
+            set: { navigation.selectPrimary($0) }
+        )
+    }
+
     var body: some View {
-        GeometryReader { proxy in
-            let topInset = proxy.safeAreaInsets.top
-            
-            ZStack(alignment: .leading) {
-                
-                // ── Active screen ────────────────────────────────────────────────
-                activeScreen
-                    .disabled(showMenu)                     // lock touches when drawer open
-                    .scaleEffect(showMenu ? 0.98 : 1.0)
-                    .offset(x: showMenu ? kMenuWidth * 0.12 : 0)
-                    .overlay(
-                        Rectangle()
-                            .fill(Color.black.opacity(showMenu ? 0.12 : 0))
-                            .allowsHitTesting(false)
-                    )
-                    // Reserve headroom under the floating hamburger so it never obscures content.
-                    .safeAreaInset(edge: .top) {
-                        Color.clear
-                            .frame(height: kHamburgerInsetHeight)
-                    }
-                    .animation(.spring(response: 0.32, dampingFraction: 0.9), value: showMenu)
-                
-                // ── Hamburger button ────────────────────────────────────────────
-                VStack {
-                    HStack {
-                        Button {
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) { showMenu.toggle() }
-                        } label: {
-                            Image(systemName: "line.horizontal.3")
-                                .imageScale(.large)
-                                .padding(12)
-                                .background(Color.black.opacity(0.55))
-                                .clipShape(Circle())
-                                .foregroundColor(.white)
-                                .shadow(radius: 6, y: 3)
-                        }
-                        Spacer()
-                    }
-                    Spacer()
+        TabView(selection: selection) {
+            DashboardView()
+                .tag(AppNavigationViewModel.PrimaryDestination.dashboard)
+                .tabItem {
+                    Label(AppNavigationViewModel.PrimaryDestination.dashboard.title,
+                          systemImage: AppNavigationViewModel.PrimaryDestination.dashboard.systemImage)
                 }
-                // sit just below the status bar on all devices
-                .padding(.top, topInset + 6)
-                .padding(.leading, 16)
-                .zIndex(showMenu ? 0 : 1)
-                
-                // ── Tap‑to‑dismiss overlay ──────────────────────────────────────
-                if showMenu {
-                    Color.black.opacity(0.001)             // invisible hit‑area
-                        .ignoresSafeArea()
-                        .padding(.leading, kMenuWidth)      // exclude drawer width
-                        .onTapGesture {
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) { showMenu = false }
-                        }
+
+            WeeklyTimesheetView()
+                .tag(AppNavigationViewModel.PrimaryDestination.timesheets)
+                .tabItem {
+                    Label(AppNavigationViewModel.PrimaryDestination.timesheets.title,
+                          systemImage: AppNavigationViewModel.PrimaryDestination.timesheets.systemImage)
                 }
-                
-                // ── Slide‑in side menu ─────────────────────────────────────────
-                SideMenuView(showMenu: $showMenu, selected: $selected)
-                    .frame(width: kMenuWidth)
-                    .offset(x: showMenu ? 0 : -kMenuWidth)
-                    .accessibilityHidden(!showMenu)
-                    .animation(.spring(response: 0.32, dampingFraction: 0.9), value: showMenu)
-                    .zIndex(2) // ensure drawer sits above content and hamburger when open
-                
-                // Edge-swipe to open
-                Color.clear
-                    .frame(width: 16)
-                    .contentShape(Rectangle())
-                    .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
-                        // keep layout reactive on rotation; no-op but forces refresh
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 10, coordinateSpace: .local)
-                            .onEnded { value in
-                                if value.startLocation.x <= 16, value.translation.width > 24 {
-                                    withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) { showMenu = true }
-                                }
-                            }
-                    )
-                    .ignoresSafeArea(edges: .vertical)
-                    .zIndex(1)
-            }
-            .zIndex(0)
+
+            YellowSheetView()
+                .tag(AppNavigationViewModel.PrimaryDestination.yellowSheet)
+                .tabItem {
+                    Label(AppNavigationViewModel.PrimaryDestination.yellowSheet.title,
+                          systemImage: AppNavigationViewModel.PrimaryDestination.yellowSheet.systemImage)
+                }
+
+            MapsView()
+                .tag(AppNavigationViewModel.PrimaryDestination.maps)
+                .tabItem {
+                    Label(AppNavigationViewModel.PrimaryDestination.maps.title,
+                          systemImage: AppNavigationViewModel.PrimaryDestination.maps.systemImage)
+                }
+
+            JobSearchView()
+                .tag(AppNavigationViewModel.PrimaryDestination.search)
+                .tabItem {
+                    Label(AppNavigationViewModel.PrimaryDestination.search.title,
+                          systemImage: AppNavigationViewModel.PrimaryDestination.search.systemImage)
+                }
+
+            MoreTabView()
+                .tag(AppNavigationViewModel.PrimaryDestination.more)
+                .tabItem {
+                    Label(AppNavigationViewModel.PrimaryDestination.more.title,
+                          systemImage: AppNavigationViewModel.PrimaryDestination.more.systemImage)
+                }
         }
     }
-    
-    // MARK: – Screen switcher
+}
+
+// MARK: - More navigation
+
+struct MoreTabView: View {
+    @EnvironmentObject private var navigation: AppNavigationViewModel
+
+    private var morePathBinding: Binding<[AppNavigationViewModel.Destination]> {
+        Binding(
+            get: { navigation.morePath },
+            set: { navigation.updateMorePath($0) }
+        )
+    }
+
+    private let backgroundGradient = LinearGradient(
+        colors: [
+            Color(red: 0.10, green: 0.14, blue: 0.18),
+            Color(red: 0.20, green: 0.45, blue: 0.55)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    var body: some View {
+        NavigationStack(path: morePathBinding) {
+            MoreMenuList()
+                .navigationTitle("More")
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationDestination(for: AppNavigationViewModel.Destination.self) { destination in
+                    MoreDestinationView(destination: destination)
+                }
+        }
+        .background(backgroundGradient.ignoresSafeArea())
+        .onAppear {
+            if !navigation.activeDestination.isMoreStackDestination {
+                navigation.navigate(to: .more)
+            }
+        }
+    }
+}
+
+private struct MoreMenuList: View {
+    @EnvironmentObject private var navigation: AppNavigationViewModel
+    @EnvironmentObject private var authViewModel: AuthViewModel
+
+    var body: some View {
+        List {
+            Section("Account") {
+                NavigationLink(value: AppNavigationViewModel.Destination.profile) {
+                    Label("Profile", systemImage: AppNavigationViewModel.Destination.profile.systemImage)
+                }
+                NavigationLink(value: AppNavigationViewModel.Destination.settings) {
+                    Label("Settings", systemImage: AppNavigationViewModel.Destination.settings.systemImage)
+                }
+            }
+
+            Section("Team") {
+                NavigationLink(value: AppNavigationViewModel.Destination.findPartner) {
+                    Label("Find a Partner", systemImage: AppNavigationViewModel.Destination.findPartner.systemImage)
+                }
+            }
+
+            if authViewModel.isSupervisorFlag {
+                Section("Supervisor") {
+                    NavigationLink(value: AppNavigationViewModel.Destination.supervisor) {
+                        Label("Supervisor", systemImage: AppNavigationViewModel.Destination.supervisor.systemImage)
+                    }
+                }
+            }
+
+            if authViewModel.isAdminFlag {
+                Section("Admin") {
+                    NavigationLink(value: AppNavigationViewModel.Destination.admin) {
+                        Label("Admin", systemImage: AppNavigationViewModel.Destination.admin.systemImage)
+                    }
+                }
+            }
+
+            Section("Support") {
+                NavigationLink(value: AppNavigationViewModel.Destination.helpCenter) {
+                    Label("Help Center", systemImage: AppNavigationViewModel.Destination.helpCenter.systemImage)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(red: 0.10, green: 0.14, blue: 0.18),
+                    Color(red: 0.20, green: 0.45, blue: 0.55)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+        )
+        .listStyle(.insetGrouped)
+    }
+}
+
+private struct MoreDestinationView: View {
+    let destination: AppNavigationViewModel.Destination
+
     @ViewBuilder
-    private var activeScreen: some View {
-        switch selected {
+    var body: some View {
+        switch destination {
         case .profile:
             ProfileView()
-            
-        case .dashboard:
-            DashboardView()
-                .environmentObject(locationService)
-                
-            
-        case .timesheets:
-            WeeklyTimesheetView()
-            
-        case .yellowSheets:
-            YellowSheetView()
-            
-        case .maps:
-            MapsView()
-                .environmentObject(locationService)
-                
-            
-        case .jobSearch:
-            JobSearchView()
-            
         case .findPartner:
-            NavigationStack {
-                FindPartnerView()
-                    .environmentObject(usersViewModel)
-                    .environmentObject(authViewModel)
-            }
-            
+            FindPartnerView()
         case .supervisor:
-            NavigationStack {
-                SupervisorDashboardView()
-                    .environmentObject(authViewModel)
-            }
-
+            SupervisorDashboardView()
         case .admin:
-            NavigationStack {
-                AdminPanelView()
-                    .environmentObject(authViewModel)
-            }
-            
-        case .helpCenter:
-            NavigationStack {
-                HelpCenterView(onNavigate: { dest in
-                    // Switch the selected tab when a Help topic's "Try it now" is tapped
-                    selected = dest
-                })
-            }
-            
+            AdminPanelView()
         case .settings:
             SettingsView()
+        case .helpCenter:
+            HelpCenterView()
+        case .more:
+            MoreMenuList()
+        default:
+            EmptyView()
         }
     }
 }
 
-// MARK: – Side‑Menu drawer
-struct SideMenuView: View {
-    @Binding var showMenu: Bool
-    @Binding var selected: MenuDestination
-    
-    @EnvironmentObject var authViewModel: AuthViewModel
-    
+// MARK: - Action buttons & menu
+
+private struct ShellActionButtons: View {
+    var onShowMenu: () -> Void
+    var onOpenHelp: () -> Void
+
     var body: some View {
-        ZStack(alignment: .leading) {
-            // Frosted glass background with subtle gradient tint
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.10),
-                            Color.black.opacity(0.05)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.25), radius: 16, x: 0, y: 12)
-                .ignoresSafeArea(edges: .bottom) // keep top insets so it never overlaps status elements
-            
-            // Scrollable content
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    // ── Profile header ─────────────────────────────────────────────
-                    Button {
-                        selected = .profile
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) { showMenu = false }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "person.crop.circle.fill")
-                                .resizable()
-                                .frame(width: 56, height: 56)
-                                .foregroundStyle(.white)
-                                .overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(authViewModel.currentUser.map { "\($0.firstName) \($0.lastName)" } ?? "Profile")
-                                    .font(.headline)
-                                    .foregroundStyle(.white)
-                                Text(authViewModel.currentUser?.email ?? "")
-                                    .font(.caption)
-                                    .foregroundStyle(.white.opacity(0.7))
-                            }
-                            Spacer()
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 52)
-                        .padding(.bottom, 20)
-                    }
-                    .buttonStyle(.plain)
-                    
-                    // ── Menu sections ──────────────────────────────────────────────
-                    sectionLabel("MAIN")
-                    menuButton("Dashboard",  .dashboard, systemImage: "rectangle.grid.2x2")
-                    
-                    sectionLabel("INFO")
-                    menuButton("Timesheets",    .timesheets, systemImage: "clock")
-                    menuButton("Yellow Sheets", .yellowSheets, systemImage: "doc.text")
-                    
-                    sectionLabel("MAPS")
-                    menuButton("Route Mapper", .maps, systemImage: "map")
-                    
-                    sectionLabel("JOB SEARCH")
-                    menuButton("Job Search", .jobSearch, systemImage: "magnifyingglass")
-                    
-                    sectionLabel("CREW PARTNER")
-                    menuButton("Find a Partner", .findPartner, systemImage: "person.2")
-                    
-                    if authViewModel.isSupervisorFlag {
-                        sectionLabel("SUPERVISOR")
-                        menuButton("Supervisor", .supervisor, systemImage: "person.text.rectangle")
-                    }
-                    
-                    if authViewModel.isAdminFlag {
-                        sectionLabel("ADMIN")
-                        menuButton("Admin", .admin, systemImage: "gearshape.2")
-                    }
-                    
-                    sectionLabel("HELP")
-                    menuButton("Help Center", .helpCenter, systemImage: "questionmark.circle")
-                    
-                    sectionLabel("SETTINGS")
-                    menuButton("Settings", .settings, systemImage: "gearshape")
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.bottom, 24) // breathing room on small screens
-            }
+        HStack(spacing: 12) {
+            RoundedActionButton(icon: "line.3.horizontal", label: "Menu", action: onShowMenu)
+            Spacer()
+            RoundedActionButton(icon: "questionmark.circle", label: "Help", action: onOpenHelp)
         }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .background(Color.clear)
     }
-    
-    // MARK: – Helpers
-    private func menuButton(_ label: String, _ dest: MenuDestination, showDot: Bool = false, systemImage: String? = nil) -> some View {
-        Button {
-            selected = dest
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) { showMenu = false }
-        } label: {
-            HStack(spacing: 12) {
-                if let systemImage {
-                    Image(systemName: systemImage)
-                        .imageScale(.medium)
-                        .frame(width: 20)
-                        .foregroundStyle(.white.opacity(0.9))
-                }
-                
-                Text(label)
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                
-                if showDot {
-                    Circle()
-                        .fill(Color(red: 0.31, green: 0.97, blue: 0.66))
-                        .frame(width: 8, height: 8)
-                }
-                
-                Spacer()
-            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(selected == dest ? 0.12 : 0.0))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(selected == dest ? 0.22 : 0.0), lineWidth: 1)
-                    )
-            )
-            .contentShape(Rectangle())
+}
+
+private struct RoundedActionButton: View {
+    let icon: String
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(label, systemImage: icon)
+                .font(.subheadline.bold())
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                        )
+                )
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 2)
-    }
-    
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundStyle(.white.opacity(0.6))
-            .padding(.horizontal)
-            .padding(.top, 20)
+        .shadow(color: Color.black.opacity(0.18), radius: 12, x: 0, y: 6)
     }
 }
 
-// MARK: – Placeholder screens (replace with real implementations)
+private struct PrimaryDestinationMenu: View {
+    @EnvironmentObject private var navigation: AppNavigationViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Primary Destinations") {
+                    ForEach(navigation.primaryDestinations, id: \.self) { destination in
+                        Button {
+                            navigation.navigate(to: destination)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Label(destination.title, systemImage: destination.systemImage)
+                                Spacer()
+                                if navigation.activeDestination.primaryDestination == destination.primaryDestination {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.blue)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("Navigate")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Placeholder screens
 
 struct AdminPanelView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+
     var body: some View {
         VStack(spacing: 12) {
             Text("Admin Panel")

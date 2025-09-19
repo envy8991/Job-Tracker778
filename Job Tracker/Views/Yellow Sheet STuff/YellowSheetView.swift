@@ -6,8 +6,6 @@ struct YellowSheetView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var yellowSheetsVM = UserYellowSheetsViewModel()
     
-    private let hamburgerOffset: CGFloat = 88
-    
     // This date determines the current week boundaries.
     @State private var selectedDate = Date()
     // Controls whether the full calendar is shown.
@@ -33,9 +31,6 @@ struct YellowSheetView: View {
                 .ignoresSafeArea()
                 
                 VStack {
-                    // Reserve vertical space so the floating hamburger button doesn't overlap
-                    Color.clear.frame(height: hamburgerOffset)
-                    
                     // Minimal Week Picker
                     minimalWeekPicker
                     
@@ -96,7 +91,6 @@ struct YellowSheetView: View {
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
-        .hamburgerClearance(hamburgerOffset)
         // Full calendar sheet.
         .sheet(isPresented: $showCalendar) {
             NavigationView {
