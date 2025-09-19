@@ -4,6 +4,7 @@ import FirebaseStorage
 struct YellowSheetView: View {
     @EnvironmentObject var jobsViewModel: JobsViewModel
     @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @StateObject private var yellowSheetsVM = UserYellowSheetsViewModel()
     
     // This date determines the current week boundaries.
@@ -16,6 +17,10 @@ struct YellowSheetView: View {
     @State private var partnerUid: String? = nil
     @State private var saveAlertMessage = ""
     
+    private var topContentPadding: CGFloat {
+        horizontalSizeClass == .compact ? 72 : 32
+    }
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -33,7 +38,7 @@ struct YellowSheetView: View {
                 VStack {
                     // Minimal Week Picker
                     minimalWeekPicker
-                    
+
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 16) {
                             ForEach(sortedJobGroups, id: \.key) { group in
@@ -62,6 +67,7 @@ struct YellowSheetView: View {
                     .padding(.horizontal)
                     .padding(.bottom, 10)
                 }
+                .padding(.top, topContentPadding)
             }
             .navigationTitle("     ")
             .onAppear {
