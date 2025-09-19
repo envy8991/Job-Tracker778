@@ -16,7 +16,7 @@ struct ContentView: View {
             if authViewModel.isSignedIn {
                 AppShellView()
             } else {
-                LoginView() // or a combined AuthView
+                AuthFlowView()
             }
         }
         .onAppear {

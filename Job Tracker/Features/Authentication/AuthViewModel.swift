@@ -78,6 +78,14 @@ func signIn(email: String, password: String, completion: @escaping (Error?) -> V
     }
 }
 
+func sendPasswordReset(email: String, completion: @escaping (Error?) -> Void) {
+    FirebaseService.shared.sendPasswordReset(to: email) { error in
+        DispatchQueue.main.async {
+            completion(error)
+        }
+    }
+}
+
 func refreshCurrentUser(completion: ((Error?) -> Void)? = nil) {
     FirebaseService.shared.fetchCurrentUser { [weak self] result in
         DispatchQueue.main.async {
