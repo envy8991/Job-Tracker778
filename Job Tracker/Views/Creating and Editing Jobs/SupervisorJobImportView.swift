@@ -428,8 +428,36 @@ final class JobSheetParser {
         Respond with JSON only (no explanations, markdown, or extra text). Return [] if no jobs are present.
         """
 
+        let jobItemProperties: [String: Any] = [
+            "address": ["type": "string"],
+            "jobNumber": ["type": ["string", "null"]],
+            "assigneeName": ["type": ["string", "null"]],
+            "assigneeId": ["type": ["string", "null"]],
+            "notes": ["type": ["string", "null"]],
+            "rawText": ["type": ["string", "null"]]
+        ]
+
+        let jobItemSchema: [String: Any] = [
+            "type": "object",
+            "required": ["address"],
+            "properties": jobItemProperties,
+            "additionalProperties": false
+        ]
+
+        let responseSchema: [String: Any] = [
+            "type": "json_schema",
+            "json_schema": [
+                "name": "job_sheet_entries",
+                "schema": [
+                    "type": "array",
+                    "items": jobItemSchema
+                ]
+            ]
+        ]
+
         let body: [String: Any] = [
             "model": "gpt-4o-mini",
+            "response_format": responseSchema,
             "messages": [
                 [
                     "role": "system",
@@ -466,17 +494,51 @@ final class JobSheetParser {
             throw ParserError.invalidResponse
         }
 
-        let text: String
-        if let contents = message["content"] as? [[String: Any]] {
-            text = contents.compactMap { $0["text"] as? String }.joined(separator: "\n")
+        let jsonData: Data
+        if let contentItems = message["content"] as? [[String: Any]] {
+            if let jsonItem = contentItems.first(where: { ($0["type"] as? String)?.lowercased() == "output_json" }),
+               let jsonObject = jsonItem["json"],
+               !(jsonObject is NSNull) {
+                if JSONSerialization.isValidJSONObject(jsonObject) {
+                    jsonData = try JSONSerialization.data(withJSONObject: jsonObject, options: [])
+                } else if let string = jsonObject as? String {
+                    let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard let data = trimmed.data(using: .utf8), !data.isEmpty else {
+                        throw ParserError.malformedJSON("Parser response was empty. Please try again.")
+                    }
+                    jsonData = data
+                } else {
+                    throw ParserError.malformedJSON("Parser response was empty. Please try again.")
+                }
+            } else {
+                let textPayload = contentItems.compactMap { item -> String? in
+                    if let text = item["text"] as? String { return text }
+                    return nil
+                }.joined(separator: "\n")
+
+                let trimmedPayload = textPayload.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                guard let data = trimmedPayload.data(using: .utf8), !data.isEmpty else {
+                    throw ParserError.malformedJSON("Parser response was empty. Please try again.")
+                }
+
+                jsonData = data
+            }
         } else if let contentString = message["content"] as? String {
-            text = contentString
+            let trimmed = contentString.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let data = trimmed.data(using: .utf8), !data.isEmpty else {
+                throw ParserError.malformedJSON("Parser response was empty. Please try again.")
+            }
+            jsonData = data
         } else {
             throw ParserError.invalidResponse
         }
-        let sanitizedJSON = sanitizeJSON(text)
 
-        guard let jsonData = sanitizedJSON.data(using: .utf8), !jsonData.isEmpty else {
+        return try parseEntries(from: jsonData, users: users)
+    }
+
+    func parseEntries(from jsonData: Data, users: [AppUser]) throws -> [ParsedEntry] {
+        guard !jsonData.isEmpty else {
             throw ParserError.malformedJSON("Parser response was empty. Please try again.")
         }
 
@@ -509,43 +571,20 @@ final class JobSheetParser {
                 return nil
             }
 
+            let normalizedAssigneeName = trimmed(raw.assigneeName)
+            let resolvedAssigneeID = trimmed(raw.assigneeID) ?? assigneeID(for: normalizedAssigneeName, in: users)
+
             return ParsedEntry(
                 address: addressCandidate ?? "",
                 jobNumber: raw.jobNumber,
-                assigneeName: raw.assigneeName,
-                assigneeID: assigneeID(for: raw.assigneeName, in: users),
+                assigneeName: normalizedAssigneeName,
+                assigneeID: resolvedAssigneeID,
                 notes: raw.notes,
                 rawText: rawLine
             )
         }
 
         return entries
-    }
-
-    private func sanitizeJSON(_ response: String) -> String {
-        var trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if trimmed.contains("```") {
-            trimmed = trimmed
-                .replacingOccurrences(of: "```json", with: "")
-                .replacingOccurrences(of: "```JSON", with: "")
-                .replacingOccurrences(of: "```", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        if let startBracket = trimmed.firstIndex(of: "["),
-           let endBracket = trimmed.lastIndex(of: "]"),
-           startBracket < endBracket {
-            return String(trimmed[startBracket...endBracket]).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        if let startBrace = trimmed.firstIndex(of: "{"),
-           let endBrace = trimmed.lastIndex(of: "}"),
-           startBrace < endBrace {
-            return String(trimmed[startBrace...endBrace]).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        return trimmed
     }
 
     private func assigneeID(for name: String?, in users: [AppUser]) -> String? {
@@ -594,6 +633,7 @@ final class JobSheetParser {
         let address: String?
         let jobNumber: String?
         let assigneeName: String?
+        let assigneeID: String?
         let notes: String?
         let rawText: String?
 
@@ -604,6 +644,10 @@ final class JobSheetParser {
             case assigneeName
             case assignee
             case assignedTo
+            case assigneeID
+            case assigneeId
+            case assignedUserID
+            case assignedUserId = "assigned_user_id"
             case notes
             case note
             case rawText
@@ -617,6 +661,7 @@ final class JobSheetParser {
             address = RawEntry.decodeFirstString(for: [.address], in: container)
             jobNumber = RawEntry.decodeFirstString(for: [.jobNumber, .jobNo], in: container)
             assigneeName = RawEntry.decodeFirstString(for: [.assigneeName, .assignee, .assignedTo], in: container)
+            assigneeID = RawEntry.decodeFirstString(for: [.assigneeID, .assigneeId, .assignedUserID, .assignedUserId], in: container)
             notes = RawEntry.decodeFirstString(for: [.notes, .note], in: container)
             rawText = RawEntry.decodeFirstString(for: [.rawText, .originalText, .entryText, .sourceText], in: container)
         }
