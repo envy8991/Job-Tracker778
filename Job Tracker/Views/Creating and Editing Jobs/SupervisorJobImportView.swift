@@ -3,10 +3,73 @@ import UIKit
 import Foundation
 import CoreLocation
 
-/// A single parsed line or entry from a job import sheet.
+/// A structured entry returned from the GPT-powered parser.
 struct ParsedEntry: Identifiable {
     let id = UUID()
-    let text: String
+    let address: String
+    let jobNumber: String?
+    let assigneeName: String?
+    let assigneeID: String?
+    let notes: String?
+    let rawText: String?
+
+    init(
+        address: String,
+        jobNumber: String? = nil,
+        assigneeName: String? = nil,
+        assigneeID: String? = nil,
+        notes: String? = nil,
+        rawText: String? = nil
+    ) {
+        self.address = ParsedEntry.clean(address)
+        self.jobNumber = ParsedEntry.normalizeJobNumber(jobNumber)
+        self.assigneeName = ParsedEntry.cleanOptional(assigneeName)
+        self.assigneeID = ParsedEntry.cleanOptional(assigneeID)
+        self.notes = ParsedEntry.cleanOptional(notes)
+        self.rawText = ParsedEntry.cleanOptional(rawText)
+    }
+
+    /// The best available address for UI/display. Falls back to the raw line when needed.
+    var resolvedAddress: String {
+        if !address.isEmpty { return address }
+        if let raw = rawText, !raw.isEmpty { return raw }
+        return "Unknown address"
+    }
+
+    /// Notes supplied by GPT, falling back to the raw text when useful.
+    var resolvedNotes: String? {
+        if let notes = notes, !notes.isEmpty { return notes }
+        if let raw = rawText,
+           !raw.isEmpty,
+           raw.caseInsensitiveCompare(resolvedAddress) != .orderedSame {
+            return raw
+        }
+        return nil
+    }
+
+    /// Whether we have enough text to create a job without prompting the user again.
+    var hasResolvableAddress: Bool {
+        !address.isEmpty || (rawText?.isEmpty == false)
+    }
+
+    private static func clean(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func cleanOptional(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
+    }
+
+    private static func normalizeJobNumber(_ value: String?) -> String? {
+        guard var trimmed = cleanOptional(value) else { return nil }
+        if trimmed.hasPrefix("#") {
+            trimmed = String(trimmed.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
 
 /// View that allows supervisors to import a job sheet and parse it using GPT-powered AI.
@@ -61,38 +124,78 @@ struct SupervisorJobImportView: View {
                         .foregroundColor(.secondary)
                 } else {
                     List(parsedEntries) { entry in
-                        HStack {
-                            Text(entry.text)
+                        HStack(alignment: .top, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(entry.resolvedAddress)
+                                    .font(.headline)
+
+                                if let jobNumber = entry.jobNumber {
+                                    Text("Job #: \(jobNumber)")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                if let assignee = assigneeDisplayName(for: entry) {
+                                    Text("Assignee: \(assignee)")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                if let notes = entry.notes {
+                                    Text(notes)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                } else if let fallbackNotes = entry.resolvedNotes {
+                                    Text(fallbackNotes)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                if entry.notes != nil,
+                                   let raw = entry.rawText,
+                                   !raw.isEmpty,
+                                   raw.caseInsensitiveCompare(entry.resolvedAddress) != .orderedSame {
+                                    Text("Original: \(raw)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+
                             Spacer()
+
                             if confirmed.contains(token(for: entry)) {
                                 Image(systemName: "checkmark.circle")
                                     .foregroundColor(.green)
                             } else if pending.contains(token(for: entry)) {
                                 ProgressView()
                             } else {
-                                Button("Import") {
-                                    let fields = extractFields(from: entry.text)
-                                    let supervisorID = authViewModel.currentUser?.id
-                                    let job = Job(
-                                        address: fields.address,
-                                        date: fields.date,
-                                        status: "Pending",
-                                        assignedTo: fields.assigneeID ?? "",   // creates it for the right user
-                                        createdBy: supervisorID ?? "",         // important for rules/audit
-                                        notes: fields.notes ?? "",
-                                        jobNumber: fields.jobNumber,
-                                        assignments: nil,
-                                        materialsUsed: "",
-                                        latitude: nil,
-                                        longitude: nil
-                                    )
-                                    importEntry(job)
-                                }
-                                .buttonStyle(.bordered)
+                                VStack(alignment: .trailing, spacing: 8) {
+                                    Button("Import") {
+                                        let fields = fields(for: entry)
+                                        let supervisorID = authViewModel.currentUser?.id
+                                        let job = Job(
+                                            address: fields.address,
+                                            date: fields.date,
+                                            status: "Pending",
+                                            assignedTo: fields.assigneeID ?? "",
+                                            createdBy: supervisorID ?? "",
+                                            notes: fields.notes ?? "",
+                                            jobNumber: fields.jobNumber,
+                                            assignments: nil,
+                                            materialsUsed: "",
+                                            latitude: nil,
+                                            longitude: nil
+                                        )
+                                        importEntry(job, for: entry)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .disabled(!entry.hasResolvableAddress)
 
-                                Button("Review…") {
-                                    reviewFields = extractFields(from: entry.text)
-                                    showReview = true
+                                    Button("Review…") {
+                                        reviewFields = fields(for: entry)
+                                        showReview = true
+                                    }
+                                    .disabled(!entry.hasResolvableAddress)
                                 }
                             }
                         }
@@ -130,62 +233,37 @@ struct SupervisorJobImportView: View {
         }
     }
 
-    // MARK: - Helpers (parsing/assignee resolution)
+    // MARK: - Helpers
 
     private func token(for entry: ParsedEntry) -> String {
-        // Prefer job # if present, else fall back to address guess; we’ll recompute via extractFields.
-        let f = extractFields(from: entry.text)
-        return f.jobNumber ?? f.address
+        if let jobNumber = entry.jobNumber, !jobNumber.isEmpty {
+            return jobNumber
+        }
+        if !entry.address.isEmpty {
+            return entry.address
+        }
+        if let raw = entry.rawText, !raw.isEmpty {
+            return raw
+        }
+        return entry.id.uuidString
     }
 
-    /// Find a user whose name appears in the line. Matches first, last, or full name.
-    private func resolveAssigneeID(in text: String) -> String? {
-        let haystack = text.lowercased()
-        for u in usersViewModel.allUsers {
-            let first = u.firstName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            let last  = u.lastName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            let full  = (first + " " + last).trimmingCharacters(in: .whitespaces)
-            if (!first.isEmpty && haystack.contains(first)) ||
-               (!last.isEmpty && haystack.contains(last)) ||
-               (!full.isEmpty && haystack.contains(full)) {
-                return u.id
-            }
-        }
-        return nil
-    }
-
-    /// Extract likely address, job number, and assignee from a raw OCR line.
-    private func extractFields(from text: String) -> ParsedJobFields {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        var addressCandidate = trimmed
-        var jobNumberCandidate: String? = nil
-        var assigneeIDCandidate: String? = nil
-
-        // 1) Job number like 1234 / 12-345 / #1234
-        if let match = trimmed.range(of: "[#]?([0-9]{3,}[A-Za-z0-9\\-]*)", options: .regularExpression) {
-            let token = String(trimmed[match])
-            jobNumberCandidate = token.replacingOccurrences(of: "#", with: "")
-        }
-
-        // 2) Resolve assignee by name
-        assigneeIDCandidate = resolveAssigneeID(in: trimmed)
-
-        // 3) Address-like prefix: house number + street words, stop at a comma if present
-        if let regex = try? NSRegularExpression(pattern: "^\\s*\\d+\\s+[A-Za-z0-9 .'\\u2019\\u2013\\u2014-]+") {
-            let ns = trimmed as NSString
-            if let m = regex.firstMatch(in: trimmed, range: NSRange(location: 0, length: ns.length)) {
-                var leading = ns.substring(with: m.range)
-                if let comma = leading.firstIndex(of: ",") { leading = String(leading[..<comma]) }
-                addressCandidate = leading.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-        }
-
-        return ParsedJobFields(
-            address: addressCandidate,
-            jobNumber: jobNumberCandidate,
-            assigneeID: assigneeIDCandidate,
-            notes: nil
+    private func fields(for entry: ParsedEntry) -> ParsedJobFields {
+        ParsedJobFields(
+            address: entry.resolvedAddress,
+            jobNumber: entry.jobNumber,
+            assigneeID: entry.assigneeID,
+            notes: entry.resolvedNotes
         )
+    }
+
+    private func assigneeDisplayName(for entry: ParsedEntry) -> String? {
+        if let id = entry.assigneeID,
+           let user = usersViewModel.user(id: id) {
+            let combined = "\(user.firstName) \(user.lastName)".trimmingCharacters(in: .whitespacesAndNewlines)
+            if !combined.isEmpty { return combined }
+        }
+        return entry.assigneeName
     }
 
     // MARK: - Actions
@@ -198,7 +276,10 @@ struct SupervisorJobImportView: View {
 
         Task {
             do {
-                let results = try await JobSheetParser.shared.parse(image: image)
+                let results = try await JobSheetParser.shared.parse(
+                    image: image,
+                    users: usersViewModel.allUsers
+                )
                 await MainActor.run {
                     self.parsedEntries = results
                     self.isParsing = false
@@ -214,9 +295,9 @@ struct SupervisorJobImportView: View {
 
     /// Imports a parsed entry as a Job and tracks the state of the upload.
     /// Geocodes to attach coordinates, mirroring the manual create flow.
-    private func importEntry(_ job: Job) {
-        let token = job.jobNumber ?? job.address
-        pending.insert(token)
+    private func importEntry(_ job: Job, for entry: ParsedEntry) {
+        let entryToken = token(for: entry)
+        pending.insert(entryToken)
 
         CLGeocoder().geocodeAddressString(job.address) { placemarks, _ in
             let coord = placemarks?.first?.location?.coordinate
@@ -236,14 +317,14 @@ struct SupervisorJobImportView: View {
 
             jobsViewModel.createJob(jobWithCoords)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                confirmed.insert(token)
-                pending.remove(token)
+                confirmed.insert(entryToken)
+                pending.remove(entryToken)
             }
         }
     }
 }
 
-/// GPT-based parser that extracts text lines from an image.
+/// GPT-based parser that extracts structured job data from an image.
 final class JobSheetParser {
     static let shared = JobSheetParser()
     private init() {}
@@ -251,6 +332,7 @@ final class JobSheetParser {
     enum ParserError: LocalizedError {
         case missingAPIKey
         case invalidResponse
+        case malformedJSON(String)
         case serverError(String)
 
         var errorDescription: String? {
@@ -259,13 +341,15 @@ final class JobSheetParser {
                 return "Missing OpenAI API key."
             case .invalidResponse:
                 return "Invalid response from the server."
+            case .malformedJSON(let message):
+                return message
             case .serverError(let message):
                 return message
             }
         }
     }
 
-    func parse(image: UIImage) async throws -> [ParsedEntry] {
+    func parse(image: UIImage, users: [AppUser]) async throws -> [ParsedEntry] {
         guard let jpegData = image.jpegData(compressionQuality: 0.8) else { return [] }
         guard
             let apiKey = Bundle.main.infoDictionary?["OPENAI_API_KEY"] as? String,
@@ -281,13 +365,31 @@ final class JobSheetParser {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
+        let systemPrompt = """
+        You extract structured job information from construction job sheets. Always reply with strictly valid JSON.
+        """
+
+        let extractionPrompt = """
+        Analyze the provided job sheet image and return a JSON array. Each object must include:
+        - "address": the job address as a string (required).
+        - "jobNumber": a string job number or null if not shown.
+        - "assigneeName": the person's name responsible for the job, or null.
+        - "notes": any additional notes or description, or null.
+        - "rawText": the original text snippet for this job entry, or null.
+        Use null instead of empty strings when data is missing. Respond with JSON only (no explanations, markdown, or extra text). Return [] if no jobs are present.
+        """
+
         let body: [String: Any] = [
             "model": "gpt-4o-mini",
             "messages": [
                 [
+                    "role": "system",
+                    "content": systemPrompt
+                ],
+                [
                     "role": "user",
                     "content": [
-                        ["type": "text", "text": "Extract each job entry as a separate line."],
+                        ["type": "text", "text": extractionPrompt],
                         ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(base64)"]]
                     ]
                 ]
@@ -323,10 +425,195 @@ final class JobSheetParser {
         } else {
             throw ParserError.invalidResponse
         }
-        let lines = text
-            .split(separator: "\n")
-            .map { ParsedEntry(text: String($0).trimmingCharacters(in: .whitespacesAndNewlines)) }
-            .filter { !$0.text.isEmpty }
-        return lines
+        let sanitizedJSON = sanitizeJSON(text)
+
+        guard let jsonData = sanitizedJSON.data(using: .utf8), !jsonData.isEmpty else {
+            throw ParserError.malformedJSON("Parser response was empty. Please try again.")
+        }
+
+        let decoder = JSONDecoder()
+
+        let rawEntries: [RawEntry]
+        do {
+            rawEntries = try decoder.decode([RawEntry].self, from: jsonData)
+        } catch {
+            do {
+                let wrapper = try decoder.decode(ResponseWrapper.self, from: jsonData)
+                rawEntries = wrapper.items
+            } catch let decodingError {
+                throw ParserError.malformedJSON("Failed to decode parser response as job JSON. \(decodingError.localizedDescription)")
+            }
+        }
+
+        func trimmed(_ value: String?) -> String? {
+            guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+                return nil
+            }
+            return trimmed
+        }
+
+        let entries = rawEntries.compactMap { raw -> ParsedEntry? in
+            let addressCandidate = trimmed(raw.address) ?? trimmed(raw.rawText)
+            let rawLine = trimmed(raw.rawText) ?? trimmed(raw.notes) ?? trimmed(raw.address)
+
+            if addressCandidate == nil && rawLine == nil {
+                return nil
+            }
+
+            return ParsedEntry(
+                address: addressCandidate ?? "",
+                jobNumber: raw.jobNumber,
+                assigneeName: raw.assigneeName,
+                assigneeID: assigneeID(for: raw.assigneeName, in: users),
+                notes: raw.notes,
+                rawText: rawLine
+            )
+        }
+
+        return entries
+    }
+
+    private func sanitizeJSON(_ response: String) -> String {
+        var trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmed.contains("```") {
+            trimmed = trimmed
+                .replacingOccurrences(of: "```json", with: "")
+                .replacingOccurrences(of: "```JSON", with: "")
+                .replacingOccurrences(of: "```", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        if let startBracket = trimmed.firstIndex(of: "["),
+           let endBracket = trimmed.lastIndex(of: "]"),
+           startBracket < endBracket {
+            return String(trimmed[startBracket...endBracket]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        if let startBrace = trimmed.firstIndex(of: "{"),
+           let endBrace = trimmed.lastIndex(of: "}"),
+           startBrace < endBrace {
+            return String(trimmed[startBrace...endBrace]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return trimmed
+    }
+
+    private func assigneeID(for name: String?, in users: [AppUser]) -> String? {
+        guard let rawName = name?.trimmingCharacters(in: .whitespacesAndNewlines), !rawName.isEmpty else {
+            return nil
+        }
+
+        let targetComponents = normalizedComponents(from: rawName)
+        guard !targetComponents.isEmpty else { return nil }
+
+        for user in users {
+            let userComponents = normalizedComponents(from: "\(user.firstName) \(user.lastName)")
+            if userComponents == targetComponents {
+                return user.id
+            }
+        }
+
+        for user in users {
+            let userComponents = normalizedComponents(from: "\(user.firstName) \(user.lastName)")
+            if targetComponents.allSatisfy({ userComponents.contains($0) }) {
+                return user.id
+            }
+        }
+
+        if targetComponents.count == 1, let needle = targetComponents.first {
+            for user in users {
+                let first = normalizedComponents(from: user.firstName)
+                let last = normalizedComponents(from: user.lastName)
+                if first.contains(needle) || last.contains(needle) {
+                    return user.id
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private func normalizedComponents(from value: String) -> [String] {
+        let folded = value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        return folded.split { !$0.isLetter && !$0.isNumber }
+            .map { String($0) }
+            .filter { !$0.isEmpty }
+    }
+
+    private struct RawEntry: Decodable {
+        let address: String?
+        let jobNumber: String?
+        let assigneeName: String?
+        let notes: String?
+        let rawText: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case address
+            case jobNumber
+            case jobNo = "job_no"
+            case assigneeName
+            case assignee
+            case assignedTo
+            case notes
+            case note
+            case rawText
+            case originalText
+            case entryText
+            case sourceText = "source"
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            address = RawEntry.decodeFirstString(for: [.address], in: container)
+            jobNumber = RawEntry.decodeFirstString(for: [.jobNumber, .jobNo], in: container)
+            assigneeName = RawEntry.decodeFirstString(for: [.assigneeName, .assignee, .assignedTo], in: container)
+            notes = RawEntry.decodeFirstString(for: [.notes, .note], in: container)
+            rawText = RawEntry.decodeFirstString(for: [.rawText, .originalText, .entryText, .sourceText], in: container)
+        }
+
+        private static func decodeFirstString(
+            for keys: [CodingKeys],
+            in container: KeyedDecodingContainer<CodingKeys>
+        ) -> String? {
+            for key in keys {
+                if let value = decodeString(for: key, in: container) {
+                    return value
+                }
+            }
+            return nil
+        }
+
+        private static func decodeString(
+            for key: CodingKeys,
+            in container: KeyedDecodingContainer<CodingKeys>
+        ) -> String? {
+            guard container.contains(key) else { return nil }
+            if let string = try? container.decode(String.self, forKey: key) {
+                return string
+            }
+            if let int = try? container.decode(Int.self, forKey: key) {
+                return String(int)
+            }
+            if let double = try? container.decode(Double.self, forKey: key) {
+                if double.rounded() == double {
+                    return String(Int(double))
+                }
+                return String(double)
+            }
+            if let bool = try? container.decode(Bool.self, forKey: key) {
+                return String(bool)
+            }
+            return nil
+        }
+    }
+
+    private struct ResponseWrapper: Decodable {
+        let jobs: [RawEntry]?
+        let entries: [RawEntry]?
+
+        var items: [RawEntry] {
+            jobs ?? entries ?? []
+        }
     }
 }
