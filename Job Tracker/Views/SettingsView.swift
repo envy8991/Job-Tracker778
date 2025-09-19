@@ -269,7 +269,6 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .hamburgerClearance(72)
     }
 }
 

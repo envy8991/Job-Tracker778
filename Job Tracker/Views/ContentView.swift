@@ -14,7 +14,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             if authViewModel.isSignedIn {
-                MainTabView()
+                AppShellView()
             } else {
                 LoginView() // or a combined AuthView
             }
