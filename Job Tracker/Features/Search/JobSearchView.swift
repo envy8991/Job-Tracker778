@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct JobSearchView: View {
     @Environment(\.dismiss) private var dismiss
@@ -312,11 +313,142 @@ private struct AggregatedJobCard: View {
 // MARK: - Aggregated Detail
 private struct AggregatedDetailView: View {
     @EnvironmentObject var usersViewModel: UsersViewModel
+    @EnvironmentObject var jobsViewModel: JobsViewModel
     let aggregate: JobSearchView.JobAggregate
+
+    @AppStorage("addressSuggestionProvider") private var suggestionProviderRaw = "apple"
+
+    @State private var isGeneratingShareLink = false
+    @State private var shareURL: URL? = nil
+    @State private var showShareSheet = false
+    @State private var shareErrorMessage: String? = nil
+    @State private var jobForShareSheet: Job? = nil
 
     private func creator(for job: Job) -> AppUser? {
         guard let id = job.createdBy else { return nil }
         return usersViewModel.usersDict[id]
+    }
+
+    private var primaryJob: Job? { aggregate.jobs.first }
+
+    private var shareErrorBinding: Binding<Bool> {
+        Binding(
+            get: { shareErrorMessage != nil },
+            set: { newValue in
+                if !newValue { shareErrorMessage = nil }
+            }
+        )
+    }
+
+    private func openInMaps(job: Job) {
+        guard let encoded = job.address.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { return }
+        if suggestionProviderRaw == "google" {
+            if let url = URL(string: "comgooglemaps://?daddr=\(encoded)&directionsmode=driving") {
+                UIApplication.shared.open(url, options: [:]) { success in
+                    if success { return }
+                    if let appleURL = URL(string: "maps://?saddr=Current%20Location&daddr=\(encoded)") {
+                        UIApplication.shared.open(appleURL)
+                    }
+                }
+                return
+            }
+        }
+        if let appleURL = URL(string: "maps://?saddr=Current%20Location&daddr=\(encoded)") {
+            UIApplication.shared.open(appleURL)
+        }
+    }
+
+    private func share(job: Job) {
+        guard !isGeneratingShareLink else { return }
+        shareErrorMessage = nil
+        jobForShareSheet = nil
+        shareURL = nil
+        isGeneratingShareLink = true
+
+        Task {
+            do {
+                let url = try await SharedJobService.shared.publishShareLink(job: job)
+                await MainActor.run {
+                    shareURL = url
+                    jobForShareSheet = job
+                    isGeneratingShareLink = false
+                    showShareSheet = true
+                }
+            } catch {
+                await MainActor.run {
+                    shareErrorMessage = error.localizedDescription
+                    jobForShareSheet = nil
+                    isGeneratingShareLink = false
+                }
+            }
+        }
+    }
+
+    private func binding(for job: Job) -> Binding<Job>? {
+        guard jobsViewModel.jobs.contains(where: { $0.id == job.id }) else { return nil }
+        return Binding(
+            get: {
+                jobsViewModel.jobs.first(where: { $0.id == job.id }) ?? job
+            },
+            set: { newValue in
+                if let index = jobsViewModel.jobs.firstIndex(where: { $0.id == job.id }) {
+                    var copy = jobsViewModel.jobs
+                    copy[index] = newValue
+                    jobsViewModel.jobs = copy
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func destination(for job: Job) -> some View {
+        if let binding = binding(for: job) {
+            JobDetailView(job: binding)
+        } else {
+            JobSearchDetailView(job: job)
+        }
+    }
+
+    @ViewBuilder
+    private func quickActions(for job: Job) -> some View {
+        HStack(spacing: JTSpacing.sm) {
+            Button {
+                openInMaps(job: job)
+            } label: {
+                HStack(spacing: JTSpacing.xs) {
+                    Image(systemName: "map")
+                    Text("Directions")
+                }
+                .font(JTTypography.caption)
+                .foregroundStyle(JTColors.textPrimary)
+                .padding(.vertical, JTSpacing.xs)
+                .padding(.horizontal, JTSpacing.sm)
+                .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                share(job: job)
+            } label: {
+                HStack(spacing: JTSpacing.xs) {
+                    if isGeneratingShareLink {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .tint(JTColors.textPrimary)
+                    } else {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    Text("Share")
+                }
+                .font(JTTypography.caption)
+                .foregroundStyle(JTColors.textPrimary)
+                .padding(.vertical, JTSpacing.xs)
+                .padding(.horizontal, JTSpacing.sm)
+                .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
+            }
+            .buttonStyle(.plain)
+            .disabled(isGeneratingShareLink)
+        }
     }
 
     var body: some View {
@@ -350,36 +482,56 @@ private struct AggregatedDetailView: View {
                                     .font(JTTypography.subheadline)
                             }
                         }
+
+                        if let job = primaryJob {
+                            quickActions(for: job)
+                                .padding(.top, JTSpacing.sm)
+                        }
                     }
 
                     // Timeline of all entries (newest first)
                     VStack(alignment: .leading, spacing: JTSpacing.md) {
                         ForEach(aggregate.jobs, id: \.id) { job in
-                            GlassCard(cornerRadius: JTShapes.smallCardCornerRadius,
-                                      strokeColor: JTColors.glassSoftStroke,
-                                      shadow: JTShadow.none) {
-                                VStack(alignment: .leading, spacing: JTSpacing.sm) {
-                                    HStack(alignment: .firstTextBaseline) {
-                                        Text(job.status)
-                                            .font(JTTypography.headline)
-                                            .foregroundStyle(JTColors.textPrimary)
-                                        Spacer()
-                                        Text(job.date, style: .date)
+                            NavigationLink {
+                                destination(for: job)
+                            } label: {
+                                GlassCard(cornerRadius: JTShapes.smallCardCornerRadius,
+                                          strokeColor: JTColors.glassSoftStroke,
+                                          shadow: JTShadow.none) {
+                                    VStack(alignment: .leading, spacing: JTSpacing.sm) {
+                                        HStack(alignment: .firstTextBaseline) {
+                                            Text(job.status)
+                                                .font(JTTypography.headline)
+                                                .foregroundStyle(JTColors.textPrimary)
+                                            Spacer()
+                                            Text(job.date, style: .date)
+                                                .font(JTTypography.caption)
+                                                .foregroundStyle(JTColors.textSecondary)
+                                        }
+
+                                        if let u = creator(for: job) {
+                                            HStack(spacing: JTSpacing.xs) {
+                                                Image(systemName: "person.crop.circle")
+                                                Text("\(u.firstName) \(u.lastName)")
+                                            }
                                             .font(JTTypography.caption)
                                             .foregroundStyle(JTColors.textSecondary)
-                                    }
-
-                                    if let u = creator(for: job) {
-                                        HStack(spacing: JTSpacing.xs) {
-                                            Image(systemName: "person.crop.circle")
-                                            Text("\(u.firstName) \(u.lastName)")
                                         }
-                                        .font(JTTypography.caption)
-                                        .foregroundStyle(JTColors.textSecondary)
                                     }
+                                    .padding(JTSpacing.md)
                                 }
-                                .padding(JTSpacing.md)
+                                .overlay(
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption)
+                                            .foregroundStyle(JTColors.textMuted)
+                                            .padding(.trailing, JTSpacing.md)
+                                    }
+                                )
+                                .contentShape(JTShapes.roundedRectangle(cornerRadius: JTShapes.smallCardCornerRadius))
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -387,5 +539,18 @@ private struct AggregatedDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showShareSheet, onDismiss: { shareURL = nil; jobForShareSheet = nil }) {
+            if let url = shareURL {
+                let subject = jobForShareSheet?.shortAddress ?? aggregate.address
+                ActivityView(activityItems: [url], subject: "Job link for \(subject)")
+            }
+        }
+        .alert("Couldn't Share Job", isPresented: shareErrorBinding, actions: {
+            Button("OK", role: .cancel) { shareErrorMessage = nil }
+        }, message: {
+            if let message = shareErrorMessage {
+                Text(message)
+            }
+        })
     }
 }
