@@ -236,27 +236,8 @@ struct JobSearchView: View {
 
     /// Returns true if the job matches the query across several fields.
     private func matches(job: Job, query: String) -> Bool {
-        let q = query.lowercased()
-
-        // Creator full name if available
-        var creatorName: String = ""
-        if let creatorId = job.createdBy,
-           let u = usersViewModel.usersDict[creatorId] {
-            creatorName = "\(u.firstName) \(u.lastName)".lowercased()
-        }
-
-        // Build a single search index string
-        let fields: [String] = [
-            job.address,
-            job.jobNumber ?? "",
-            job.status,
-            creatorName,
-            // Safe date string
-            DateFormatter.localizedString(from: job.date, dateStyle: .short, timeStyle: .none)
-        ]
-
-        let haystack = fields.joined(separator: " ").lowercased()
-        return haystack.contains(q)
+        let creator = job.createdBy.flatMap { usersViewModel.usersDict[$0] }
+        return JobSearchMatcher.matches(job: job, query: query, creator: creator)
     }
 
     private func creator(for job: Job) -> AppUser? {
@@ -633,6 +614,43 @@ private struct MissingSearchDestinationView: View {
             }
             .padding(.horizontal, JTSpacing.lg)
         }
+    }
+}
+
+// MARK: - Matching Helpers
+
+struct JobSearchMatcher {
+    static func matches(job: Job, query: String, creator: AppUser?) -> Bool {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tokens = normalizedQuery
+            .split { $0.isWhitespace }
+            .map { String($0).lowercased() }
+
+        guard !tokens.isEmpty else { return false }
+
+        let haystack = normalizedHaystack(for: job, creator: creator)
+        return tokens.allSatisfy { haystack.contains($0) }
+    }
+
+    private static func normalizedHaystack(for job: Job, creator: AppUser?) -> String {
+        let creatorName: String
+        if let creator {
+            creatorName = "\(creator.firstName) \(creator.lastName)"
+        } else {
+            creatorName = ""
+        }
+
+        let fields: [String] = [
+            job.address,
+            job.jobNumber ?? "",
+            job.status,
+            creatorName,
+            DateFormatter.localizedString(from: job.date, dateStyle: .short, timeStyle: .none)
+        ]
+
+        return fields
+            .joined(separator: " ")
+            .lowercased()
     }
 }
 
