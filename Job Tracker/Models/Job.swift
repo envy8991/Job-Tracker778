@@ -62,6 +62,16 @@ struct Job: Identifiable, Codable {
     }
 }
 
+extension Job: Hashable {
+    static func == (lhs: Job, rhs: Job) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+}
+
 extension Job {
     /// Returns the first component of the address (before any commas) as a "short address."
     var shortAddress: String {

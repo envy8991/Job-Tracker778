@@ -14,6 +14,11 @@ struct MainTabView: View {
     private var shouldShowShellButtons: Bool {
         guard navigation.selectedPrimary != .timesheets else { return false }
 
+        if navigation.selectedPrimary == .search,
+           !navigation.shouldShowShellChrome {
+            return false
+        }
+
         if navigation.selectedPrimary == .more,
            navigation.activeDestination.isMoreStackDestination,
            navigation.activeDestination != .more {
