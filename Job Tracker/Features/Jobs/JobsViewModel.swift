@@ -11,6 +11,9 @@ class JobsViewModel: ObservableObject {
     // Global search index: all jobs (used by JobSearchView to search across *everyone's* jobs)
     @Published var searchJobs: [JobSearchIndexEntry] = []
 
+    // Union of the lightweight index and locally-owned jobs so search always has a complete dataset.
+    @Published private(set) var allSearchEntries: [JobSearchIndexEntry] = []
+
     // Track whether the initial snapshot for the current query has been received.
     @Published var hasLoadedInitialJobs: Bool = false
 
@@ -60,10 +63,15 @@ class JobsViewModel: ObservableObject {
                 self.hasPendingWrites = false
                 self.lastServerSync = nil
                 self.hasLoadedInitialJobs = true
+                self.searchJobs = []
+                self.rebuildSearchIndexEntries()
                 self.notifyJobsChanged()
             }
             return
         }
+
+        // Ensure the cross-company search index is active as soon as we begin syncing jobs for the user.
+        startSearchIndexForAllJobs()
 
         var query: Query = db.collection("jobs").whereField("participants", arrayContains: me)
 
@@ -126,6 +134,7 @@ class JobsViewModel: ObservableObject {
                     self.hasLoadedInitialJobs = true
                 }
 
+                self.rebuildSearchIndexEntries()
                 self.notifyJobsChanged()
                 NotificationCenter.default.post(name: .jobsSyncStateDidChange, object: nil)
             }
@@ -156,8 +165,35 @@ class JobsViewModel: ObservableObject {
 
                 DispatchQueue.main.async {
                     self.searchJobs = decoded
+                    self.rebuildSearchIndexEntries()
                 }
             }
+    }
+
+    private func rebuildSearchIndexEntries() {
+        assert(Thread.isMainThread, "Search index rebuild must occur on the main thread")
+        let ownedEntries = jobs.map(JobSearchIndexEntry.init(job:))
+
+        guard !searchJobs.isEmpty else {
+            allSearchEntries = ownedEntries
+            return
+        }
+
+        var merged: [JobSearchIndexEntry] = []
+        merged.reserveCapacity(searchJobs.count + ownedEntries.count)
+
+        var seen: Set<String> = []
+
+        for entry in ownedEntries {
+            merged.append(entry)
+            seen.insert(entry.id)
+        }
+
+        for entry in searchJobs where !seen.contains(entry.id) {
+            merged.append(entry)
+        }
+
+        allSearchEntries = merged
     }
 
     // MARK: - Fetch By Day / Week

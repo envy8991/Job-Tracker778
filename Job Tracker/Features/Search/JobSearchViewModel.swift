@@ -83,6 +83,10 @@ final class JobSearchViewModel: ObservableObject {
         self.jobsViewModel = jobsViewModel
         self.usersViewModel = usersViewModel
 
+        // Ensure the global search index listener is active so results always
+        // include every job, not just the ones owned by the current user.
+        jobsViewModel.startSearchIndexForAllJobs()
+
         configureSubscriptions()
         rebuildResults()
     }
@@ -119,7 +123,7 @@ final class JobSearchViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        jobsViewModel.$searchJobs
+        jobsViewModel.$allSearchEntries
             .sink { [weak self] _ in
                 self?.rebuildResults()
             }
@@ -145,14 +149,7 @@ final class JobSearchViewModel: ObservableObject {
         let tokens = Self.normalizedTokens(from: trimmedQuery)
         let users = usersViewModel.usersDict
         let ownedJobs = jobsViewModel.jobs
-        let searchEntries = jobsViewModel.searchJobs
-
-        let indexEntries: [JobSearchIndexEntry]
-        if searchEntries.isEmpty {
-            indexEntries = ownedJobs.map(JobSearchIndexEntry.init(job:))
-        } else {
-            indexEntries = searchEntries
-        }
+        let indexEntries = jobsViewModel.allSearchEntries
 
         quickFilters = Self.buildQuickFilters(from: indexEntries, users: users)
 
@@ -184,7 +181,7 @@ final class JobSearchViewModel: ObservableObject {
         }
     }
 
-    private static func performSearch(
+    private nonisolated static func performSearch(
         tokens: [String],
         trimmedQuery: String,
         indexEntries: [JobSearchIndexEntry],
@@ -236,7 +233,7 @@ final class JobSearchViewModel: ObservableObject {
         return (results, lookupResults, lookup, .results(query: trimmedQuery, items: results), results.count)
     }
 
-    private static func buildResults(
+    private nonisolated static func buildResults(
         from entries: [JobSearchIndexEntry],
         users: [String: AppUser],
         ownedIDs: Set<String>,
@@ -248,7 +245,7 @@ final class JobSearchViewModel: ObservableObject {
         }
     }
 
-    private static func buildResult(
+    private nonisolated static func buildResult(
         entry: JobSearchIndexEntry,
         creator: AppUser?,
         ownedIDs: Set<String>,
@@ -287,7 +284,7 @@ final class JobSearchViewModel: ObservableObject {
         )
     }
 
-    private static func snippet(for entry: JobSearchIndexEntry, tokens: [String]) -> Result.DetailSnippet? {
+    private nonisolated static func snippet(for entry: JobSearchIndexEntry, tokens: [String]) -> Result.DetailSnippet? {
         let candidates: [(String, String?)] = [
             ("Notes", entry.notes),
             ("Materials", entry.materialsUsed),
@@ -311,7 +308,7 @@ final class JobSearchViewModel: ObservableObject {
         return nil
     }
 
-    private static func matches(job: JobSearchMatchable, tokens: [String], creator: AppUser?) -> Bool {
+    private nonisolated static func matches(job: JobSearchMatchable, tokens: [String], creator: AppUser?) -> Bool {
         guard !tokens.isEmpty else { return true }
 
         var haystackParts: [String] = []
@@ -421,19 +418,19 @@ final class JobSearchViewModel: ObservableObject {
             .map { $0.lowercased() }
     }
 
-    private static func normalizedNonEmpty(_ value: String?) -> String? {
+    private nonisolated static func normalizedNonEmpty(_ value: String?) -> String? {
         guard let value = value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    private static func displayValue(_ value: String?) -> String? {
+    private nonisolated static func displayValue(_ value: String?) -> String? {
         guard let value = value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    private static func displayName(for user: AppUser) -> String {
+    private nonisolated static func displayName(for user: AppUser) -> String {
         "\(user.firstName) \(user.lastName)".trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
