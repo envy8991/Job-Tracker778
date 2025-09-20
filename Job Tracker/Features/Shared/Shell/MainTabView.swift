@@ -54,6 +54,8 @@ struct MainTabView: View {
 
 private struct PrimaryTabContainer: View {
     @EnvironmentObject private var navigation: AppNavigationViewModel
+    @EnvironmentObject private var jobsViewModel: JobsViewModel
+    @EnvironmentObject private var usersViewModel: UsersViewModel
 
     private var selection: Binding<AppNavigationViewModel.PrimaryDestination> {
         Binding(
@@ -85,7 +87,7 @@ private struct PrimaryTabContainer: View {
                           systemImage: AppNavigationViewModel.PrimaryDestination.yellowSheet.systemImage)
                 }
 
-            JobSearchView()
+            JobSearchView(viewModel: JobSearchViewModel(jobsViewModel: jobsViewModel, usersViewModel: usersViewModel))
                 .tag(AppNavigationViewModel.PrimaryDestination.search)
                 .tabItem {
                     Label(AppNavigationViewModel.PrimaryDestination.search.title,
@@ -194,13 +196,16 @@ private struct MoreMenuList: View {
 private struct MoreDestinationView: View {
     let destination: AppNavigationViewModel.Destination
 
+    @EnvironmentObject private var jobsViewModel: JobsViewModel
+    @EnvironmentObject private var usersViewModel: UsersViewModel
+
     @ViewBuilder
     var body: some View {
         switch destination {
         case .profile:
             ProfileView()
         case .search:
-            JobSearchView()
+            JobSearchView(viewModel: JobSearchViewModel(jobsViewModel: jobsViewModel, usersViewModel: usersViewModel))
         case .maps:
             MapsView()
         case .findPartner:

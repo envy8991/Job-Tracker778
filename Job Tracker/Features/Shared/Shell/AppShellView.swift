@@ -75,6 +75,9 @@ private struct SidebarList: View {
 private struct AppShellDetailView: View {
     let destination: AppNavigationViewModel.Destination
 
+    @EnvironmentObject private var jobsViewModel: JobsViewModel
+    @EnvironmentObject private var usersViewModel: UsersViewModel
+
     @ViewBuilder
     var body: some View {
         switch destination {
@@ -85,7 +88,7 @@ private struct AppShellDetailView: View {
         case .yellowSheet:
             YellowSheetView()
         case .search:
-            JobSearchView()
+            JobSearchView(viewModel: JobSearchViewModel(jobsViewModel: jobsViewModel, usersViewModel: usersViewModel))
         case .maps:
             MapsView()
         case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter:
