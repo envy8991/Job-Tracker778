@@ -19,7 +19,8 @@ struct ChatView: View {
     @Binding var inChat: Bool
     @EnvironmentObject private var authVM: AuthViewModel
     @Environment(\.dismiss) private var dismiss
-    
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     @StateObject private var vm: ChatViewModel
     
     // Build a deterministic roomID from the two UIDs
@@ -81,10 +82,14 @@ struct ChatView: View {
                 .background(.ultraThinMaterial)
             }
         }
-        .toolbar(.hidden, for: .navigationBar) // Hide system nav bar so hamburger can't overlap the back button
+        .toolbar(navigationBarVisibility, for: .navigationBar) // Hide system nav bar in compact to avoid hamburger overlap
         .gradientBackground()
         .onAppear { inChat = true }
         .onDisappear { inChat = false }
+    }
+
+    private var navigationBarVisibility: Visibility {
+        horizontalSizeClass == .compact ? .hidden : .automatic
     }
     
     // MARK: – Custom header

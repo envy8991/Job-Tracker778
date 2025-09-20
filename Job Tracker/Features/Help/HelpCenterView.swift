@@ -14,6 +14,7 @@ struct HelpCenterView: View {
     @EnvironmentObject var usersViewModel: UsersViewModel
     @EnvironmentObject var jobsViewModel: JobsViewModel
     @EnvironmentObject var navigation: AppNavigationViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var query: String = ""
     @State private var showingCreateJob = false
@@ -152,6 +153,10 @@ struct HelpCenterView: View {
         }
     }
 
+    private var navigationBarVisibility: Visibility {
+        horizontalSizeClass == .compact ? .hidden : .automatic
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             JTGradients.background
@@ -218,7 +223,7 @@ struct HelpCenterView: View {
             TopicDetailSheet(topic: topic)
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(navigationBarVisibility, for: .navigationBar)
     }
 
     // Topic detail sheet

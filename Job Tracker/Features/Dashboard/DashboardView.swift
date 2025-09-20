@@ -3,6 +3,7 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject var jobsViewModel: JobsViewModel
     @EnvironmentObject var locationService: LocationService
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @AppStorage("smartRoutingEnabled") private var smartRoutingEnabled = false
     @AppStorage("routingOptimizeBy") private var routingOptimizeBy = "closest"
@@ -11,6 +12,10 @@ struct DashboardView: View {
     @StateObject private var viewModel = DashboardViewModel()
 
     private var sortClosest: Bool { routingOptimizeBy == "closest" }
+
+    private var navigationBarVisibility: Visibility {
+        horizontalSizeClass == .compact ? .hidden : .automatic
+    }
 
     private var sections: DashboardViewModel.JobSections {
         viewModel.sections(
@@ -135,7 +140,7 @@ struct DashboardView: View {
                 }
                 .padding(.top, JTSpacing.md)
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .toolbar(navigationBarVisibility, for: .navigationBar)
             .safeAreaInset(edge: .top) {
                 Color.clear.frame(height: 66)
             }
