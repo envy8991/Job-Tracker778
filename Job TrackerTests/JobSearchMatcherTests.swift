@@ -55,4 +55,10 @@ final class JobSearchMatcherTests: XCTestCase {
         XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "150ft", creator: creator))
         XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "200 ft", creator: creator))
     }
+
+    func testMatchesUsingSearchIndexEntry() {
+        let entry = JobSearchIndexEntry(job: sampleJob)
+        XCTAssertTrue(JobSearchMatcher.matches(job: entry, query: "main", creator: creator))
+        XCTAssertTrue(JobSearchMatcher.matches(job: entry, query: "completed", creator: creator))
+    }
 }

@@ -89,3 +89,104 @@ extension Job {
         return CLLocation(latitude: lat, longitude: lon)
     }
 }
+
+// MARK: - Search index support
+
+protocol JobSearchMatchable {
+    var id: String { get }
+    var address: String { get }
+    var jobNumber: String? { get }
+    var status: String { get }
+    var createdBy: String? { get }
+    var date: Date { get }
+    var notes: String? { get }
+    var assignments: String? { get }
+    var materialsUsed: String? { get }
+    var nidFootage: String? { get }
+    var canFootage: String? { get }
+}
+
+extension Job: JobSearchMatchable {}
+
+struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearchMatchable {
+    var id: String
+    var address: String
+    var jobNumber: String?
+    var status: String
+    var createdBy: String?
+    var date: Date
+    var notes: String?
+    var assignments: String?
+    var materialsUsed: String?
+    var nidFootage: String?
+    var canFootage: String?
+
+    init(
+        id: String,
+        address: String,
+        jobNumber: String? = nil,
+        status: String,
+        createdBy: String? = nil,
+        date: Date,
+        notes: String? = nil,
+        assignments: String? = nil,
+        materialsUsed: String? = nil,
+        nidFootage: String? = nil,
+        canFootage: String? = nil
+    ) {
+        self.id = id
+        self.address = address
+        self.jobNumber = jobNumber
+        self.status = status
+        self.createdBy = createdBy
+        self.date = date
+        self.notes = notes
+        self.assignments = assignments
+        self.materialsUsed = materialsUsed
+        self.nidFootage = nidFootage
+        self.canFootage = canFootage
+    }
+
+    init(job: Job) {
+        self.init(
+            id: job.id,
+            address: job.address,
+            jobNumber: job.jobNumber,
+            status: job.status,
+            createdBy: job.createdBy,
+            date: job.date,
+            notes: job.notes,
+            assignments: job.assignments,
+            materialsUsed: job.materialsUsed,
+            nidFootage: job.nidFootage,
+            canFootage: job.canFootage
+        )
+    }
+
+    func makePartialJob() -> Job {
+        var job = Job(
+            id: id,
+            address: address,
+            date: date,
+            status: status,
+            createdBy: createdBy,
+            notes: notes ?? "",
+            jobNumber: jobNumber,
+            assignments: assignments,
+            materialsUsed: materialsUsed,
+            photos: [],
+            participants: nil,
+            hours: 0.0,
+            nidFootage: nidFootage,
+            canFootage: canFootage
+        )
+        job.notes = notes
+        job.assignments = assignments
+        job.materialsUsed = materialsUsed
+        job.nidFootage = nidFootage
+        job.canFootage = canFootage
+        job.jobNumber = jobNumber
+        job.createdBy = createdBy
+        return job
+    }
+}

@@ -2,13 +2,14 @@ import SwiftUI
 import FirebaseFirestore
 import FirebaseAuth
 import Combine
+import FirebaseFirestoreSwift
 
 class JobsViewModel: ObservableObject {
     // Main data
     @Published var jobs: [Job] = []
 
     // Global search index: all jobs (used by JobSearchView to search across *everyone's* jobs)
-    @Published var searchJobs: [Job] = []
+    @Published var searchJobs: [JobSearchIndexEntry] = []
 
     // Track whether the initial snapshot for the current query has been received.
     @Published var hasLoadedInitialJobs: Bool = false
@@ -133,12 +134,12 @@ class JobsViewModel: ObservableObject {
 
     // MARK: - Global Search Index (all jobs)
 
-    /// Begin listening to *all* jobs so search can span the entire database (subject to Firestore rules).
-    /// Safe to call multiple times; it will only attach once.
+    /// Begin listening to the lightweight search index for all jobs so search can span the entire database
+    /// (subject to Firestore rules). Safe to call multiple times; it will only attach once.
     func startSearchIndexForAllJobs() {
         if searchListenerRegistration != nil { return }
 
-        searchListenerRegistration = db.collection("jobs")
+        searchListenerRegistration = db.collection("jobsSearch")
             .addSnapshotListener(includeMetadataChanges: false) { [weak self] snapshot, error in
                 guard let self = self else { return }
                 if let error = error {
@@ -147,10 +148,10 @@ class JobsViewModel: ObservableObject {
                 }
                 guard let snapshot = snapshot else { return }
 
-                let decoded: [Job] = snapshot.documents.compactMap { doc in
-                    var job = try? doc.data(as: Job.self)
-                    job?.id = doc.documentID
-                    return job
+                let decoded: [JobSearchIndexEntry] = snapshot.documents.compactMap { doc in
+                    var entry = try? doc.data(as: JobSearchIndexEntry.self)
+                    entry?.id = doc.documentID
+                    return entry
                 }
 
                 DispatchQueue.main.async {

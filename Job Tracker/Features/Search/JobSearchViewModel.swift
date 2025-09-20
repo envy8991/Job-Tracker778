@@ -94,10 +94,13 @@ final class JobSearchViewModel: ObservableObject {
         if let cached = jobLookup[id] {
             return cached
         }
-        if let job = jobsViewModel.searchJobs.first(where: { $0.id == id }) {
+        if let job = jobsViewModel.jobs.first(where: { $0.id == id }) {
             return job
         }
-        return jobsViewModel.jobs.first(where: { $0.id == id })
+        if let entry = jobsViewModel.searchJobs.first(where: { $0.id == id }) {
+            return entry.makePartialJob()
+        }
+        return nil
     }
 
     private func binding(for job: Job) -> Binding<Job>? {
@@ -153,11 +156,13 @@ final class JobSearchViewModel: ObservableObject {
 
         guard !trimmedQuery.isEmpty else {
             var lookup: [String: Job] = [:]
-            for job in searchJobs {
-                lookup[job.id] = job
-            }
             for job in jobs {
                 lookup[job.id] = job
+            }
+            for entry in searchJobs {
+                if lookup[entry.id] == nil {
+                    lookup[entry.id] = entry.makePartialJob()
+                }
             }
 
             aggregates = []
@@ -167,7 +172,7 @@ final class JobSearchViewModel: ObservableObject {
             return
         }
 
-        let source = searchJobs.isEmpty ? jobs : searchJobs
+        let source = searchJobs.isEmpty ? jobs.map(JobSearchIndexEntry.init(job:)) : searchJobs
 
         Task.detached(priority: .userInitiated) { [weak self] in
             let filtered = source
@@ -186,14 +191,18 @@ final class JobSearchViewModel: ObservableObject {
             let aggregateLookup = Dictionary(uniqueKeysWithValues: aggregates.map { ($0.id, $0) })
 
             var jobLookup: [String: Job] = [:]
-            for job in filtered {
-                jobLookup[job.id] = job
-            }
-            for job in searchJobs {
-                jobLookup[job.id] = job
-            }
             for job in jobs {
                 jobLookup[job.id] = job
+            }
+            for entry in filtered {
+                if jobLookup[entry.id] == nil {
+                    jobLookup[entry.id] = entry.makePartialJob()
+                }
+            }
+            for entry in searchJobs {
+                if jobLookup[entry.id] == nil {
+                    jobLookup[entry.id] = entry.makePartialJob()
+                }
             }
 
             let resultsState: ResultsState
@@ -213,7 +222,7 @@ final class JobSearchViewModel: ObservableObject {
         }
     }
 
-    private nonisolated static func buildAggregates(from jobs: [Job], users: [String: AppUser]) -> [Aggregate] {
+    private nonisolated static func buildAggregates<T: JobSearchMatchable>(from jobs: [T], users: [String: AppUser]) -> [Aggregate] {
         let grouped = Dictionary(grouping: jobs) { job -> String in
             let number = (job.jobNumber ?? "").trimmingCharacters(in: .whitespaces)
             return job.address.lowercased() + "|#" + number.lowercased()
