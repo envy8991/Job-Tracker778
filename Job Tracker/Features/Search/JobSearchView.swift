@@ -378,6 +378,7 @@ private struct AggregatedJobCard: View {
 // MARK: - Aggregated Detail
 private struct AggregatedDetailView: View {
     @EnvironmentObject var usersViewModel: UsersViewModel
+    @EnvironmentObject var jobsViewModel: JobsViewModel
     let aggregate: JobSearchView.JobAggregate
 
     @AppStorage("addressSuggestionProvider") private var suggestionProviderRaw = "apple"
@@ -490,6 +491,31 @@ private struct AggregatedDetailView: View {
         }
     }
 
+    private func binding(for job: Job) -> Binding<Job>? {
+        guard jobsViewModel.jobs.contains(where: { $0.id == job.id }) else { return nil }
+        return Binding(
+            get: {
+                jobsViewModel.jobs.first(where: { $0.id == job.id }) ?? job
+            },
+            set: { newValue in
+                if let index = jobsViewModel.jobs.firstIndex(where: { $0.id == job.id }) {
+                    var copy = jobsViewModel.jobs
+                    copy[index] = newValue
+                    jobsViewModel.jobs = copy
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func destination(for job: Job) -> some View {
+        if let binding = binding(for: job) {
+            JobDetailView(job: binding)
+        } else {
+            JobSearchDetailView(job: job)
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             JTGradients.background
@@ -531,7 +557,9 @@ private struct AggregatedDetailView: View {
                     // Timeline of all entries (newest first)
                     VStack(alignment: .leading, spacing: JTSpacing.md) {
                         ForEach(aggregate.jobs, id: \.id) { job in
-                            NavigationLink(value: JobSearchView.Route.job(id: job.id)) {
+                            NavigationLink {
+                                destination(for: job)
+                            } label: {
                                 GlassCard(cornerRadius: JTShapes.smallCardCornerRadius,
                                           strokeColor: JTColors.glassSoftStroke,
                                           shadow: JTShadow.none) {
