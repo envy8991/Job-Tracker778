@@ -2,12 +2,18 @@ import SwiftUI
 import UIKit
 
 struct JobSearchView: View {
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var jobsViewModel: JobsViewModel
     @EnvironmentObject var usersViewModel: UsersViewModel
+    @EnvironmentObject private var navigation: AppNavigationViewModel
     @Environment(\.shellChromeHeight) private var shellChromeHeight
 
     @State private var searchText: String = ""
+    @State private var path: [Route] = []
+
+    enum Route: Hashable {
+        case aggregate(JobAggregate)
+        case job(Job)
+    }
 
     // MARK: - Filter + Group
 
@@ -76,8 +82,12 @@ struct JobSearchView: View {
         max(0, JTSpacing.lg - shellChromeHeight)
     }
 
+    private func updateShellChrome(for path: [Route]) {
+        navigation.shouldShowShellChrome = path.isEmpty
+    }
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ZStack(alignment: .top) {
                 JTGradients.background
                     .ignoresSafeArea()
@@ -101,11 +111,28 @@ struct JobSearchView: View {
                 }
             }
         }
+        .navigationDestination(for: Route.self) { route in
+            switch route {
+            case .aggregate(let aggregate):
+                AggregatedDetailView(aggregate: aggregate)
+                    .environmentObject(usersViewModel)
+                    .environmentObject(jobsViewModel)
+            case .job(let job):
+                destination(for: job)
+            }
+        }
         .safeAreaInset(edge: .top) {
             Color.clear.frame(height: shellChromeHeight)
         }
         .onAppear {
             jobsViewModel.startSearchIndexForAllJobs()
+            updateShellChrome(for: path)
+        }
+        .onChange(of: path) { newValue in
+            updateShellChrome(for: newValue)
+        }
+        .onDisappear {
+            navigation.shouldShowShellChrome = true
         }
     }
 
@@ -146,16 +173,40 @@ struct JobSearchView: View {
         } else {
             LazyVStack(spacing: JTSpacing.md) {
                 ForEach(aggregatedResults) { agg in
-                    NavigationLink {
-                        AggregatedDetailView(aggregate: agg)
-                            .environmentObject(usersViewModel)
-                    } label: {
+                    NavigationLink(value: Route.aggregate(agg)) {
                         AggregatedJobCard(aggregate: agg)
                             .contentShape(JTShapes.roundedRectangle(cornerRadius: JTShapes.smallCardCornerRadius))
                     }
                     .buttonStyle(.plain)
                 }
             }
+        }
+    }
+
+    // MARK: - Navigation
+
+    private func binding(for job: Job) -> Binding<Job>? {
+        guard jobsViewModel.jobs.contains(where: { $0.id == job.id }) else { return nil }
+        return Binding(
+            get: {
+                jobsViewModel.jobs.first(where: { $0.id == job.id }) ?? job
+            },
+            set: { newValue in
+                if let index = jobsViewModel.jobs.firstIndex(where: { $0.id == job.id }) {
+                    var copy = jobsViewModel.jobs
+                    copy[index] = newValue
+                    jobsViewModel.jobs = copy
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func destination(for job: Job) -> some View {
+        if let binding = binding(for: job) {
+            JobDetailView(job: binding)
+        } else {
+            JobSearchDetailView(job: job)
         }
     }
 
@@ -323,7 +374,6 @@ private struct AggregatedJobCard: View {
 // MARK: - Aggregated Detail
 private struct AggregatedDetailView: View {
     @EnvironmentObject var usersViewModel: UsersViewModel
-    @EnvironmentObject var jobsViewModel: JobsViewModel
     let aggregate: JobSearchView.JobAggregate
 
     @AppStorage("addressSuggestionProvider") private var suggestionProviderRaw = "apple"
@@ -391,31 +441,6 @@ private struct AggregatedDetailView: View {
                     isGeneratingShareLink = false
                 }
             }
-        }
-    }
-
-    private func binding(for job: Job) -> Binding<Job>? {
-        guard jobsViewModel.jobs.contains(where: { $0.id == job.id }) else { return nil }
-        return Binding(
-            get: {
-                jobsViewModel.jobs.first(where: { $0.id == job.id }) ?? job
-            },
-            set: { newValue in
-                if let index = jobsViewModel.jobs.firstIndex(where: { $0.id == job.id }) {
-                    var copy = jobsViewModel.jobs
-                    copy[index] = newValue
-                    jobsViewModel.jobs = copy
-                }
-            }
-        )
-    }
-
-    @ViewBuilder
-    private func destination(for job: Job) -> some View {
-        if let binding = binding(for: job) {
-            JobDetailView(job: binding)
-        } else {
-            JobSearchDetailView(job: job)
         }
     }
 
@@ -502,9 +527,7 @@ private struct AggregatedDetailView: View {
                     // Timeline of all entries (newest first)
                     VStack(alignment: .leading, spacing: JTSpacing.md) {
                         ForEach(aggregate.jobs, id: \.id) { job in
-                            NavigationLink {
-                                destination(for: job)
-                            } label: {
+                            NavigationLink(value: JobSearchView.Route.job(job)) {
                                 GlassCard(cornerRadius: JTShapes.smallCardCornerRadius,
                                           strokeColor: JTColors.glassSoftStroke,
                                           shadow: JTShadow.none) {
@@ -562,5 +585,17 @@ private struct AggregatedDetailView: View {
                 Text(message)
             }
         })
+    }
+}
+
+// MARK: - Hashable support
+
+extension JobSearchView.JobAggregate: Hashable {
+    static func == (lhs: JobSearchView.JobAggregate, rhs: JobSearchView.JobAggregate) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }

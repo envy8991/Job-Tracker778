@@ -108,6 +108,7 @@ final class AppNavigationViewModel: ObservableObject {
     @Published var activeDestination: Destination = .dashboard
     @Published var isPrimaryMenuPresented: Bool = false
     @Published private(set) var morePath: [Destination] = []
+    @Published var shouldShowShellChrome: Bool = true
 
     var primaryDestinations: [Destination] {
         PrimaryDestination.allCases.map { $0.destination }
