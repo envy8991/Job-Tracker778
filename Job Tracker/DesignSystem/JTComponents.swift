@@ -19,7 +19,7 @@ private struct JTGlassBackgroundModifier<S: Shape>: ViewModifier {
 
 @MainActor public extension View {
     func jtGlassBackground(cornerRadius: CGFloat = JTShapes.cardCornerRadius,
-                           strokeColor: Color = JTColors.glassStroke,
+                           strokeColor: Color? = nil,
                            strokeWidth: CGFloat = 1) -> some View {
         jtGlassBackground(
             shape: JTShapes.roundedRectangle(cornerRadius: cornerRadius),
@@ -29,9 +29,15 @@ private struct JTGlassBackgroundModifier<S: Shape>: ViewModifier {
     }
 
     func jtGlassBackground<S: Shape>(shape: S,
-                                     strokeColor: Color = JTColors.glassStroke,
+                                     strokeColor: Color? = nil,
                                      strokeWidth: CGFloat = 1) -> some View {
-        modifier(JTGlassBackgroundModifier(shape: shape, strokeColor: strokeColor, strokeWidth: strokeWidth))
+        modifier(
+            JTGlassBackgroundModifier(
+                shape: shape,
+                strokeColor: strokeColor ?? JTColors.glassStroke,
+                strokeWidth: strokeWidth
+            )
+        )
     }
 }
 
@@ -45,12 +51,12 @@ struct GlassCard<Content: View>: View {
     private let content: () -> Content
 
     init(cornerRadius: CGFloat = JTShapes.cardCornerRadius,
-         strokeColor: Color = JTColors.glassStroke,
+         strokeColor: Color? = nil,
          strokeWidth: CGFloat = 1,
          shadow: JTShadow = JTElevations.card,
          @ViewBuilder content: @escaping () -> Content) {
         self.cornerRadius = cornerRadius
-        self.strokeColor = strokeColor
+        self.strokeColor = strokeColor ?? JTColors.glassStroke
         self.strokeWidth = strokeWidth
         self.shadow = shadow
         self.content = content
