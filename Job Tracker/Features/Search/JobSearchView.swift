@@ -38,7 +38,7 @@ struct JobSearchView: View {
                             .textInputAutocapitalization(.never)
                             .disableAutocorrection(true)
 
-                        resultsContent
+                        JobSearchResultsContent(viewState: viewModel.resultsState)
                     }
                     .padding(.top, scrollContentTopPadding)
                     .padding(.horizontal, JTSpacing.lg)
@@ -47,23 +47,7 @@ struct JobSearchView: View {
             }
         }
         .navigationDestination(for: JobSearchViewModel.Route.self) { route in
-            if let destination = viewModel.routeDestination(for: route) {
-                switch destination {
-                case .aggregate(let aggregate):
-                    AggregatedDetailView(aggregate: aggregate, viewModel: viewModel)
-                        .environmentObject(usersViewModel)
-                        .environmentObject(jobsViewModel)
-                case .job(let job):
-                    destination(for: job)
-                }
-            } else {
-                switch route {
-                case .aggregate:
-                    MissingSearchDestinationView(message: "Job results are no longer available. Try running your search again.")
-                case .job:
-                    MissingSearchDestinationView(message: "We couldn't load that job. It may have been removed.")
-                }
-            }
+            destinationView(for: route)
         }
         .safeAreaInset(edge: .top) {
             Color.clear.frame(height: shellChromeHeight)
@@ -80,13 +64,42 @@ struct JobSearchView: View {
         }
     }
 
-    // MARK: - View Content
+    // MARK: - Navigation
 
     @ViewBuilder
-    private var resultsContent: some View {
-        let trimmedQuery = viewModel.query.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func destinationView(for route: JobSearchViewModel.Route) -> some View {
+        if let destination = viewModel.destination(for: route) {
+            switch destination {
+            case .aggregate(let id):
+                AggregatedDetailView(aggregateID: id, viewModel: viewModel)
+                    .environmentObject(usersViewModel)
+            case .job(let jobDestination):
+                if let binding = jobDestination.binding {
+                    JobDetailView(job: binding)
+                } else {
+                    JobSearchDetailView(job: jobDestination.job)
+                }
+            }
+        } else {
+            switch route {
+            case .aggregate:
+                MissingSearchDestinationView(message: "Job results are no longer available. Try running your search again.")
+            case .job:
+                MissingSearchDestinationView(message: "We couldn't load that job. It may have been removed.")
+            }
+        }
+    }
+}
 
-        if trimmedQuery.isEmpty {
+// MARK: - Results
+
+private struct JobSearchResultsContent: View {
+    let viewState: JobSearchViewModel.ResultsState
+
+    @ViewBuilder
+    var body: some View {
+        switch viewState.content {
+        case .prompt:
             VStack(spacing: JTSpacing.md) {
                 Spacer(minLength: 40)
                 Image(systemName: "magnifyingglass")
@@ -103,10 +116,10 @@ struct JobSearchView: View {
                     .padding(.horizontal, JTSpacing.xl)
                 Spacer(minLength: 20)
             }
-        } else if viewModel.aggregates.isEmpty {
+        case .empty(let query):
             VStack(spacing: JTSpacing.sm) {
                 Spacer(minLength: 40)
-                Text("No jobs found for “\(trimmedQuery)”")
+                Text("No jobs found for “\(query)”")
                     .font(JTTypography.headline)
                     .foregroundStyle(JTColors.textPrimary)
                 Text("Try fewer keywords, or search by street, city, job #, status, or creator name.")
@@ -116,94 +129,29 @@ struct JobSearchView: View {
                     .padding(.horizontal, JTSpacing.xl)
                 Spacer(minLength: 20)
             }
-        } else {
-            LazyVStack(spacing: JTSpacing.md) {
-                ForEach(viewModel.aggregates) { aggregate in
-                    NavigationLink(value: JobSearchViewModel.Route.aggregate(id: aggregate.id)) {
-                        AggregatedJobCard(aggregate: aggregate)
-                            .contentShape(JTShapes.roundedRectangle(cornerRadius: JTShapes.smallCardCornerRadius))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    // MARK: - Navigation
-
-    private func binding(for job: Job) -> Binding<Job>? {
-        guard jobsViewModel.jobs.contains(where: { $0.id == job.id }) else { return nil }
-        return Binding(
-            get: {
-                jobsViewModel.jobs.first(where: { $0.id == job.id }) ?? job
-            },
-            set: { newValue in
-                if let index = jobsViewModel.jobs.firstIndex(where: { $0.id == job.id }) {
-                    var copy = jobsViewModel.jobs
-                    copy[index] = newValue
-                    jobsViewModel.jobs = copy
-                }
-            }
-        )
-    }
-
-    @ViewBuilder
-    private func destination(for job: Job) -> some View {
-        if let binding = binding(for: job) {
-            JobDetailView(job: binding)
-        } else {
-            JobSearchDetailView(job: job)
+        case .aggregates(let aggregates):
+            JobSearchResultsList(aggregates: aggregates)
         }
     }
 }
 
-// MARK: - Row
-
-private struct JobRow: View {
-    let job: Job
-    let creator: AppUser?
+private struct JobSearchResultsList: View {
+    let aggregates: [JobSearchViewModel.Aggregate]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(job.address)
-                    .font(JTTypography.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(JTColors.textPrimary)
-                    .lineLimit(2)
-                Spacer(minLength: 8)
-                if let num = job.jobNumber, !num.isEmpty {
-                    Text("#\(num)")
-                        .font(JTTypography.caption)
-                        .padding(.vertical, 3)
-                        .padding(.horizontal, 6)
-                        .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
-                        .foregroundStyle(JTColors.textPrimary)
+        LazyVStack(spacing: JTSpacing.md) {
+            ForEach(aggregates) { aggregate in
+                NavigationLink(value: JobSearchViewModel.Route.aggregate(id: aggregate.id)) {
+                    JobSearchAggregateRow(aggregate: aggregate)
+                        .contentShape(JTShapes.roundedRectangle(cornerRadius: JTShapes.smallCardCornerRadius))
                 }
-            }
-
-            HStack(spacing: 10) {
-                Label(job.status, systemImage: "checkmark.seal")
-                    .font(JTTypography.caption)
-                    .foregroundStyle(JTColors.textSecondary)
-                Text(job.date, style: .date)
-                    .font(JTTypography.caption)
-                    .foregroundStyle(JTColors.textSecondary)
-                if let creator {
-                    Text("·")
-                        .foregroundStyle(JTColors.textMuted)
-                    Text("\(creator.firstName) \(creator.lastName)")
-                        .font(JTTypography.caption)
-                        .foregroundStyle(JTColors.textSecondary)
-                }
+                .buttonStyle(.plain)
             }
         }
-        .padding(.vertical, 6)
     }
 }
 
-// MARK: - Aggregated Card
-private struct AggregatedJobCard: View {
+private struct JobSearchAggregateRow: View {
     let aggregate: JobSearchViewModel.Aggregate
 
     private func statusColor(_ status: String) -> Color {
@@ -286,11 +234,55 @@ private struct AggregatedJobCard: View {
     }
 }
 
+// MARK: - Row
+
+private struct JobRow: View {
+    let job: Job
+    let creator: AppUser?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(job.address)
+                    .font(JTTypography.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(JTColors.textPrimary)
+                    .lineLimit(2)
+                Spacer(minLength: 8)
+                if let num = job.jobNumber, !num.isEmpty {
+                    Text("#\(num)")
+                        .font(JTTypography.caption)
+                        .padding(.vertical, 3)
+                        .padding(.horizontal, 6)
+                        .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
+                        .foregroundStyle(JTColors.textPrimary)
+                }
+            }
+
+            HStack(spacing: 10) {
+                Label(job.status, systemImage: "checkmark.seal")
+                    .font(JTTypography.caption)
+                    .foregroundStyle(JTColors.textSecondary)
+                Text(job.date, style: .date)
+                    .font(JTTypography.caption)
+                    .foregroundStyle(JTColors.textSecondary)
+                if let creator {
+                    Text("·")
+                        .foregroundStyle(JTColors.textMuted)
+                    Text("\(creator.firstName) \(creator.lastName)")
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+                }
+            }
+        }
+        .padding(.vertical, 6)
+    }
+}
+
 // MARK: - Aggregated Detail
 private struct AggregatedDetailView: View {
     @EnvironmentObject var usersViewModel: UsersViewModel
-    @EnvironmentObject var jobsViewModel: JobsViewModel
-    let aggregate: JobSearchViewModel.Aggregate
+    let aggregateID: JobSearchViewModel.Aggregate.ID
     @ObservedObject var viewModel: JobSearchViewModel
 
     @AppStorage("addressSuggestionProvider") private var suggestionProviderRaw = "apple"
@@ -301,12 +293,11 @@ private struct AggregatedDetailView: View {
     @State private var shareErrorMessage: String? = nil
     @State private var jobForShareSheet: Job? = nil
 
-    private func creator(for job: JobSearchViewModel.Aggregate.JobDigest) -> AppUser? {
-        guard let id = job.createdBy else { return nil }
-        return usersViewModel.usersDict[id]
+    private var aggregate: JobSearchViewModel.Aggregate? {
+        viewModel.aggregate(forID: aggregateID)
     }
 
-    private var primaryJob: Job? {
+    private func primaryJob(for aggregate: JobSearchViewModel.Aggregate) -> Job? {
         guard let id = aggregate.jobs.first?.id else { return nil }
         return viewModel.job(forID: id)
     }
@@ -318,6 +309,11 @@ private struct AggregatedDetailView: View {
                 if !newValue { shareErrorMessage = nil }
             }
         )
+    }
+
+    private func creator(for job: JobSearchViewModel.Aggregate.JobDigest) -> AppUser? {
+        guard let id = job.createdBy else { return nil }
+        return usersViewModel.usersDict[id]
     }
 
     private func openInMaps(job: Job) {
@@ -406,39 +402,14 @@ private struct AggregatedDetailView: View {
         }
     }
 
-    private func binding(for job: Job) -> Binding<Job>? {
-        guard jobsViewModel.jobs.contains(where: { $0.id == job.id }) else { return nil }
-        return Binding(
-            get: {
-                jobsViewModel.jobs.first(where: { $0.id == job.id }) ?? job
-            },
-            set: { newValue in
-                if let index = jobsViewModel.jobs.firstIndex(where: { $0.id == job.id }) {
-                    var copy = jobsViewModel.jobs
-                    copy[index] = newValue
-                    jobsViewModel.jobs = copy
-                }
-            }
-        )
-    }
-
     @ViewBuilder
-    private func destination(for job: Job) -> some View {
-        if let binding = binding(for: job) {
-            JobDetailView(job: binding)
-        } else {
-            JobSearchDetailView(job: job)
-        }
-    }
-
-    var body: some View {
+    private func content(for aggregate: JobSearchViewModel.Aggregate) -> some View {
         ZStack(alignment: .top) {
             JTGradients.background
                 .ignoresSafeArea()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: JTSpacing.lg) {
-                    // Header
                     VStack(alignment: .leading, spacing: 8) {
                         Text(aggregate.address)
                             .font(JTTypography.screenTitle)
@@ -463,13 +434,12 @@ private struct AggregatedDetailView: View {
                             }
                         }
 
-                        if let job = primaryJob {
+                        if let job = primaryJob(for: aggregate) {
                             quickActions(for: job)
                                 .padding(.top, JTSpacing.sm)
                         }
                     }
 
-                    // Timeline of all entries (newest first)
                     VStack(alignment: .leading, spacing: JTSpacing.md) {
                         ForEach(aggregate.jobs, id: \.id) { entry in
                             NavigationLink(value: JobSearchViewModel.Route.job(id: entry.id)) {
@@ -517,10 +487,20 @@ private struct AggregatedDetailView: View {
                 .padding(JTSpacing.lg)
             }
         }
+    }
+
+    var body: some View {
+        Group {
+            if let aggregate {
+                content(for: aggregate)
+            } else {
+                MissingSearchDestinationView(message: "Job results are no longer available. Try running your search again.")
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showShareSheet, onDismiss: { shareURL = nil; jobForShareSheet = nil }) {
             if let url = shareURL {
-                let subject = jobForShareSheet?.shortAddress ?? aggregate.address
+                let subject = jobForShareSheet?.shortAddress ?? aggregate?.address ?? "Job"
                 ActivityView(activityItems: [url], subject: "Job link for \(subject)")
             }
         }
@@ -531,18 +511,6 @@ private struct AggregatedDetailView: View {
                 Text(message)
             }
         })
-        .navigationDestination(for: JobSearchViewModel.Route.self) { route in
-            switch route {
-            case .job(let jobID):
-                if let job = viewModel.job(forID: jobID) {
-                    destination(for: job)
-                } else {
-                    MissingSearchDestinationView(message: "We couldn't load that job. It may have been removed.")
-                }
-            case .aggregate:
-                EmptyView()
-            }
-        }
     }
 }
 

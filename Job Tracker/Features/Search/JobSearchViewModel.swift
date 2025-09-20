@@ -35,13 +35,29 @@ final class JobSearchViewModel: ObservableObject {
         case job(id: String)
     }
 
+    struct JobDestination {
+        let job: Job
+        let binding: Binding<Job>?
+    }
+
     enum RouteDestination {
-        case aggregate(Aggregate)
-        case job(Job)
+        case aggregate(id: String)
+        case job(JobDestination)
+    }
+
+    struct ResultsState {
+        enum Content {
+            case prompt
+            case empty(query: String)
+            case aggregates([Aggregate])
+        }
+
+        let content: Content
     }
 
     @Published var query: String = ""
     @Published private(set) var aggregates: [Aggregate] = []
+    @Published private(set) var resultsState: ResultsState = .init(content: .prompt)
     @Published var navigationPath: [Route] = []
 
     private let jobsViewModel: JobsViewModel
@@ -59,14 +75,18 @@ final class JobSearchViewModel: ObservableObject {
         rebuildAggregates()
     }
 
-    func routeDestination(for route: Route) -> RouteDestination? {
+    func aggregate(forID id: String) -> Aggregate? {
+        aggregateLookup[id]
+    }
+
+    func destination(for route: Route) -> RouteDestination? {
         switch route {
         case .aggregate(let id):
-            guard let aggregate = aggregateLookup[id] else { return nil }
-            return .aggregate(aggregate)
+            guard aggregateLookup[id] != nil else { return nil }
+            return .aggregate(id: id)
         case .job(let id):
             guard let job = job(forID: id) else { return nil }
-            return .job(job)
+            return .job(JobDestination(job: job, binding: binding(for: job)))
         }
     }
 
@@ -78,6 +98,24 @@ final class JobSearchViewModel: ObservableObject {
             return job
         }
         return jobsViewModel.jobs.first(where: { $0.id == id })
+    }
+
+    private func binding(for job: Job) -> Binding<Job>? {
+        guard jobsViewModel.jobs.contains(where: { $0.id == job.id }) else { return nil }
+        return Binding(
+            get: { [weak self] in
+                guard let self else { return job }
+                return self.jobsViewModel.jobs.first(where: { $0.id == job.id }) ?? job
+            },
+            set: { [weak self] newValue in
+                guard let self else { return }
+                if let index = self.jobsViewModel.jobs.firstIndex(where: { $0.id == job.id }) {
+                    var copy = self.jobsViewModel.jobs
+                    copy[index] = newValue
+                    self.jobsViewModel.jobs = copy
+                }
+            }
+        )
     }
 
     private func configureSubscriptions() {
@@ -115,6 +153,7 @@ final class JobSearchViewModel: ObservableObject {
             aggregates = []
             aggregateLookup = [:]
             rebuildJobLookup(filteredJobs: [])
+            resultsState = .init(content: .prompt)
             return
         }
 
@@ -133,6 +172,12 @@ final class JobSearchViewModel: ObservableObject {
         self.aggregates = aggregates
         aggregateLookup = Dictionary(uniqueKeysWithValues: aggregates.map { ($0.id, $0) })
         rebuildJobLookup(filteredJobs: filtered)
+
+        if aggregates.isEmpty {
+            resultsState = .init(content: .empty(query: trimmedQuery))
+        } else {
+            resultsState = .init(content: .aggregates(aggregates))
+        }
     }
 
     private func rebuildJobLookup(filteredJobs: [Job]) {
