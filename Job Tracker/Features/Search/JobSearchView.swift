@@ -11,8 +11,8 @@ struct JobSearchView: View {
     @State private var path: [Route] = []
 
     enum Route: Hashable {
-        case aggregate(JobAggregate)
-        case job(Job)
+        case aggregate(id: String)
+        case job(id: String)
     }
 
     // MARK: - Filter + Group
@@ -113,12 +113,20 @@ struct JobSearchView: View {
         }
         .navigationDestination(for: Route.self) { route in
             switch route {
-            case .aggregate(let aggregate):
-                AggregatedDetailView(aggregate: aggregate)
-                    .environmentObject(usersViewModel)
-                    .environmentObject(jobsViewModel)
-            case .job(let job):
-                destination(for: job)
+            case .aggregate(let aggregateID):
+                if let aggregate = aggregate(forID: aggregateID) {
+                    AggregatedDetailView(aggregate: aggregate)
+                        .environmentObject(usersViewModel)
+                        .environmentObject(jobsViewModel)
+                } else {
+                    MissingSearchDestinationView(message: "Job results are no longer available. Try running your search again.")
+                }
+            case .job(let jobID):
+                if let job = job(forID: jobID) {
+                    destination(for: job)
+                } else {
+                    MissingSearchDestinationView(message: "We couldn't load that job. It may have been removed.")
+                }
             }
         }
         .safeAreaInset(edge: .top) {
@@ -173,7 +181,7 @@ struct JobSearchView: View {
         } else {
             LazyVStack(spacing: JTSpacing.md) {
                 ForEach(aggregatedResults) { agg in
-                    NavigationLink(value: Route.aggregate(agg)) {
+                    NavigationLink(value: Route.aggregate(id: agg.id)) {
                         AggregatedJobCard(aggregate: agg)
                             .contentShape(JTShapes.roundedRectangle(cornerRadius: JTShapes.smallCardCornerRadius))
                     }
@@ -199,6 +207,20 @@ struct JobSearchView: View {
                 }
             }
         )
+    }
+
+    private func aggregate(forID id: String) -> JobAggregate? {
+        aggregatedResults.first { $0.id == id }
+    }
+
+    private func job(forID id: String) -> Job? {
+        if let fromAggregates = aggregatedResults.flatMap({ $0.jobs }).first(where: { $0.id == id }) {
+            return fromAggregates
+        }
+        if let job = jobsViewModel.searchJobs.first(where: { $0.id == id }) {
+            return job
+        }
+        return jobsViewModel.jobs.first(where: { $0.id == id })
     }
 
     @ViewBuilder
@@ -528,7 +550,7 @@ private struct AggregatedDetailView: View {
                     // Timeline of all entries (newest first)
                     VStack(alignment: .leading, spacing: JTSpacing.md) {
                         ForEach(aggregate.jobs, id: \.id) { job in
-                            NavigationLink(value: JobSearchView.Route.job(job)) {
+                            NavigationLink(value: JobSearchView.Route.job(id: job.id)) {
                                 GlassCard(cornerRadius: JTShapes.smallCardCornerRadius,
                                           strokeColor: JTColors.glassSoftStroke,
                                           shadow: JTShadow.none) {
@@ -587,6 +609,30 @@ private struct AggregatedDetailView: View {
                 Text(message)
             }
         })
+    }
+}
+
+private struct MissingSearchDestinationView: View {
+    let message: String
+
+    var body: some View {
+        ZStack {
+            JTGradients.background
+                .ignoresSafeArea()
+
+            VStack(spacing: JTSpacing.md) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(JTColors.warning)
+
+                Text(message)
+                    .multilineTextAlignment(.center)
+                    .font(JTTypography.body)
+                    .foregroundStyle(JTColors.textSecondary)
+                    .padding(.horizontal, JTSpacing.lg)
+            }
+            .padding(.horizontal, JTSpacing.lg)
+        }
     }
 }
 
