@@ -95,6 +95,7 @@ struct WeeklyTimesheetView: View {
             }) {
                 Image(systemName: "chevron.left")
                     .padding(8)
+                    .foregroundStyle(JTColors.textPrimary)
             }
             Spacer(minLength: 0)
             // Tappable center label shows the week start.
@@ -104,7 +105,7 @@ struct WeeklyTimesheetView: View {
                 Text("Week of \(formattedDate(startOfWeek))")
                     .font(.subheadline)
                     .lineLimit(1)
-                    .foregroundColor(.white)
+                    .foregroundStyle(JTColors.textPrimary)
             }
             Spacer(minLength: 0)
             Button(action: {
@@ -115,6 +116,7 @@ struct WeeklyTimesheetView: View {
             }) {
                 Image(systemName: "chevron.right")
                     .padding(8)
+                    .foregroundStyle(JTColors.textPrimary)
             }
         }
         .padding(.vertical, 4)
@@ -122,7 +124,7 @@ struct WeeklyTimesheetView: View {
         .background(.ultraThinMaterial)
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                .stroke(JTColors.glassStroke, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
@@ -137,16 +139,9 @@ struct WeeklyTimesheetView: View {
         NavigationStack {
             ZStack {
                 // Background gradient matching your Dashboard and CreateJobView.
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.17254902, green: 0.24313726, blue: 0.3137255),
-                        Color(red: 0.29803923, green: 0.6313726, blue: 0.6862745)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .edgesIgnoringSafeArea(.all)
-                RadialGradient(colors: [Color.white.opacity(0.05), .clear], center: .topLeading, startRadius: 0, endRadius: 400)
+                JTGradients.background(stops: 4)
+                    .edgesIgnoringSafeArea(.all)
+                RadialGradient(colors: [JTColors.textPrimary.opacity(0.05), .clear], center: .topLeading, startRadius: 0, endRadius: 400)
                     .allowsHitTesting(false)
                 
                 ScrollView {
@@ -169,7 +164,7 @@ struct WeeklyTimesheetView: View {
                         Text("Gibson Connect Weekly")
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(.white)
+                            .foregroundStyle(JTColors.textPrimary)
                         
                         // Display each day in a vertical list (Sun → Sat) with shadow
                         ForEach(weekdays, id: \.self) { day in

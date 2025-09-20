@@ -124,14 +124,7 @@ struct SupervisorDashboardView: View {
     var body: some View {
         ZStack {
             // App-wide gradient background
-            LinearGradient(
-                colors: [
-                    Color(red: 0.1725, green: 0.2431, blue: 0.3137),
-                    Color(red: 0.2980, green: 0.6314, blue: 0.6863)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            JTGradients.background(stops: 4)
             .ignoresSafeArea()
 
             ScrollView {
@@ -646,13 +639,7 @@ struct SupervisorCreateJobView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.1725, green: 0.2431, blue: 0.3137),
-                        Color(red: 0.2980, green: 0.6314, blue: 0.6863)
-                    ],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                )
+                JTGradients.background(stops: 4)
                 .ignoresSafeArea()
 
                 Form {

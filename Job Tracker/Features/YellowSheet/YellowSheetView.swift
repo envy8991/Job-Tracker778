@@ -25,14 +25,7 @@ struct YellowSheetView: View {
         NavigationView {
             ZStack {
                 // Background gradient.
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.17254902, green: 0.24313726, blue: 0.3137255),
-                        Color(red: 0.29803923, green: 0.6313726, blue: 0.6862745)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                JTGradients.background(stops: 4)
                 .ignoresSafeArea()
                 
                 VStack {
@@ -44,7 +37,7 @@ struct YellowSheetView: View {
                             ForEach(sortedJobGroups, id: \.key) { group in
                                 Section(header: Text("Job Number: \(group.key)")
                                             .font(.headline)
-                                            .foregroundColor(.white)
+                                            .foregroundColor(JTColors.textPrimary)
                                             .padding(.vertical, 4)) {
                                     ForEach(group.value) { job in
                                         YellowSheetJobCard(job: job)
@@ -59,10 +52,10 @@ struct YellowSheetView: View {
                     Button("Save Yellow Sheet") {
                         saveCurrentYellowSheet()
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(JTColors.onAccent)
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(Color.blue.opacity(0.8))
+                    .background(JTColors.accent.opacity(0.9))
                     .cornerRadius(8)
                     .padding(.horizontal)
                     .padding(.bottom, 10)

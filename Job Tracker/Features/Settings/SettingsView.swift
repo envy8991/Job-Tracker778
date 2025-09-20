@@ -2,16 +2,6 @@ import SwiftUI
 
 // MARK: - iOS 26-Style Settings
 
-// Background gradient (kept from your original but renamed for clarity)
-private let settingsGradient = LinearGradient(
-    gradient: Gradient(colors: [
-        Color(red: 0.1725, green: 0.2431, blue: 0.3137), // deep steel
-        Color(red: 0.2980, green: 0.6314, blue: 0.6863)  // teal mist
-    ]),
-    startPoint: .topLeading,
-    endPoint: .bottomTrailing
-)
-
 // Lightweight section header label used inside cards
 private struct SectionHeader: View {
     let title: String
@@ -26,6 +16,7 @@ private struct SectionHeader: View {
 struct SettingsView: View {
     // MARK: - Dependencies
     @EnvironmentObject var authViewModel: AuthViewModel
+    @EnvironmentObject private var themeManager: JTThemeManager
 
     // Persisted settings
     @AppStorage("smartRoutingEnabled") private var smartRoutingEnabled = false
@@ -43,6 +34,7 @@ struct SettingsView: View {
     @State private var showDeleteConfirm = false
     @State private var isDeleting = false
     @State private var deleteError: String? = nil
+    @State private var showThemeEditor = false
 
     // Update these to your real URLs/emails
     private let privacyURL = URL(string: "https://gist.github.com/Qathom89911/82366354d14a9283d9d1c49f601c8f93")!
@@ -50,8 +42,7 @@ struct SettingsView: View {
 
     var body: some View {
         ZStack {
-            // glassy gradient background
-            settingsGradient
+            JTGradients.background(stops: 4)
                 .ignoresSafeArea()
 
             ScrollView(.vertical, showsIndicators: false) {
@@ -61,21 +52,30 @@ struct SettingsView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "gearshape.2.fill")
                             .symbolRenderingMode(.palette)
-                            .foregroundStyle(.white.opacity(0.95), .white.opacity(0.45))
+                            .foregroundStyle(JTColors.textPrimary, JTColors.textSecondary)
                             .font(.system(size: 26, weight: .semibold))
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Settings")
                                 .font(.system(.title2, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.95))
+                                .foregroundStyle(JTColors.textPrimary)
                             Text("Tune routing, notifications, and your account")
                                 .font(.footnote)
-                                .foregroundStyle(.white.opacity(0.7))
+                                .foregroundStyle(JTColors.textSecondary)
                         }
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 28) // room for the hamburger overlay (iOS 16-safe)
+
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            SectionHeader(title: "Appearance")
+                            ThemeSelectionSection(showThemeEditor: $showThemeEditor)
+                        }
+                        .padding(16)
+                    }
+                    .padding(.horizontal, 16)
 
                     // Smart Routing
                     GlassCard {
@@ -251,6 +251,291 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showThemeEditor) {
+            let storedCustom = themeManager.storedCustomTheme()
+            ThemeEditorSheet(
+                initialTheme: storedCustom ?? themeManager.theme,
+                isEditingExistingCustom: storedCustom != nil,
+                isPresented: $showThemeEditor
+            )
+            .environmentObject(themeManager)
+        }
+    }
+}
+
+private struct ThemeSelectionSection: View {
+    @EnvironmentObject private var themeManager: JTThemeManager
+    @Binding var showThemeEditor: Bool
+
+    private var customPreview: JTTheme {
+        if let stored = themeManager.storedCustomTheme() {
+            return stored
+        }
+        let base = themeManager.theme
+        return JTTheme(
+            id: "custom-preview",
+            name: "Custom",
+            subtitle: "Start from your current palette",
+            style: base.style,
+            backgroundTop: base.backgroundTopColor,
+            backgroundBottom: base.backgroundBottomColor,
+            accent: base.accentColor
+        )
+    }
+
+    private var statusDescription: String {
+        if themeManager.isUsingCustomTheme {
+            return "Custom theme active: \(themeManager.theme.name)"
+        } else if let preset = themeManager.selectedPreset {
+            return "Preset in use: \(preset.theme.name)"
+        }
+        return ""
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(themeManager.availablePresets) { preset in
+                        ThemePreviewCard(
+                            theme: preset.theme,
+                            subtitle: preset.theme.subtitle,
+                            isSelected: themeManager.selectedPreset == preset,
+                            action: { themeManager.applyPreset(preset) }
+                        )
+                    }
+
+                    ThemePreviewCard(
+                        theme: customPreview,
+                        subtitle: themeManager.storedCustomTheme() == nil ? "Tap to design" : "Your colors",
+                        isSelected: themeManager.isUsingCustomTheme,
+                        action: { showThemeEditor = true }
+                    )
+                }
+                .padding(.vertical, 4)
+            }
+
+            Button {
+                showThemeEditor = true
+            } label: {
+                Label(themeManager.isUsingCustomTheme ? "Edit custom theme" : "Create custom theme", systemImage: "paintbrush.pointed")
+                    .font(.callout.weight(.semibold))
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 14)
+                    .background(JTColors.accent.opacity(0.18), in: Capsule(style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(JTColors.accent)
+
+            if !statusDescription.isEmpty {
+                Text(statusDescription)
+                    .font(.caption)
+                    .foregroundStyle(JTColors.textMuted)
+            }
+        }
+    }
+}
+
+private struct ThemePreviewCard: View {
+    let theme: JTTheme
+    let subtitle: String?
+    let isSelected: Bool
+    var action: () -> Void
+
+    private var outlineColor: Color {
+        isSelected ? Color.white.opacity(0.95) : Color.white.opacity(0.4)
+    }
+
+    private var textColor: Color { Color.white }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: theme.backgroundGradientStops(count: 4),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(outlineColor, lineWidth: isSelected ? 3 : 1.5)
+                    )
+                    .overlay(alignment: .topLeading) {
+                        Capsule(style: .continuous)
+                            .fill(theme.accentColor)
+                            .frame(width: 36, height: 12)
+                            .overlay(
+                                Capsule(style: .continuous)
+                                    .strokeBorder(theme.onAccentColor.opacity(0.55), lineWidth: 1)
+                            )
+                            .padding(10)
+                    }
+                    .frame(width: 150, height: 90)
+
+                Text(theme.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(textColor)
+                    .lineLimit(1)
+
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(textColor.opacity(0.8))
+                        .lineLimit(2)
+                }
+            }
+            .padding(12)
+            .frame(width: 170, alignment: .leading)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(isSelected ? JTColors.accent : JTColors.glassStroke, lineWidth: isSelected ? 2 : 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct ThemeEditorSheet: View {
+    @EnvironmentObject private var themeManager: JTThemeManager
+    private let originalTheme: JTTheme
+    private let isEditingExistingCustom: Bool
+    @Binding var isPresented: Bool
+
+    @State private var name: String
+    @State private var backgroundTop: Color
+    @State private var backgroundBottom: Color
+    @State private var accent: Color
+
+    init(initialTheme: JTTheme, isEditingExistingCustom: Bool, isPresented: Binding<Bool>) {
+        self.originalTheme = initialTheme
+        self.isEditingExistingCustom = isEditingExistingCustom
+        _name = State(initialValue: initialTheme.name)
+        _backgroundTop = State(initialValue: initialTheme.backgroundTopColor)
+        _backgroundBottom = State(initialValue: initialTheme.backgroundBottomColor)
+        _accent = State(initialValue: initialTheme.accentColor)
+        _isPresented = isPresented
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Details") {
+                    TextField("Theme name", text: $name)
+                }
+
+                Section("Background") {
+                    ColorPicker("Top", selection: $backgroundTop, supportsOpacity: false)
+                    ColorPicker("Bottom", selection: $backgroundBottom, supportsOpacity: false)
+                }
+
+                Section("Accent") {
+                    ColorPicker("Accent", selection: $accent, supportsOpacity: false)
+                }
+
+                Section("Preview") {
+                    ThemePreviewDisplay(theme: previewTheme)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+            }
+            .navigationTitle("Custom Theme")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { isPresented = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let finalName = trimmed.isEmpty ? "Custom" : trimmed
+                        let customID = isEditingExistingCustom ? originalTheme.id : "custom-\(UUID().uuidString)"
+                        let customTheme = JTTheme(
+                            id: customID,
+                            name: finalName,
+                            subtitle: "User defined",
+                            style: originalTheme.style,
+                            backgroundTop: backgroundTop,
+                            backgroundBottom: backgroundBottom,
+                            accent: accent
+                        )
+                        themeManager.applyCustom(customTheme)
+                        isPresented = false
+                    }
+                }
+            }
+        }
+    }
+
+    private var previewTheme: JTTheme {
+        let previewID = isEditingExistingCustom ? originalTheme.id : "preview"
+        return JTTheme(
+            id: previewID,
+            name: name,
+            subtitle: originalTheme.subtitle,
+            style: originalTheme.style,
+            backgroundTop: backgroundTop,
+            backgroundBottom: backgroundBottom,
+            accent: accent
+        )
+    }
+}
+
+private struct ThemePreviewDisplay: View {
+    let theme: JTTheme
+
+    private var textColor: Color { Color.white }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: theme.backgroundGradientStops(count: 4),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .strokeBorder(textColor.opacity(0.25), lineWidth: 1.5)
+                    )
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(theme.name.isEmpty ? "Preview" : theme.name)
+                        .font(.headline.weight(.semibold))
+                        .foregroundColor(textColor)
+                    if let subtitle = theme.subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundColor(textColor.opacity(0.8))
+                    }
+                }
+                .padding()
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 160)
+
+            HStack(spacing: 16) {
+                Capsule()
+                    .fill(theme.accentColor)
+                    .frame(height: 36)
+                    .overlay(
+                        Text("Accent sample")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundColor(theme.onAccentColor)
+                    )
+
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(0.14))
+                    .frame(height: 36)
+                    .overlay(
+                        Text("Glass surface")
+                            .font(.footnote)
+                            .foregroundColor(textColor.opacity(0.85))
+                    )
+            }
+        }
     }
 }
 

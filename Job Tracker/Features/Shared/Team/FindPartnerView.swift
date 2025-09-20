@@ -7,15 +7,6 @@
 
 import SwiftUI
 
-private let partnerGradient = LinearGradient(
-    gradient: Gradient(colors: [
-        Color(red: 0.1725, green: 0.2431, blue: 0.3137),
-        Color(red: 0.2980, green: 0.6314, blue: 0.6863)
-    ]),
-    startPoint: .topLeading,
-    endPoint: .bottomTrailing
-)
-
 struct FindPartnerView: View {
     @EnvironmentObject var usersViewModel: UsersViewModel
     @EnvironmentObject var authViewModel: AuthViewModel
@@ -28,7 +19,7 @@ struct FindPartnerView: View {
 
     var body: some View {
         ZStack {
-            partnerGradient
+            JTGradients.background(stops: 4)
                 .ignoresSafeArea()
 
             List {

@@ -91,15 +91,6 @@ struct MoreTabView: View {
         )
     }
 
-    private let backgroundGradient = LinearGradient(
-        colors: [
-            Color(red: 0.10, green: 0.14, blue: 0.18),
-            Color(red: 0.20, green: 0.45, blue: 0.55)
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-
     var body: some View {
         NavigationStack(path: morePathBinding) {
             MoreMenuList()
@@ -109,7 +100,7 @@ struct MoreTabView: View {
                     MoreDestinationView(destination: destination)
                 }
         }
-        .background(backgroundGradient.ignoresSafeArea())
+        .background(JTGradients.background(stops: 4).ignoresSafeArea())
         .onAppear {
             if !navigation.activeDestination.isMoreStackDestination {
                 navigation.navigate(to: .more)
@@ -170,15 +161,8 @@ private struct MoreMenuList: View {
         }
         .scrollContentBackground(.hidden)
         .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 0.10, green: 0.14, blue: 0.18),
-                    Color(red: 0.20, green: 0.45, blue: 0.55)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            JTGradients.background(stops: 4)
+                .ignoresSafeArea()
         )
         .listStyle(.insetGrouped)
     }

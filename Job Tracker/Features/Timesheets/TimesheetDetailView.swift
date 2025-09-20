@@ -8,15 +8,8 @@ struct TimesheetDetailView: View {
     var body: some View {
         ZStack {
             // Background gradient.
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.17254902, green: 0.24313726, blue: 0.3137255),
-                    Color(red: 0.29803923, green: 0.6313726, blue: 0.6862745)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .edgesIgnoringSafeArea(.all)
+            JTGradients.background(stops: 4)
+                .edgesIgnoringSafeArea(.all)
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
@@ -50,8 +43,8 @@ struct TimesheetDetailView: View {
                             showPDFViewer = true
                         }
                         .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
+                        .background(JTColors.accent)
+                        .foregroundColor(JTColors.onAccent)
                         .cornerRadius(8)
                         .sheet(isPresented: $showPDFViewer) {
                             PDFViewer(url: url)
