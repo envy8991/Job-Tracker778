@@ -1,6 +1,7 @@
 import SwiftUI
 import PDFKit
 import UIKit   // for haptics
+import FirebaseStorage
 
 // MARK: - Model for header rows
 // Each worker has separate Gibson and CS hours.
@@ -15,6 +16,13 @@ struct WorkerHours: Identifiable, Hashable {
 
 private struct PDFGenerationStatus: Identifiable, Equatable {
     let id = UUID()
+    let message: String
+    let isSuccess: Bool
+}
+
+private struct SaveStatusAlert: Identifiable, Equatable {
+    let id = UUID()
+    let title: String
     let message: String
     let isSuccess: Bool
 }
@@ -49,6 +57,8 @@ struct WeeklyTimesheetView: View {
     @State private var partnerUid: String? = nil
     @State private var isGeneratingPDF = false
     @State private var pdfGenerationStatus: PDFGenerationStatus? = nil
+    @State private var isSavingTimesheet = false
+    @State private var saveStatusAlert: SaveStatusAlert? = nil
     
     // State for selecting the week.
     @State private var selectedDate = Date()
@@ -233,7 +243,23 @@ struct WeeklyTimesheetView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button {
+                        saveCurrentTimesheet()
+                    } label: {
+                        Group {
+                            if isSavingTimesheet {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: JTColors.textPrimary))
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "tray.and.arrow.down")
+                            }
+                        }
+                        .frame(width: 24, height: 24)
+                    }
+                    .disabled(isSavingTimesheet || isGeneratingPDF)
+
                     Button {
                         guard !isGeneratingPDF else { return }
                         isGeneratingPDF = true
@@ -299,6 +325,9 @@ struct WeeklyTimesheetView: View {
             .onChange(of: selectedDate) { _ in
                 loadTimesheet()
             }
+            .onChange(of: partnerUid) { _ in
+                loadTimesheet()
+            }
             .onReceive(timesheetVM.$timesheet) { newTimesheet in
                 if let ts = newTimesheet {
                     supervisor = ts.supervisor
@@ -311,6 +340,9 @@ struct WeeklyTimesheetView: View {
                                       WorkerHours(name: "", gibson: "", cs: "")]
                     }
                     workers = Array(newWorkers.prefix(2))
+                    dailyTotalHours = convertDailyTotals(from: ts.dailyTotalHours)
+                } else {
+                    dailyTotalHours = [:]
                 }
             }
             .onReceive(authViewModel.$currentUser) { _ in
@@ -321,6 +353,13 @@ struct WeeklyTimesheetView: View {
                 } else {
                     self.partnerUid = nil
                 }
+            }
+            .alert(item: $saveStatusAlert) { status in
+                Alert(
+                    title: Text(status.title),
+                    message: Text(status.message),
+                    dismissButton: .default(Text("OK"))
+                )
             }
         }
         .sheet(isPresented: $showCalendar) {
@@ -440,13 +479,19 @@ extension WeeklyTimesheetView {
     }
     
     private func filteredJobs(for day: Date) -> [Job] {
+        let calendar = Calendar.current
+        return jobsForTimesheet().filter { job in
+            calendar.isDate(job.date, inSameDayAs: day)
+        }
+    }
+
+    private func jobsForTimesheet() -> [Job] {
         guard let me = authViewModel.currentUser?.id else { return [] }
         let other = partnerUid
         return timesheetJobsVM.jobs.filter { job in
             let mine = (job.createdBy == me || job.assignedTo == me)
             let partners = (other != nil) && (job.createdBy == other || job.assignedTo == other)
             return (mine || partners)
-                && Calendar.current.isDate(job.date, inSameDayAs: day)
                 && job.status.lowercased() != "pending"
         }
     }
@@ -466,6 +511,148 @@ extension WeeklyTimesheetView {
                 dailyTotalHours[key] = newValue
             }
         )
+    }
+
+    private func normalizedDailyTotalsDictionary() -> [String: String] {
+        var result: [String: String] = [:]
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let calendar = Calendar.current
+
+        for day in weekdays {
+            let start = calendar.startOfDay(for: day)
+            let key = formatter.string(from: start)
+            if let manual = dailyTotalHours[start]?.trimmingCharacters(in: .whitespacesAndNewlines), !manual.isEmpty {
+                result[key] = manual
+            } else {
+                let sum = filteredJobs(for: day).reduce(0.0) { $0 + $1.hours }
+                result[key] = String(format: "%.1f", sum)
+            }
+        }
+
+        return result
+    }
+
+    private func convertDailyTotals(from raw: [String: String]) -> [Date: String] {
+        var converted: [Date: String] = [:]
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let calendar = Calendar.current
+
+        for (key, value) in raw {
+            if let date = formatter.date(from: key) {
+                converted[calendar.startOfDay(for: date)] = value
+            }
+        }
+
+        return converted
+    }
+
+    private func aggregatedWorkerTotals() -> (gibson: Double, cs: Double) {
+        let gibson = workers.reduce(0.0) { partial, worker in
+            partial + (Double(worker.gibson) ?? 0)
+        }
+        let cs = workers.reduce(0.0) { partial, worker in
+            partial + (Double(worker.cs) ?? 0)
+        }
+        return (gibson, cs)
+    }
+
+    private func saveCurrentTimesheet() {
+        guard !isSavingTimesheet else { return }
+        guard let ownerId = authViewModel.currentUser?.id else {
+            presentSaveStatus(title: "Not Signed In", message: "You must be signed in to save a timesheet.", isSuccess: false)
+            return
+        }
+
+        let supervisorName = supervisor
+        let partner = partnerUid
+        let weekStartDate = startOfWeek
+        let weekIdentifier = weekStartString(from: weekStartDate)
+        let workerName1 = workers.indices.contains(0) ? workers[0].name : ""
+        let workerName2 = workers.indices.contains(1) ? workers[1].name : ""
+        let headerTotals = aggregatedWorkerTotals()
+        let gibsonString = String(format: "%.1f", headerTotals.gibson)
+        let csString = String(format: "%.1f", headerTotals.cs)
+        let totalString = String(format: "%.1f", weeklyTotalHours)
+        let dailyTotals = normalizedDailyTotalsDictionary()
+
+        isSavingTimesheet = true
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let pdfURL = self.generatePDF() else {
+                DispatchQueue.main.async {
+                    self.isSavingTimesheet = false
+                    self.presentSaveStatus(title: "Save Failed", message: "We couldn't generate the weekly PDF.", isSuccess: false)
+                }
+                return
+            }
+
+            guard let pdfData = try? Data(contentsOf: pdfURL) else {
+                DispatchQueue.main.async {
+                    self.isSavingTimesheet = false
+                    self.presentSaveStatus(title: "Save Failed", message: "Unable to read the generated PDF.", isSuccess: false)
+                }
+                return
+            }
+
+            let storagePath = "timesheets/\(ownerId)_\(weekIdentifier).pdf"
+            let storageRef = Storage.storage().reference().child(storagePath)
+            let metadata = StorageMetadata()
+            metadata.contentType = "application/pdf"
+
+            storageRef.putData(pdfData, metadata: metadata) { _, error in
+                if let error = error {
+                    DispatchQueue.main.async {
+                        self.isSavingTimesheet = false
+                        self.presentSaveStatus(title: "Upload Failed", message: error.localizedDescription, isSuccess: false)
+                    }
+                    return
+                }
+
+                storageRef.downloadURL { url, error in
+                    DispatchQueue.main.async {
+                        guard let downloadURL = url, error == nil else {
+                            self.isSavingTimesheet = false
+                            let message = error?.localizedDescription ?? "Unable to fetch the PDF download link."
+                            self.presentSaveStatus(title: "Upload Failed", message: message, isSuccess: false)
+                            return
+                        }
+
+                        let timesheet = Timesheet(
+                            userId: ownerId,
+                            partnerId: partner,
+                            weekStart: weekStartDate,
+                            supervisor: supervisorName,
+                            name1: workerName1,
+                            name2: workerName2,
+                            gibsonHours: gibsonString,
+                            cableSouthHours: csString,
+                            totalHours: totalString,
+                            dailyTotalHours: dailyTotals,
+                            pdfURL: downloadURL.absoluteString
+                        )
+
+                        self.timesheetVM.saveTimesheet(timesheet) { result in
+                            self.isSavingTimesheet = false
+                            switch result {
+                            case .success:
+                                self.presentSaveStatus(title: "Timesheet Saved", message: "Your weekly timesheet is now available under Past Timesheets.", isSuccess: true)
+                            case .failure(let error):
+                                self.presentSaveStatus(title: "Save Failed", message: error.localizedDescription, isSuccess: false)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func presentSaveStatus(title: String, message: String, isSuccess: Bool) {
+        saveStatusAlert = SaveStatusAlert(title: title, message: message, isSuccess: isSuccess)
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(isSuccess ? .success : .error)
     }
 
     @MainActor
@@ -509,7 +696,7 @@ extension WeeklyTimesheetView {
         let generator = WeeklyTimesheetPDFGenerator(
             startOfWeek: startOfWeek,
             endOfWeek: endOfWeek,
-            jobs: timesheetJobsVM.jobs,
+            jobs: jobsForTimesheet(),
             currentUserID: authViewModel.currentUser?.id ?? "",
             partnerUserID: partnerUid,
             supervisor: supervisor,
@@ -541,7 +728,7 @@ extension WeeklyTimesheetView {
     
     private func loadTimesheet() {
         guard let userId = authViewModel.currentUser?.id else { return }
-        timesheetVM.fetchTimesheet(for: startOfWeek, userId: userId)
+        timesheetVM.fetchTimesheet(for: startOfWeek, userId: userId, partnerId: partnerUid)
         // Also fetch jobs for the selected week in our independent model.
         timesheetJobsVM.fetchJobsForWeek(selectedDate: selectedDate)
     }
