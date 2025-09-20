@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Centralized color tokens for the Job Tracker design system.
+@MainActor
 public enum JTColors {
     private static var theme: JTTheme { JTThemeManager.shared.theme }
 
@@ -30,6 +31,7 @@ public enum JTColors {
 }
 
 /// Gradients that compose reusable backgrounds.
+@MainActor
 public enum JTGradients {
     public static var background: LinearGradient { background(stops: 2) }
 
