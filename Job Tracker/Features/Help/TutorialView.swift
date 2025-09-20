@@ -29,7 +29,7 @@ struct TutorialView: View {
                 description: """
 - From **Jobs**, tap **Create Job** to open the new job form.
 - Fill **Enter address**, adjust **Select Date**, and pick a status from the **Status** menu before saving.
-- Enter the required number in **Job Number \***; CAN roles should add dotted codes in **Assignments** using the provided formatter.
+- Enter the required number in **Job Number** (required); CAN roles should add dotted codes in **Assignments** using the provided formatter.
 - Capture context with **Materials Used** and **Notes**, then hit **Save Job**. After saving, open the job and use **Add Photo** under **New Photos** to attach images.
 """,
                 imageName: "plus.circle.fill"
