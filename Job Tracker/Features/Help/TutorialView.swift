@@ -15,57 +15,99 @@ struct TutorialView: View {
     var body: some View {
         TabView {
             TutorialPage(
-                title: "Create Jobs Easily",
-                description: "Tap **Create Job** to enter the job number and address. You can add it quickly and edit details later.",
+                title: "Welcome to Job Tracker",
+                description: """
+- Use the segmented control at the top to choose **Sign In**, **Sign Up**, or **Reset** for your account task.
+- Enter your credentials in the selected form and submit to reach the **Jobs** dashboard.
+- Anytime you need a refresher, tap **Preview the onboarding tutorial** under the forms.
+""",
+                imageName: "sparkles"
+            )
+
+            TutorialPage(
+                title: "Create Jobs the Right Way",
+                description: """
+- From **Jobs**, tap **Create Job** to open the new job form.
+- Fill **Enter address**, adjust **Select Date**, and pick a status from the **Status** menu before saving.
+- Enter the required number in **Job Number \***; CAN roles should add dotted codes in **Assignments** using the provided formatter.
+- Capture context with **Materials Used** and **Notes**, then hit **Save Job**. After saving, open the job and use **Add Photo** under **New Photos** to attach images.
+""",
                 imageName: "plus.circle.fill"
             )
 
             TutorialPage(
-                title: "Manage Your Dashboard",
-                description: "Pick **Mon–Fri** to see jobs for the day, update status, or get directions. Long-press to reorder if needed.",
+                title: "Own Your Dashboard",
+                description: """
+- Switch days with the weekday capsules above the list or tap the **calendar** button in the Jobs header to jump to another date.
+- Tap any job card to open details, or press its **Status** chip to move between Pending, Needs Aerial, Done, or **Custom…**.
+- Use the **map** button for directions, the **square.and.arrow.up** share icon, or swipe for the contextual **Directions**, **Share**, and **Delete** menu.
+""",
                 imageName: "calendar"
             )
 
             TutorialPage(
-                title: "Add Job Details",
-                description: "Open a job to add **notes**, **materials**, and **assignment**. Assignment format accepts 54, 54.1, or 1.2.3 (up to 3 groups).",
-                imageName: "note.text"
+                title: "Search & Update Details",
+                description: """
+- Open **Search Jobs** and type in the **Address, #, status, user…** field to search across your crew.
+- Tap a result card to open **Job Detail**; adjust the **Status** menu, update the **Materials —** section, and expand **Notes** as needed.
+- Scroll to **Existing Photos** to review attachments, then tap **Add Photo** in **New Photos** and use **Save** in the navigation bar to commit your edits.
+""",
+                imageName: "magnifyingglass.circle.fill"
             )
 
             TutorialPage(
-                title: "Smart Sorting",
-                description: "Enable **Smart Routing** in Settings to automatically sort jobs by closest-first (or farthest-first).",
-                imageName: "location"
+                title: "Weekly Timesheet & Yellow Sheet",
+                description: """
+- Open **Timesheets** and use the **Week of …** button or the chevrons to pick the correct week.
+- Enter crew info with **Supervisor** and **Add Name**, then fill each worker's Gibson and CS hours; tap day cards to adjust totals per job.
+- Switch to **Yellow Sheet**, reuse the **Week of …** picker to review grouped jobs, and tap **Save Yellow Sheet** when everything matches.
+""",
+                imageName: "clock.badge.checkmark"
             )
 
             TutorialPage(
-                title: "Time Sheets",
-                description: "Any job not **Pending** automatically appears on your **Time Sheet** and **Yellow Sheet**.",
-                imageName: "clock"
+                title: "Route Mapper Essentials",
+                description: """
+- In **Route Mapper**, start with the **Search address** bar; choosing a suggestion zooms in and drops your next pole.
+- Tap the map to add poles or long-press between spans to insert; use the markup palette to switch drawing tools.
+- Host live work by tapping **Start Session** or join with **Join**; share the code with the invite button (person+ icon), recenter with **location.fill**, and export using **square.and.arrow.up**.
+""",
+                imageName: "map"
             )
 
             TutorialPage(
-                title: "Share Your Day",
-                description: "Use the **Share** button on the dashboard to send today’s jobs by text — it includes your notes and photos.",
-                imageName: "square.and.arrow.up"
-            )
-
-            TutorialPage(
-                title: "Route Mapper (Private Sessions)",
-                description: "Start a private session and **invite a coworker** to view updates in real time. Only invited users can see the route.",
+                title: "Partner Coordination",
+                description: """
+- Visit **Find a Partner** to review your current partner and use **Unpair** when you need to disconnect.
+- Respond to crew invites with **Approve** or **Decline** inside **Incoming Requests**, and monitor pending outreach under **Outgoing Requests**.
+- Browse the roster in **Find a Partner** and tap **Request** beside a teammate to send a new invite; the row will update to **Requested** once sent.
+""",
                 imageName: "person.2.fill"
             )
 
             TutorialPage(
-                title: "Map Controls",
-                description: "Tap the **locate** button to jump to you. Use the **satellite** map for imagery. Tap the map to drop poles; long‑press to insert between spans.",
-                imageName: "location.circle.fill"
+                title: "Settings & Support",
+                description: """
+- Open **Settings** to customize the app for your crew.
+- Toggle **Enable Smart Routing** and choose an **Optimize By** option to sort your day automatically.
+- Adjust the **Address Suggestions** picker, review your account card, and tap **Contact Support** whenever you need help.
+""",
+                imageName: "gearshape.2.fill"
+            )
+
+            TutorialPage(
+                title: "Address Suggestions Overview",
+                description: """
+- Job entry uses live lookups powered by Apple Maps by default; switching to Google (Beta) can surface harder-to-find addresses.
+- Pick the provider that fits your territory now—you can always change it later in **Settings → Maps & Addresses → Address Suggestions**.
+""",
+                imageName: "map.circle"
             )
 
             // Choice page: Apple vs Google suggestions
             TutorialChoicePage(
                 title: "Address Suggestions",
-                description: "Choose your preferred provider for address lookups. You can change this anytime in **Settings → Maps & Addresses**.",
+                description: "Choose your preferred provider for address lookups. You can change this anytime in **Settings → Maps & Addresses → Address Suggestions**.",
                 imageName: "mappin.circle",
                 selection: $suggestionProviderRaw
             )
