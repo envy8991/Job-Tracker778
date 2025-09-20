@@ -34,15 +34,6 @@ extension View {
     }
 }
 
-private let detailGradient = LinearGradient(
-    gradient: Gradient(colors: [
-        Color(red: 0.1725, green: 0.2431, blue: 0.3137),
-        Color(red: 0.2980, green: 0.6314, blue: 0.6863)
-    ]),
-    startPoint: .topLeading,
-    endPoint: .bottomTrailing
-)
-
 struct JobDetailView: View {
     @Binding var job: Job
 
@@ -123,7 +114,7 @@ private let fiberChoices = ["Flat", "Round", "Mainline"]
     var body: some View {
         NavigationStack {
             ZStack {
-                detailGradient.edgesIgnoringSafeArea(.all)
+            JTGradients.background(stops: 4).edgesIgnoringSafeArea(.all)
 
                 // Main editable form
                 Form {

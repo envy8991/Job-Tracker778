@@ -8,14 +8,7 @@ struct PastYellowSheetsView: View {
         NavigationView {
             ZStack {
                 // Background gradient.
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.17254902, green: 0.24313726, blue: 0.3137255),
-                        Color(red: 0.29803923, green: 0.6313726, blue: 0.6862745)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                JTGradients.background(stops: 4)
                 .edgesIgnoringSafeArea(.all)
                 
                 List {

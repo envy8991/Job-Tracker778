@@ -19,23 +19,16 @@ struct ExtraWorkView: View {
         NavigationView {
             ZStack {
                 // Background gradient matching Dashboard/CreateJobView.
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.17254902, green: 0.24313726, blue: 0.3137255),
-                        Color(red: 0.29803923, green: 0.6313726, blue: 0.6862745)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                JTGradients.background(stops: 4)
                 .edgesIgnoringSafeArea(.all)
-                
+
                 List {
                     ForEach(neededStatuses, id: \.self) { needed in
                         Section(header: Text(needed)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(JTColors.textPrimary)
                                     .font(.headline)) {
                             let matchingJobs = unclaimedJobs(status: needed)
-                            
+
                             if matchingJobs.isEmpty {
                                 Text("No jobs")
                                     .foregroundColor(.gray)

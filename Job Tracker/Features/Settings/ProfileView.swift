@@ -8,47 +8,40 @@ struct ProfileView: View {
         NavigationView {
             ZStack {
                 // Background gradient.
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.17254902, green: 0.24313726, blue: 0.3137255),
-                        Color(red: 0.29803923, green: 0.6313726, blue: 0.6862745)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                JTGradients.background(stops: 4)
                 .edgesIgnoringSafeArea(.all)
-                
+
                 VStack(spacing: 20) {
                     if let user = authViewModel.currentUser {
                         Text("Name: \(user.firstName) \(user.lastName)")
                             .font(.title2)
-                            .foregroundColor(.white)
+                            .foregroundColor(JTColors.textPrimary)
                         Text("Position: \(user.position)")
                             .font(.headline)
-                            .foregroundColor(.white)
-                        
+                            .foregroundColor(JTColors.textSecondary)
+
                         NavigationLink(destination: PastTimesheetsView().environmentObject(authViewModel)) {
                             Text("View Past Timesheets")
-                                .foregroundColor(.blue)
+                                .foregroundColor(JTColors.accent)
                         }
                         .padding(.top, 10)
-                        
+
                         NavigationLink(destination: PastYellowSheetsView().environmentObject(authViewModel)) {
                             Text("View Past Yellow Sheets")
-                                .foregroundColor(.blue)
+                                .foregroundColor(JTColors.accent)
                         }
                         .padding(.top, 10)
-                        
+
                         Button("Sign Out") {
                             authViewModel.signOut()
                         }
                         .padding()
-                        .background(Color.red)
-                        .foregroundColor(.white)
+                        .background(JTColors.error)
+                        .foregroundColor(JTColors.onAccent)
                         .cornerRadius(8)
                     } else {
                         Text("No user info available.")
-                            .foregroundColor(.white)
+                            .foregroundColor(JTColors.textSecondary)
                     }
                     Spacer()
                 }

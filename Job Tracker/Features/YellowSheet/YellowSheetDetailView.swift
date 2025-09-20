@@ -6,15 +6,8 @@ struct YellowSheetDetailView: View {
     var body: some View {
         ZStack {
             // Background gradient.
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.17254902, green: 0.24313726, blue: 0.3137255),
-                    Color(red: 0.29803923, green: 0.6313726, blue: 0.6862745)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .edgesIgnoringSafeArea(.all)
+            JTGradients.background(stops: 4)
+                .edgesIgnoringSafeArea(.all)
             
             VStack(spacing: 20) {
                 Text("Yellow Sheet Detail")
@@ -36,10 +29,10 @@ struct YellowSheetDetailView: View {
                     NavigationLink(destination: PDFViewer(url: url)) {
                         Text("View PDF")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(JTColors.onAccent)
                             .padding()
                             .frame(maxWidth: .infinity)
-                            .background(Color.blue)
+                            .background(JTColors.accent)
                             .cornerRadius(8)
                     }
                     .padding(.horizontal)

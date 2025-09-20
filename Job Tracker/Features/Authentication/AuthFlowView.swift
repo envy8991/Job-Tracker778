@@ -37,6 +37,7 @@ struct AuthFlowView: View {
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var themeManager: JTThemeManager
     @AppStorage("hasSeenTutorial") private var hasSeenTutorial: Bool = false
 
     @State private var selection: Step
@@ -112,7 +113,7 @@ struct AuthFlowView: View {
                         }
                     }
             }
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(themeManager.theme.colorScheme)
         }
     }
 

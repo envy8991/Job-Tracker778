@@ -43,6 +43,7 @@ struct JobTrackerApp: App {
     @StateObject private var jobsViewModel  = JobTrackerApp.makeJobsVM()
     @StateObject private var usersViewModel = JobTrackerApp.makeUsersVM()
     @StateObject private var navigationViewModel = AppNavigationViewModel()
+    @StateObject private var themeManager = JTThemeManager.shared
     @AppStorage("arrivalAlertsEnabledToday") private var arrivalAlertsEnabledToday = true
     @AppStorage("hasSeenTutorial") private var hasSeenTutorial: Bool = false
     @State private var showSplash: Bool = true
@@ -122,7 +123,9 @@ struct JobTrackerApp: App {
             .environmentObject(usersViewModel)
             .environmentObject(navigationViewModel)
             .environmentObject(locationService)
-            .preferredColorScheme(.dark)
+            .environmentObject(themeManager)
+            .preferredColorScheme(themeManager.theme.colorScheme)
+            .tint(themeManager.theme.accentColor)
             // Deep links
             .onOpenURL { url in
                 DeepLinkRouter.handle(url)
