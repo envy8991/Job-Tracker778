@@ -557,9 +557,7 @@ private struct AggregatedDetailView: View {
                     // Timeline of all entries (newest first)
                     VStack(alignment: .leading, spacing: JTSpacing.md) {
                         ForEach(aggregate.jobs, id: \.id) { job in
-                            NavigationLink {
-                                destination(for: job)
-                            } label: {
+                            NavigationLink(value: JobSearchView.Route.job(id: job.id)) {
                                 GlassCard(cornerRadius: JTShapes.smallCardCornerRadius,
                                           strokeColor: JTColors.glassSoftStroke,
                                           shadow: JTShadow.none) {
@@ -618,6 +616,18 @@ private struct AggregatedDetailView: View {
                 Text(message)
             }
         })
+        .navigationDestination(for: JobSearchView.Route.self) { route in
+            switch route {
+            case .job(let jobID):
+                if let job = aggregate.jobs.first(where: { $0.id == jobID }) {
+                    destination(for: job)
+                } else {
+                    MissingSearchDestinationView(message: "We couldn't load that job. It may have been removed.")
+                }
+            case .aggregate:
+                EmptyView()
+            }
+        }
     }
 }
 
