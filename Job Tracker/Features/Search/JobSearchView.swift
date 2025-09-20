@@ -79,7 +79,7 @@ struct JobSearchView: View {
     }
 
     private var scrollContentTopPadding: CGFloat {
-        max(0, JTSpacing.lg - shellChromeHeight)
+        shellChromeHeight > 0 ? JTSpacing.xxl : JTSpacing.lg
     }
 
     private func updateShellChrome(for path: [Route]) {
@@ -367,6 +367,7 @@ private struct AggregatedJobCard: View {
                     .foregroundStyle(JTColors.textMuted)
                     .padding(.trailing, JTSpacing.md)
             }
+            .allowsHitTesting(false)
         )
     }
 }
@@ -561,6 +562,7 @@ private struct AggregatedDetailView: View {
                                             .foregroundStyle(JTColors.textMuted)
                                             .padding(.trailing, JTSpacing.md)
                                     }
+                                    .allowsHitTesting(false)
                                 )
                                 .contentShape(JTShapes.roundedRectangle(cornerRadius: JTShapes.smallCardCornerRadius))
                             }
