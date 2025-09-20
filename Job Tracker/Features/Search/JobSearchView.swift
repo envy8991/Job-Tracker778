@@ -633,24 +633,57 @@ struct JobSearchMatcher {
     }
 
     private static func normalizedHaystack(for job: Job, creator: AppUser?) -> String {
-        let creatorName: String
-        if let creator {
-            creatorName = "\(creator.firstName) \(creator.lastName)"
-        } else {
-            creatorName = ""
+        var fields: [String] = []
+
+        if let address = normalizedNonEmpty(job.address) {
+            fields.append(address)
         }
 
-        let fields: [String] = [
-            job.address,
-            job.jobNumber ?? "",
-            job.status,
-            creatorName,
+        if let jobNumber = normalizedNonEmpty(job.jobNumber) {
+            fields.append(jobNumber)
+        }
+
+        if let status = normalizedNonEmpty(job.status) {
+            fields.append(status)
+        }
+
+        if let creator,
+           let creatorName = normalizedNonEmpty("\(creator.firstName) \(creator.lastName)") {
+            fields.append(creatorName)
+        }
+
+        if let date = normalizedNonEmpty(
             DateFormatter.localizedString(from: job.date, dateStyle: .short, timeStyle: .none)
+        ) {
+            fields.append(date)
+        }
+
+        let optionalFields: [String?] = [
+            job.notes,
+            job.materialsUsed,
+            job.assignments,
+            job.nidFootage,
+            job.canFootage
         ]
 
-        return fields
-            .joined(separator: " ")
-            .lowercased()
+        for field in optionalFields {
+            if let normalized = normalizedNonEmpty(field) {
+                fields.append(normalized)
+            }
+        }
+
+        return fields.joined(separator: " ")
+    }
+
+    private static func normalizedNonEmpty(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return trimmed.lowercased()
+    }
+
+    private static func normalizedNonEmpty(_ value: String?) -> String? {
+        guard let value = value else { return nil }
+        return normalizedNonEmpty(value)
     }
 }
 
