@@ -33,4 +33,26 @@ final class JobSearchMatcherTests: XCTestCase {
         XCTAssertTrue(JobSearchMatcher.matches(job: sampleJob, query: "foreman", creator: creator))
         XCTAssertFalse(JobSearchMatcher.matches(job: sampleJob, query: "foreman", creator: nil))
     }
+
+    func testOptionalFieldsIncludedInHaystack() {
+        let jobWithOptionals = Job(
+            id: "job-optional",
+            address: "456 Elm Street",
+            date: Date(timeIntervalSince1970: 1_700_100_000),
+            status: "Pending",
+            createdBy: "user-1",
+            notes: "   Needs Ladder   ",
+            jobNumber: nil,
+            assignments: "  42.7.1  ",
+            materialsUsed: "  Fiber Cable  ",
+            nidFootage: "  150FT  ",
+            canFootage: "  200 FT  "
+        )
+
+        XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "ladder", creator: creator))
+        XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "fiber", creator: creator))
+        XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "42.7.1", creator: creator))
+        XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "150ft", creator: creator))
+        XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "200 ft", creator: creator))
+    }
 }
