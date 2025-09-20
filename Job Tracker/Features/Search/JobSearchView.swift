@@ -94,6 +94,9 @@ struct JobSearchView: View {
                 }
             }
         }
+        .safeAreaInset(edge: .top) {
+            Color.clear.frame(height: 66)
+        }
         .onAppear {
             jobsViewModel.startSearchIndexForAllJobs()
         }
