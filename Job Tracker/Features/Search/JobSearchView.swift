@@ -5,6 +5,7 @@ struct JobSearchView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var jobsViewModel: JobsViewModel
     @EnvironmentObject var usersViewModel: UsersViewModel
+    @Environment(\.shellChromeHeight) private var shellChromeHeight
 
     @State private var searchText: String = ""
 
@@ -71,6 +72,10 @@ struct JobSearchView: View {
         }
     }
 
+    private var scrollContentTopPadding: CGFloat {
+        max(0, JTSpacing.lg - shellChromeHeight)
+    }
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
@@ -90,12 +95,14 @@ struct JobSearchView: View {
 
                         resultsContent
                     }
-                    .padding(JTSpacing.lg)
+                    .padding(.top, scrollContentTopPadding)
+                    .padding(.horizontal, JTSpacing.lg)
+                    .padding(.bottom, JTSpacing.lg)
                 }
             }
         }
         .safeAreaInset(edge: .top) {
-            Color.clear.frame(height: 66)
+            Color.clear.frame(height: shellChromeHeight)
         }
         .onAppear {
             jobsViewModel.startSearchIndexForAllJobs()

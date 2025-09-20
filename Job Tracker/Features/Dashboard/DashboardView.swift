@@ -4,6 +4,7 @@ struct DashboardView: View {
     @EnvironmentObject var jobsViewModel: JobsViewModel
     @EnvironmentObject var locationService: LocationService
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.shellChromeHeight) private var shellChromeHeight
 
     @AppStorage("smartRoutingEnabled") private var smartRoutingEnabled = false
     @AppStorage("routingOptimizeBy") private var routingOptimizeBy = "closest"
@@ -142,7 +143,7 @@ struct DashboardView: View {
             }
             .toolbar(navigationBarVisibility, for: .navigationBar)
             .safeAreaInset(edge: .top) {
-                Color.clear.frame(height: 66)
+                Color.clear.frame(height: shellChromeHeight)
             }
             .sheet(item: selectedJobBinding) { job in
                 if let index = jobsViewModel.jobs.firstIndex(where: { $0.id == job.id }) {
