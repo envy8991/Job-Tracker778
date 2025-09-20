@@ -20,6 +20,8 @@ struct HelpCenterView: View {
     @State private var showingCreateJob = false
     @State fileprivate var selectedTopic: HelpTopic? = nil
 
+    private let supportMailURL = URL(string: "mailto:qathom8991@gmail.com")!
+
     fileprivate struct HelpTopic: Identifiable {
         let id = UUID()
         let title: String
@@ -34,109 +36,169 @@ struct HelpCenterView: View {
             HelpTopic(
                 title: "Quick Start",
                 icon: "bolt.circle.fill",
-                summary: "Create a job, update its status, and share or print.",
+                summary: "End-to-end checklist from creating a job to sharing paperwork.",
                 bullets: [
-                    "Tap **Create Job** to add Job #, address, assignments, photos, and notes.",
-                    "From **Dashboard**, tap a card to view details; use the **status pill** to set Pending, In Progress, or Done.",
-                    "Any job with a status **other than Pending** is automatically included in **Timesheets** for that week.",
-                    "Finished work also appears in **Yellow Sheet** grouped by Job # for the selected week.",
-                    "Use **Share** on a job, Yellow Sheet, or Timesheet to send via Messages, Mail, or save as PDF."
+                    "**Step 1:** From the **Dashboard**, tap **Create Job** (plus button) to capture the job #, address, crew, and schedule.",
+                    "**Step 2:** Save, then tap the new job card to adjust assignments, notes, materials, and attach progress photos as work continues.",
+                    "**Step 3:** Move the status to **In Progress** when you roll out and **Done** when complete—anything not Pending flows automatically into Timesheets and the Yellow Sheet.",
+                    "**Step 4:** Open **Timesheets** to enter daily Gibson/CS hours; switch to **Yellow Sheet** to verify the week’s grouped jobs before submitting.",
+                    "**Step 5:** Use **Share** or **Print** from a job, Timesheet, or Yellow Sheet to deliver a PDF recap to supervisors."
                 ],
                 action: { showingCreateJob = true }
             ),
             HelpTopic(
                 title: "Create Job",
                 icon: "plus.circle.fill",
-                summary: "Add a new job with address, assignees, photos, and notes.",
+                summary: "Capture a new job with address suggestions, crew assignments, and photos.",
                 bullets: [
-                    "Job Number** is required. Example: `12345` 'ask Rick' or '?'.",
-                    "Enter the address for the job.",
-                    "Status** controls workflow. Change to any of the preset options or a custom one when appropriate.",
-                    "The status is like at the end of the day when you send in yor jobs and say “1234 example st is done” or 1234 example st needs underground”.",
-                    "Later after the jobs been created you can click on it to include the materials or any notes you might need to add.",
-                    "Photos**: attach before/after shots; they upload and sync to your account. These can be included when sharing."
+                    "**Step 1:** On the **Dashboard**, tap **Create Job** to open the full job form.",
+                    "**Step 2:** Enter the required **Job #** and street address—pick from live suggestions to auto-fill quickly.",
+                    "**Step 3:** Set the scheduled date, assign teammates, and choose an initial status (keep **Pending** until work starts).",
+                    "**Step 4:** Record notes, materials, and reference numbers that the crew needs on-site.",
+                    "**Step 5:** Attach photos or documents before saving so everything syncs to the cloud for later sharing."
                 ],
                 action: { showingCreateJob = true }
             ),
             HelpTopic(
+                title: "Job Details & Updates",
+                icon: "square.and.pencil",
+                summary: "Edit addresses, statuses, materials, and photos after a job is created.",
+                bullets: [
+                    "**Step 1:** Tap any job card from the **Dashboard**, **Job Search**, or **Timesheets** to open the detail editor.",
+                    "**Step 2:** Update the address or job number—autocomplete keeps suggestions active while you type.",
+                    "**Step 3:** Use the **Status** menu to apply preset options or enter a custom label; changes sync instantly to partners.",
+                    "**Step 4:** Log assignments, fiber type, materials, and notes in their dedicated sections so everything stays in one place.",
+                    "**Step 5:** Manage the photo gallery: add new shots, select and delete old ones, or open any image full screen for review."
+                ],
+                action: { navigation.navigate(to: .dashboard) }
+            ),
+            HelpTopic(
                 title: "Statuses & Workflow",
                 icon: "checkmark.circle",
-                summary: "How statuses drive Timesheets and Yellow Sheets.",
+                summary: "Statuses control payroll feeds and keep partners in sync.",
                 bullets: [
-                    "Jobs start as **Pending** and are **excluded** from Timesheets/Yellow Sheet (until changed).",
-                    "Once a status is changed to any status besides pending they get added to your Timesheet/YellowSheet automatically.",
-                    "Change a status anytime from **Dashboard** or **tapping the job itself on the dashboard** to update instantly."
+                    "**Step 1:** Open a job from the **Dashboard** or **Job Search** and review the colored status pill at the top.",
+                    "**Step 2:** Tap the status to choose **Pending**, **In Progress**, **Done**, or a custom need such as Needs Underground.",
+                    "**Step 3:** The updated status saves immediately and appears for your partner and supervisors.",
+                    "**Step 4:** Any status other than Pending automatically includes the job in the current week’s **Timesheet** and **Yellow Sheet**.",
+                    "**Step 5:** Switch back to Pending only when a job should drop off payroll tracking for the week."
                 ],
                 action: { navigation.navigate(to: .dashboard) }
             ),
             HelpTopic(
                 title: "Dashboard",
                 icon: "rectangle.grid.2x2",
-                summary: "Today’s jobs, quick status changes, maps, and sharing.",
+                summary: "Plan the day, reorder routes, update statuses, and share job packets.",
                 bullets: [
-                    "The dashboard is where you handle creating and managing your jobs for the day or week.",
-                    "If location services are enabled jobs will be sorted from closest-furthest or vise versa. You can change this in your settings.",
-                    "Tap the **map** button to open directions to a job in your selected maps app.",
-                    "Tap **share** to send job details and attached photos.",
-                    "Use the date picker to jump to another day."
+                    "**Step 1:** Swipe the weekday selector or tap the date header to jump to another day’s schedule.",
+                    "**Step 2:** Review summary counts, then tap any job card for full details or adjust the status right from the list.",
+                    "**Step 3:** Use the **map** button on a job to launch your preferred maps app for turn-by-turn directions.",
+                    "**Step 4:** Tap **Share** on a job to generate a PDF packet with notes and photos for coworkers or inspectors.",
+                    "**Step 5:** Hit **Create Job** at the top whenever new work comes in to keep the day organized."
                 ],
                 action: { navigation.navigate(to: .dashboard) }
             ),
             HelpTopic(
+                title: "Job Search",
+                icon: "magnifyingglass",
+                summary: "Search the global job index by address, job number, status, or creator.",
+                bullets: [
+                    "**Step 1:** Switch to **Job Search** from the main tabs—the app preloads the shared search index.",
+                    "**Step 2:** Type part of an address, job #, status, or teammate name; results update instantly as you type.",
+                    "**Step 3:** Review grouped results—duplicate addresses collapse so you can see every submission and who created it.",
+                    "**Step 4:** Tap a result to open its history, attachments, and notes without leaving the search flow.",
+                    "**Step 5:** Need edits? Open the job from search and update status or details just like you would from the Dashboard."
+                ],
+                action: { navigation.navigate(to: .search) }
+            ),
+            HelpTopic(
                 title: "Timesheets",
                 icon: "clock",
-                summary: "Your jobs get automatically added.",
+                summary: "Log weekly hours and submit a PDF with the auto-filled job list.",
                 bullets: [
-                    "Pick a week; your **non-Pending** jobs for that week appear automatically.",
-                    "Enter Gibson and CableSouth hours per day.",
-                    "Your past timesheets are also always accessible here. just simpy change the week..",
-                    "Use **Print** to AirPrint or **Share** to send/save the PDF."
+                    "**Step 1:** Open **Timesheets** and use the week picker (arrows or calendar) to choose the Sunday you need.",
+                    "**Step 2:** Fill in the header—add the supervisor and up to two worker names, then enter Gibson and CS hours per day.",
+                    "**Step 3:** Scroll through the auto-populated job cards for each day; tap any job to open the detail editor for adjustments.",
+                    "**Step 4:** Adjust daily totals if needed—the running weekly total updates at the bottom of the screen.",
+                    "**Step 5:** Use the toolbar’s **PDF** button to generate, preview, print, or share the completed weekly packet."
                 ],
                 action: { navigation.navigate(to: .timesheets) }
             ),
             HelpTopic(
+                title: "Past Timesheets",
+                icon: "archivebox.fill",
+                summary: "Review, reopen, or delete archived weekly submissions.",
+                bullets: [
+                    "**Step 1:** From the **More › Profile** screen, tap **View Past Timesheets** to open your history.",
+                    "**Step 2:** Scroll the list—each entry shows the week start, total hours, and whether a PDF is saved.",
+                    "**Step 3:** Tap a week to view the snapshot with supervisor, worker names, and daily totals.",
+                    "**Step 4:** Choose **View PDF** (when available) to open or share the saved file for auditing.",
+                    "**Step 5:** Swipe left on an entry to delete it from the archive if it was uploaded in error."
+                ],
+                action: { navigation.navigate(to: .profile) }
+            ),
+            HelpTopic(
                 title: "Yellow Sheet",
                 icon: "doc.text",
-                summary: "Weekly jobs grouped by Job # (non-Pending only).",
+                summary: "Confirm non-pending jobs for the week before submitting payroll.",
                 bullets: [
-                    "Select a week at the top; swipe to change weeks.",
-                    "you can always access previous weeks here too if needed.",
-                    "Shows any job with statuses that aren’t set to Pending)."
-                    
+                    "**Step 1:** Go to **Yellow Sheet** and select the week with the picker or calendar sheet.",
+                    "**Step 2:** Review grouped sections by Job #—every non-Pending job from you or your partner is included.",
+                    "**Step 3:** Expand a job card to double-check notes, assignments, and materials for the inspector.",
+                    "**Step 4:** Tap **Save Yellow Sheet** to capture the weekly summary and sync it to the archive.",
+                    "**Step 5:** Use the share button on individual jobs (from Dashboard) if additional documentation is requested."
                 ],
                 action: { navigation.navigate(to: .yellowSheet) }
             ),
-            
             HelpTopic(
                 title: "Route Mapper",
                 icon: "map.fill",
-                summary: "Drop poles, measure distance, export a route PDF.",
+                summary: "Plot poles, measure footage, and export a polished route map.",
                 bullets: [
-                    "Search for a location, then **tap the map** to drop poles in order.",
-                    "Long‑press to insert between points; drag to adjust; tap a pin for details.",
-                    "Tap **share** to export a PDF of your route."
+                    "**Step 1:** Search for an address or drop a pin to center the map, then tap to place poles in order.",
+                    "**Step 2:** Long-press between poles to insert a new point, drag to refine placement, or tap a pin for details.",
+                    "**Step 3:** In the pole inspector, capture assignments, footage, notes, and photos for construction teams.",
+                    "**Step 4:** Use the map-style picker and distance badge to confirm the path before exporting.",
+                    "**Step 5:** Tap **Share** to generate a PDF route packet you can send or save for permits."
+                ],
+                action: { navigation.navigate(to: .maps) }
+            ),
+            HelpTopic(
+                title: "Route Mapper Sessions & Markup",
+                icon: "person.2.circle",
+                summary: "Collaborate live, draw markups, and manage shared annotations.",
+                bullets: [
+                    "**Step 1:** Open **Route Mapper** and tap **Start Session** to host or **Join** to enter a coworker’s code.",
+                    "**Step 2:** Share the session code or invite link; the online badge updates as teammates connect.",
+                    "**Step 3:** Expand the markup drawer to pick drawing tools, shapes, colors, line widths, and underground dash styles.",
+                    "**Step 4:** Use undo, delete, or clear actions to manage shared markups—changes broadcast instantly to everyone.",
+                    "**Step 5:** When finished, end the session or export the PDF so the markup snapshot is saved with the route."
                 ],
                 action: { navigation.navigate(to: .maps) }
             ),
             HelpTopic(
                 title: "Find a Partner",
                 icon: "person.2.fill",
-                summary: "Pair with a coworker to coordinate work.",
+                summary: "Pair with a coworker so job updates and payroll stay synchronized.",
                 bullets: [
-                    "Send a **Request** to a coworker; they’ll **Approve** from their inbox.",
-                    "When paired, everything you do will work together allowing you to easily update jobs, this feature is useful for timesheets when one person  isn’t here.",
-                    "Unpair anytime from the Partner screen."
+                    "**Step 1:** Open **Find a Partner** to see your current pairing status at the top of the list.",
+                    "**Step 2:** Browse coworkers—tap **Request** to send a pairing invite or approve/decline incoming requests.",
+                    "**Step 3:** Once connected, your jobs, Timesheets, and Yellow Sheets stay aligned across both accounts.",
+                    "**Step 4:** Use the outgoing and incoming sections to monitor pending requests or resend if needed.",
+                    "**Step 5:** Tap **Unpair** whenever you need to switch partners; the change syncs immediately."
                 ],
                 action: { navigation.navigate(to: .findPartner) }
             ),
             HelpTopic(
                 title: "Account & Settings",
                 icon: "gearshape.fill",
-                summary: "Maps provider, notifications, sign‑out, and delete account.",
+                summary: "Tune routing preferences, notifications, themes, and account access.",
                 bullets: [
-                    "Switch between **Apple** and **Google** Maps.",
-                    "Enable **arrival notifications** for today’s route.",
-                    "Manage account and sign out from here."
+                    "**Step 1:** Visit **Settings** to adjust appearance or open the theme editor for custom colors.",
+                    "**Step 2:** Enable **Smart Routing** and choose closest- or farthest-first ordering to reorder the Dashboard.",
+                    "**Step 3:** Toggle arrival alerts for today and pick Apple or Google for address suggestions.",
+                    "**Step 4:** Review your profile information, then sign out or delete the account if needed.",
+                    "**Step 5:** Use the support links for privacy info or email the team when you need help."
                 ],
                 action: { navigation.navigate(to: .settings) }
             )
@@ -201,13 +263,11 @@ struct HelpCenterView: View {
                             Text("Need more help?")
                                 .font(JTTypography.title3)
                                 .foregroundStyle(JTColors.textPrimary)
-                            Text("Tap a topic for step‑by‑step instructions. Remember: jobs marked **In Progress** or **Done** are auto‑included in **Timesheets** and **Yellow Sheet** for the appropriate week.")
+                            Text("Use search to jump straight to a workflow, or reach out if you need a walkthrough tailored to your crew.")
                                 .foregroundStyle(JTColors.textSecondary)
 
                             JTPrimaryButton("Email Support", systemImage: "envelope.fill") {
-                                if let url = URL(string: "mailto:support@example.com") {
-                                    UIApplication.shared.open(url)
-                                }
+                                UIApplication.shared.open(supportMailURL)
                             }
                         }
                         .padding(JTSpacing.lg)
