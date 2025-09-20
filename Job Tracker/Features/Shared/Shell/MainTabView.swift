@@ -243,15 +243,15 @@ struct RoundedActionButton: View {
         Button(action: action) {
             Label(label, systemImage: icon)
                 .font(.subheadline.bold())
-                .foregroundStyle(.white)
+                .foregroundStyle(JTColors.textPrimary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(
                     Capsule()
-                        .fill(.ultraThinMaterial)
+                        .fill(JTColors.glassHighlight)
                         .overlay(
                             Capsule()
-                                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                                .stroke(JTColors.glassStroke, lineWidth: 1)
                         )
                 )
         }
