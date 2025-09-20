@@ -83,6 +83,10 @@ final class JobSearchViewModel: ObservableObject {
         self.jobsViewModel = jobsViewModel
         self.usersViewModel = usersViewModel
 
+        // Ensure the global search index listener is active so results always
+        // include every job, not just the ones owned by the current user.
+        jobsViewModel.startSearchIndexForAllJobs()
+
         configureSubscriptions()
         rebuildResults()
     }
@@ -119,7 +123,7 @@ final class JobSearchViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        jobsViewModel.$searchJobs
+        jobsViewModel.$allSearchEntries
             .sink { [weak self] _ in
                 self?.rebuildResults()
             }
@@ -145,14 +149,7 @@ final class JobSearchViewModel: ObservableObject {
         let tokens = Self.normalizedTokens(from: trimmedQuery)
         let users = usersViewModel.usersDict
         let ownedJobs = jobsViewModel.jobs
-        let searchEntries = jobsViewModel.searchJobs
-
-        let indexEntries: [JobSearchIndexEntry]
-        if searchEntries.isEmpty {
-            indexEntries = ownedJobs.map(JobSearchIndexEntry.init(job:))
-        } else {
-            indexEntries = searchEntries
-        }
+        let indexEntries = jobsViewModel.allSearchEntries
 
         quickFilters = Self.buildQuickFilters(from: indexEntries, users: users)
 
