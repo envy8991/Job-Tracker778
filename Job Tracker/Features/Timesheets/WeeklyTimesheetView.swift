@@ -13,6 +13,12 @@ struct WorkerHours: Identifiable, Hashable {
     var total: Double { (Double(gibson) ?? 0) + (Double(cs) ?? 0) }
 }
 
+private struct PDFGenerationStatus: Identifiable, Equatable {
+    let id = UUID()
+    let message: String
+    let isSuccess: Bool
+}
+
 struct WeeklyTimesheetView: View {
     // Top padding to provide breathing room above the week picker and action buttons.
     private let topContentPadding: CGFloat = 20
@@ -41,6 +47,8 @@ struct WeeklyTimesheetView: View {
     @State private var showPDFPreview = false
     @State private var previewURL: URL? = nil
     @State private var partnerUid: String? = nil
+    @State private var isGeneratingPDF = false
+    @State private var pdfGenerationStatus: PDFGenerationStatus? = nil
     
     // State for selecting the week.
     @State private var selectedDate = Date()
@@ -207,6 +215,18 @@ struct WeeklyTimesheetView: View {
                         Rectangle().fill(Color.white.opacity(0.12)).frame(height: 0.5), alignment: .top
                     )
                 }
+
+                if let status = pdfGenerationStatus {
+                    VStack {
+                        PDFGenerationStatusHUD(status: status)
+                            .padding(.top, 24)
+                            .padding(.horizontal)
+                        Spacer()
+                    }
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(5)
+                    .allowsHitTesting(false)
+                }
             }
             .navigationTitle("Timesheet")
             .navigationBarTitleDisplayMode(.inline)
@@ -215,21 +235,39 @@ struct WeeklyTimesheetView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
+                        guard !isGeneratingPDF else { return }
+                        isGeneratingPDF = true
+
                         // Generate the PDF off-main-thread.
                         DispatchQueue.global(qos: .userInitiated).async {
-                            if let url = generatePDF() {
-                                DispatchQueue.main.async {
+                            let url = generatePDF()
+                            DispatchQueue.main.async {
+                                isGeneratingPDF = false
+                                if let url = url {
                                     previewURL = url
+                                    presentPDFGenerationStatus(message: "PDF ready for preview", isSuccess: true)
                                     // Give the system ~300 ms to load the PDF before showing the sheet.
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                                         showPDFPreview = true
                                     }
+                                } else {
+                                    presentPDFGenerationStatus(message: "Failed to generate PDF", isSuccess: false)
                                 }
                             }
                         }
                     } label: {
-                        Image(systemName: "doc.richtext")
+                        Group {
+                            if isGeneratingPDF {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: JTColors.textPrimary))
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "doc.richtext")
+                            }
+                        }
+                        .frame(width: 24, height: 24)
                     }
+                    .disabled(isGeneratingPDF)
                 }
             }
             // Job editing sheet.
@@ -429,7 +467,31 @@ extension WeeklyTimesheetView {
             }
         )
     }
-    
+
+    @MainActor
+    private func presentPDFGenerationStatus(message: String, isSuccess: Bool) {
+        let status = PDFGenerationStatus(message: message, isSuccess: isSuccess)
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+            pdfGenerationStatus = status
+        }
+
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(isSuccess ? .success : .error)
+
+        schedulePDFStatusDismiss(for: status)
+    }
+
+    @MainActor
+    private func schedulePDFStatusDismiss(for status: PDFGenerationStatus) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            if pdfGenerationStatus?.id == status.id {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    pdfGenerationStatus = nil
+                }
+            }
+        }
+    }
+
     /// Generates the weekly PDF and returns its file URL.
     private func generatePDF() -> URL? {
         // Person 1
@@ -495,7 +557,7 @@ extension WeeklyTimesheetView {
 struct PDFPreviewSheet: View {
     let pdfURL: URL
     let onPrint: () -> Void
-    
+
     var body: some View {
         NavigationView {
             PDFKitView(url: pdfURL)
@@ -507,5 +569,33 @@ struct PDFPreviewSheet: View {
                     }
                 }
         }
+    }
+}
+
+private struct PDFGenerationStatusHUD: View {
+    let status: PDFGenerationStatus
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: status.isSuccess ? "checkmark.circle.fill" : "xmark.octagon.fill")
+                .font(.title3)
+                .foregroundStyle(status.isSuccess ? JTColors.success : JTColors.error)
+
+            Text(status.message)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(JTColors.textPrimary)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(JTColors.glassStroke.opacity(0.6), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.2), radius: 12, x: 0, y: 8)
     }
 }
