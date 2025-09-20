@@ -120,6 +120,7 @@ final class JobSearchViewModel: ObservableObject {
 
     private func configureSubscriptions() {
         $query
+            .debounce(for: .milliseconds(200), scheduler: RunLoop.main)
             .removeDuplicates()
             .sink { [weak self] _ in
                 self?.rebuildAggregates()
