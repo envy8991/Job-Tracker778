@@ -148,61 +148,72 @@ final class JobSearchViewModel: ObservableObject {
     private func rebuildAggregates() {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let users = usersViewModel.usersDict
+        let searchJobs = jobsViewModel.searchJobs
+        let jobs = jobsViewModel.jobs
 
         guard !trimmedQuery.isEmpty else {
+            var lookup: [String: Job] = [:]
+            for job in searchJobs {
+                lookup[job.id] = job
+            }
+            for job in jobs {
+                lookup[job.id] = job
+            }
+
             aggregates = []
             aggregateLookup = [:]
-            rebuildJobLookup(filteredJobs: [])
+            jobLookup = lookup
             resultsState = .init(content: .prompt)
             return
         }
 
-        let source = jobsViewModel.searchJobs.isEmpty ? jobsViewModel.jobs : jobsViewModel.searchJobs
+        let source = searchJobs.isEmpty ? jobs : searchJobs
 
-        let filtered = source
-            .filter { matches(job: $0, query: trimmedQuery, users: users) }
-            .sorted { lhs, rhs in
-                if lhs.date != rhs.date {
-                    return lhs.date > rhs.date
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let filtered = source
+                .filter { job in
+                    let creator = job.createdBy.flatMap { users[$0] }
+                    return JobSearchMatcher.matches(job: job, query: trimmedQuery, creator: creator)
                 }
-                return lhs.address.localizedCaseInsensitiveCompare(rhs.address) == .orderedAscending
+                .sorted { lhs, rhs in
+                    if lhs.date != rhs.date {
+                        return lhs.date > rhs.date
+                    }
+                    return lhs.address.localizedCaseInsensitiveCompare(rhs.address) == .orderedAscending
+                }
+
+            let aggregates = Self.buildAggregates(from: filtered, users: users)
+            let aggregateLookup = Dictionary(uniqueKeysWithValues: aggregates.map { ($0.id, $0) })
+
+            var jobLookup: [String: Job] = [:]
+            for job in filtered {
+                jobLookup[job.id] = job
+            }
+            for job in searchJobs {
+                jobLookup[job.id] = job
+            }
+            for job in jobs {
+                jobLookup[job.id] = job
             }
 
-        let aggregates = buildAggregates(from: filtered, users: users)
-        self.aggregates = aggregates
-        aggregateLookup = Dictionary(uniqueKeysWithValues: aggregates.map { ($0.id, $0) })
-        rebuildJobLookup(filteredJobs: filtered)
+            let resultsState: ResultsState
+            if aggregates.isEmpty {
+                resultsState = .init(content: .empty(query: trimmedQuery))
+            } else {
+                resultsState = .init(content: .aggregates(aggregates))
+            }
 
-        if aggregates.isEmpty {
-            resultsState = .init(content: .empty(query: trimmedQuery))
-        } else {
-            resultsState = .init(content: .aggregates(aggregates))
+            await MainActor.run {
+                guard let self = self else { return }
+                self.aggregates = aggregates
+                self.aggregateLookup = aggregateLookup
+                self.jobLookup = jobLookup
+                self.resultsState = resultsState
+            }
         }
     }
 
-    private func rebuildJobLookup(filteredJobs: [Job]) {
-        var lookup: [String: Job] = [:]
-        for job in filteredJobs {
-            lookup[job.id] = job
-        }
-
-        for job in jobsViewModel.searchJobs {
-            lookup[job.id] = job
-        }
-
-        for job in jobsViewModel.jobs {
-            lookup[job.id] = job
-        }
-
-        jobLookup = lookup
-    }
-
-    private func matches(job: Job, query: String, users: [String: AppUser]) -> Bool {
-        let creator = job.createdBy.flatMap { users[$0] }
-        return JobSearchMatcher.matches(job: job, query: query, creator: creator)
-    }
-
-    private func buildAggregates(from jobs: [Job], users: [String: AppUser]) -> [Aggregate] {
+    private nonisolated static func buildAggregates(from jobs: [Job], users: [String: AppUser]) -> [Aggregate] {
         let grouped = Dictionary(grouping: jobs) { job -> String in
             let number = (job.jobNumber ?? "").trimmingCharacters(in: .whitespaces)
             return job.address.lowercased() + "|#" + number.lowercased()
