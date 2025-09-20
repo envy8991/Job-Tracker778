@@ -143,12 +143,17 @@ class JobsViewModel: ObservableObject {
 
     // MARK: - Global Search Index (all jobs)
 
-    /// Begin listening to the lightweight search index for all jobs so search can span the entire database
-    /// (subject to Firestore rules). Safe to call multiple times; it will only attach once.
+    /// Begin listening to a lightweight representation of every job so search can span the entire
+    /// database (subject to Firestore rules). Safe to call multiple times; it will only attach once.
     func startSearchIndexForAllJobs() {
         if searchListenerRegistration != nil { return }
 
-        searchListenerRegistration = db.collection("jobsSearch")
+        // The dedicated `jobsSearch` collection previously mirrored global job metadata, but in
+        // practice it only exposed the current user's jobs. To guarantee company-wide visibility,
+        // listen directly to the primary `jobs` collection and decode just the fields needed for
+        // search. Firestore ignores any extra properties when decoding into `JobSearchIndexEntry`,
+        // keeping this listener lightweight while ensuring every job is searchable.
+        searchListenerRegistration = db.collection("jobs")
             .addSnapshotListener(includeMetadataChanges: false) { [weak self] snapshot, error in
                 guard let self = self else { return }
                 if let error = error {
