@@ -7,8 +7,12 @@ private struct JTGlassBackgroundModifier<S: Shape>: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background(.ultraThinMaterial, in: shape)
-            .overlay(shape.stroke(strokeColor, lineWidth: strokeWidth))
+            .background {
+                shape.fill(.ultraThinMaterial)
+            }
+            .overlay {
+                shape.stroke(strokeColor, lineWidth: strokeWidth)
+            }
             .clipShape(shape)
     }
 }
