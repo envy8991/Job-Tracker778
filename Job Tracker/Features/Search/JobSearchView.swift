@@ -541,7 +541,7 @@ private struct MissingSearchDestinationView: View {
 // MARK: - Matching Helpers
 
 struct JobSearchMatcher {
-    static func matches(job: Job, query: String, creator: AppUser?) -> Bool {
+    static func matches(job: JobSearchMatchable, query: String, creator: AppUser?) -> Bool {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let tokens = normalizedQuery
             .split { $0.isWhitespace }
@@ -553,7 +553,7 @@ struct JobSearchMatcher {
         return tokens.allSatisfy { haystack.contains($0) }
     }
 
-    private static func normalizedHaystack(for job: Job, creator: AppUser?) -> String {
+    private static func normalizedHaystack(for job: JobSearchMatchable, creator: AppUser?) -> String {
         var fields: [String] = []
 
         if let address = normalizedNonEmpty(job.address) {
