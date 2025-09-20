@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject private var navigation: AppNavigationViewModel
+    @State private var measuredShellChromeHeight: CGFloat = 0
 
     private var menuPresentation: Binding<Bool> {
         Binding(
@@ -24,17 +25,22 @@ struct MainTabView: View {
 
     var body: some View {
         PrimaryTabContainer()
+            .environment(\.shellChromeHeight, shouldShowShellButtons ? measuredShellChromeHeight : 0)
             .safeAreaInset(edge: .top) {
                 if shouldShowShellButtons {
                     ShellActionButtons(
                         onShowMenu: { navigation.isPrimaryMenuPresented = true },
                         onOpenHelp: { navigation.navigate(to: .helpCenter) }
                     )
+                    .measureShellChromeHeight()
                 }
             }
             .sheet(isPresented: menuPresentation) {
                 PrimaryDestinationMenu()
                     .presentationDetents([.medium, .large])
+            }
+            .onPreferenceChange(ShellChromeHeightPreferenceKey.self) { height in
+                measuredShellChromeHeight = height
             }
     }
 }
