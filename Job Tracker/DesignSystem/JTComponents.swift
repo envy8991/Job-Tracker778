@@ -13,7 +13,7 @@ private struct JTGlassBackgroundModifier<S: Shape>: ViewModifier {
     }
 }
 
-public extension View {
+@MainActor public extension View {
     func jtGlassBackground(cornerRadius: CGFloat = JTShapes.cardCornerRadius,
                            strokeColor: Color = JTColors.glassStroke,
                            strokeWidth: CGFloat = 1) -> some View {
@@ -32,6 +32,7 @@ public extension View {
 }
 
 /// Glass-morphism surface used for dashboard cards and detail panels.
+@MainActor
 struct GlassCard<Content: View>: View {
     private let cornerRadius: CGFloat
     private let strokeColor: Color
@@ -59,6 +60,7 @@ struct GlassCard<Content: View>: View {
 }
 
 /// A filled button that represents the primary call to action on a screen.
+@MainActor
 struct JTPrimaryButton: View {
     let title: String
     var systemImage: String?
@@ -84,6 +86,7 @@ struct JTPrimaryButton: View {
     }
 }
 
+@MainActor
 private struct JTPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -99,6 +102,7 @@ private struct JTPrimaryButtonStyle: ButtonStyle {
     }
 }
 
+@MainActor
 extension ButtonStyle where Self == JTPrimaryButtonStyle {
     static var jtPrimary: JTPrimaryButtonStyle { JTPrimaryButtonStyle() }
 }
@@ -109,6 +113,7 @@ enum JTInputState: Equatable {
     case success
     case error
 
+    @MainActor
     func strokeColor(isFocused: Bool) -> Color {
         switch self {
         case .neutral:
@@ -120,6 +125,7 @@ enum JTInputState: Equatable {
         }
     }
 
+    @MainActor
     func iconColor(isFocused: Bool) -> Color {
         switch self {
         case .neutral:
@@ -131,6 +137,7 @@ enum JTInputState: Equatable {
         }
     }
 
+    @MainActor
     var supportingTextColor: Color {
         switch self {
         case .neutral:
@@ -144,6 +151,7 @@ enum JTInputState: Equatable {
 }
 
 /// Glass-backed text field that supports icons, inline messaging, and password reveals.
+@MainActor
 struct JTTextField: View {
     private let title: String
     @Binding private var text: String
