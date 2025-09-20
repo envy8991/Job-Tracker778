@@ -34,10 +34,14 @@ class UserYellowSheetsViewModel: ObservableObject {
 
                     guard let documents = snapshot?.documents else { return }
 
-                    self?.yellowSheets = documents.compactMap { document in
+                    let sheets: [YellowSheet] = documents.compactMap { document in
                         var sheet = try? document.data(as: YellowSheet.self)
                         sheet?.id = document.documentID
                         return sheet
+                    }
+
+                    DispatchQueue.main.async { [weak self] in
+                        self?.yellowSheets = sheets.sorted { $0.weekStart > $1.weekStart }
                     }
                 }
         }
