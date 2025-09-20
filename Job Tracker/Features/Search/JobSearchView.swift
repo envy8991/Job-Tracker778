@@ -3,10 +3,17 @@ import UIKit
 
 struct JobSearchView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var navigation: AppNavigationViewModel
     @EnvironmentObject var jobsViewModel: JobsViewModel
     @EnvironmentObject var usersViewModel: UsersViewModel
 
     @State private var searchText: String = ""
+    @State private var path: [Route] = []
+
+    private enum Route: Hashable {
+        case aggregate(id: String)
+        case job(aggregateID: String, jobID: String)
+    }
 
     // MARK: - Filter + Group
 
@@ -72,7 +79,7 @@ struct JobSearchView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ZStack(alignment: .top) {
                 JTGradients.background
                     .ignoresSafeArea()
@@ -94,8 +101,26 @@ struct JobSearchView: View {
                 }
             }
         }
+        .navigationDestination(for: Route.self) { route in
+            switch route {
+            case .aggregate(let id):
+                if let aggregate = aggregate(for: id) {
+                    AggregatedDetailView(aggregate: aggregate)
+                        .environmentObject(usersViewModel)
+                        .environmentObject(jobsViewModel)
+                } else {
+                    MissingSearchResultView()
+                }
+            case .job(let aggregateID, let jobID):
+                jobDetailDestination(for: jobID, aggregateID: aggregateID)
+            }
+        }
         .onAppear {
             jobsViewModel.startSearchIndexForAllJobs()
+            navigation.isJobSearchDetailVisible = !path.isEmpty
+        }
+        .onChange(of: path.isEmpty) { isRoot in
+            navigation.isJobSearchDetailVisible = !isRoot
         }
     }
 
@@ -136,10 +161,7 @@ struct JobSearchView: View {
         } else {
             LazyVStack(spacing: JTSpacing.md) {
                 ForEach(aggregatedResults) { agg in
-                    NavigationLink {
-                        AggregatedDetailView(aggregate: agg)
-                            .environmentObject(usersViewModel)
-                    } label: {
+                    NavigationLink(value: Route.aggregate(id: agg.id)) {
                         AggregatedJobCard(aggregate: agg)
                             .contentShape(JTShapes.roundedRectangle(cornerRadius: JTShapes.smallCardCornerRadius))
                     }
@@ -176,9 +198,87 @@ struct JobSearchView: View {
         return haystack.contains(q)
     }
 
+    private func aggregate(for id: String) -> JobAggregate? {
+        aggregatedResults.first { $0.id == id }
+    }
+
+    private func job(for jobID: String, in aggregateID: String) -> Job? {
+        if let aggregate = aggregate(for: aggregateID) {
+            if let job = aggregate.jobs.first(where: { $0.id == jobID }) {
+                return job
+            }
+        }
+
+        if let job = jobsViewModel.jobs.first(where: { $0.id == jobID }) {
+            return job
+        }
+
+        if let job = jobsViewModel.searchJobs.first(where: { $0.id == jobID }) {
+            return job
+        }
+
+        return nil
+    }
+
+    private func binding(for job: Job) -> Binding<Job>? {
+        guard jobsViewModel.jobs.contains(where: { $0.id == job.id }) else { return nil }
+        return Binding(
+            get: {
+                jobsViewModel.jobs.first(where: { $0.id == job.id }) ?? job
+            },
+            set: { newValue in
+                if let index = jobsViewModel.jobs.firstIndex(where: { $0.id == job.id }) {
+                    var copy = jobsViewModel.jobs
+                    copy[index] = newValue
+                    jobsViewModel.jobs = copy
+                }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func jobDetailDestination(for jobID: String, aggregateID: String) -> some View {
+        if let job = job(for: jobID, in: aggregateID) {
+            if let binding = binding(for: job) {
+                JobDetailView(job: binding)
+            } else {
+                JobSearchDetailView(job: job)
+            }
+        } else {
+            MissingSearchResultView()
+        }
+    }
+
     private func creator(for job: Job) -> AppUser? {
         guard let id = job.createdBy else { return nil }
         return usersViewModel.usersDict[id]
+    }
+}
+
+private struct MissingSearchResultView: View {
+    var body: some View {
+        ZStack {
+            JTGradients.background
+                .ignoresSafeArea()
+
+            VStack(spacing: JTSpacing.md) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 38, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(JTColors.textSecondary)
+
+                Text("This job is no longer available.")
+                    .font(JTTypography.title3)
+                    .foregroundStyle(JTColors.textPrimary)
+
+                Text("Return to search to pick a different result.")
+                    .multilineTextAlignment(.center)
+                    .font(JTTypography.body)
+                    .foregroundStyle(JTColors.textSecondary)
+                    .padding(.horizontal, JTSpacing.xl)
+            }
+            .padding(JTSpacing.lg)
+        }
     }
 }
 
@@ -384,31 +484,6 @@ private struct AggregatedDetailView: View {
         }
     }
 
-    private func binding(for job: Job) -> Binding<Job>? {
-        guard jobsViewModel.jobs.contains(where: { $0.id == job.id }) else { return nil }
-        return Binding(
-            get: {
-                jobsViewModel.jobs.first(where: { $0.id == job.id }) ?? job
-            },
-            set: { newValue in
-                if let index = jobsViewModel.jobs.firstIndex(where: { $0.id == job.id }) {
-                    var copy = jobsViewModel.jobs
-                    copy[index] = newValue
-                    jobsViewModel.jobs = copy
-                }
-            }
-        )
-    }
-
-    @ViewBuilder
-    private func destination(for job: Job) -> some View {
-        if let binding = binding(for: job) {
-            JobDetailView(job: binding)
-        } else {
-            JobSearchDetailView(job: job)
-        }
-    }
-
     @ViewBuilder
     private func quickActions(for job: Job) -> some View {
         HStack(spacing: JTSpacing.sm) {
@@ -492,9 +567,7 @@ private struct AggregatedDetailView: View {
                     // Timeline of all entries (newest first)
                     VStack(alignment: .leading, spacing: JTSpacing.md) {
                         ForEach(aggregate.jobs, id: \.id) { job in
-                            NavigationLink {
-                                destination(for: job)
-                            } label: {
+                            NavigationLink(value: JobSearchView.Route.job(aggregateID: aggregate.id, jobID: job.id)) {
                                 GlassCard(cornerRadius: JTShapes.smallCardCornerRadius,
                                           strokeColor: JTColors.glassSoftStroke,
                                           shadow: JTShadow.none) {

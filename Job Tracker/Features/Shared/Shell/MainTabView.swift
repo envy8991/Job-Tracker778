@@ -10,10 +10,27 @@ struct MainTabView: View {
         )
     }
 
+    private var shouldShowShellButtons: Bool {
+        guard navigation.selectedPrimary != .timesheets else { return false }
+
+        if navigation.selectedPrimary == .search,
+           navigation.isJobSearchDetailVisible {
+            return false
+        }
+
+        if navigation.selectedPrimary == .more,
+           navigation.activeDestination.isMoreStackDestination,
+           navigation.activeDestination != .more {
+            return false
+        }
+
+        return true
+    }
+
     var body: some View {
         PrimaryTabContainer()
             .safeAreaInset(edge: .top) {
-                if navigation.selectedPrimary != .timesheets {
+                if shouldShowShellButtons {
                     ShellActionButtons(
                         onShowMenu: { navigation.isPrimaryMenuPresented = true },
                         onOpenHelp: { navigation.navigate(to: .helpCenter) }

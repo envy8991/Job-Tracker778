@@ -108,6 +108,7 @@ final class AppNavigationViewModel: ObservableObject {
     @Published var activeDestination: Destination = .dashboard
     @Published var isPrimaryMenuPresented: Bool = false
     @Published private(set) var morePath: [Destination] = []
+    @Published var isJobSearchDetailVisible: Bool = false
 
     var primaryDestinations: [Destination] {
         PrimaryDestination.allCases.map { $0.destination }
@@ -116,6 +117,7 @@ final class AppNavigationViewModel: ObservableObject {
     // MARK: - Selection
     func selectPrimary(_ destination: PrimaryDestination) {
         selectedPrimary = destination
+        isJobSearchDetailVisible = false
         switch destination {
         case .dashboard:
             activeDestination = .dashboard
@@ -140,6 +142,12 @@ final class AppNavigationViewModel: ObservableObject {
     func navigate(to destination: Destination) {
         activeDestination = destination
         selectedPrimary = destination.primaryDestination
+
+        if destination.primaryDestination != .search {
+            isJobSearchDetailVisible = false
+        } else if destination == .search {
+            isJobSearchDetailVisible = false
+        }
 
         if destination.primaryDestination == .more {
             if destination == .more {
