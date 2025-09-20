@@ -46,18 +46,23 @@ class UserTimesheetsViewModel: ObservableObject {
         listenerRegistration?.remove()
     }
     
-    func saveTimesheet(_ timesheet: Timesheet) {
-        let docId = "\(timesheet.userId)_\(weekStartString(from: timesheet.weekStart))"
+    func saveTimesheet(_ timesheet: Timesheet, completion: @escaping (Result<Void, Error>) -> Void = { _ in }) {
+        let partnerComponent = timesheet.partnerId ?? ""
+        let docId = "\(timesheet.userId)\(partnerComponent.isEmpty ? "" : "_\(partnerComponent)")_\(weekStartString(from: timesheet.weekStart))"
         do {
             try db.collection("timesheets").document(docId).setData(from: timesheet) { error in
-                if let error = error {
-                    print("Error saving timesheet: \(error)")
-                } else {
-                    print("Timesheet saved successfully.")
+                DispatchQueue.main.async {
+                    if let error = error {
+                        completion(.failure(error))
+                    } else {
+                        completion(.success(()))
+                    }
                 }
             }
         } catch {
-            print("Error encoding timesheet: \(error)")
+            DispatchQueue.main.async {
+                completion(.failure(error))
+            }
         }
     }
     
