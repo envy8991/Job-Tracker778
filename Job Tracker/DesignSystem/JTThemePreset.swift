@@ -7,6 +7,8 @@ public enum JTThemePreset: String, CaseIterable, Identifiable, Codable, Equatabl
     case forestTrail
     case sunsetGlow
     case glacierLight
+    case emberForge
+    case lunarMist
 
     public var id: String { rawValue }
 
@@ -61,6 +63,26 @@ public enum JTThemePreset: String, CaseIterable, Identifiable, Codable, Equatabl
                 backgroundTop: Color(red: 0.07, green: 0.12, blue: 0.23),
                 backgroundBottom: Color(red: 0.12, green: 0.35, blue: 0.47),
                 accent: Color(red: 0.30, green: 0.73, blue: 0.88)
+            )
+        case .emberForge:
+            return JTTheme(
+                id: rawValue,
+                name: "Ember Forge",
+                subtitle: "Molten embers with copper highlights",
+                style: .dark,
+                backgroundTop: Color(red: 0.12, green: 0.05, blue: 0.03),
+                backgroundBottom: Color(red: 0.47, green: 0.18, blue: 0.06),
+                accent: Color(red: 0.98, green: 0.57, blue: 0.24)
+            )
+        case .lunarMist:
+            return JTTheme(
+                id: rawValue,
+                name: "Lunar Mist",
+                subtitle: "Moonlit indigo with silver mist",
+                style: .dark,
+                backgroundTop: Color(red: 0.05, green: 0.10, blue: 0.18),
+                backgroundBottom: Color(red: 0.27, green: 0.39, blue: 0.52),
+                accent: Color(red: 0.72, green: 0.84, blue: 0.96)
             )
         }
     }
