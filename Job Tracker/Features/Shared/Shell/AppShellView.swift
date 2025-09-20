@@ -84,9 +84,11 @@ private struct AppShellDetailView: View {
             WeeklyTimesheetView()
         case .yellowSheet:
             YellowSheetView()
+        case .search:
+            JobSearchView()
         case .maps:
             MapsView()
-        case .more, .search, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter:
+        case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter:
             MoreTabView()
         }
     }

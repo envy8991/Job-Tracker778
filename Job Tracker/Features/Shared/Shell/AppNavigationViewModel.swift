@@ -23,8 +23,8 @@ final class AppNavigationViewModel: ObservableObject {
             case .dashboard:   return "Dashboard"
             case .timesheets:  return "Timesheets"
             case .yellowSheet: return "Yellow Sheet"
-            case .maps:        return "Maps"
-            case .search:      return "Search"
+            case .maps:        return "Route Mapper"
+            case .search:      return "Job Search"
             case .more:        return "More"
             case .profile:     return "Profile"
             case .findPartner: return "Find Partner"
@@ -57,9 +57,9 @@ final class AppNavigationViewModel: ObservableObject {
             case .dashboard:   return .dashboard
             case .timesheets:  return .timesheets
             case .yellowSheet: return .yellowSheet
-            case .maps:        return .maps
-            case .search,
-                 .more,
+            case .maps:        return .more
+            case .search:      return .search
+            case .more,
                  .profile,
                  .findPartner,
                  .supervisor,
@@ -72,7 +72,7 @@ final class AppNavigationViewModel: ObservableObject {
 
         var isMoreStackDestination: Bool {
             switch self {
-            case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter, .search:
+            case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter, .maps:
                 return true
             default:
                 return false
@@ -84,7 +84,7 @@ final class AppNavigationViewModel: ObservableObject {
         case dashboard
         case timesheets
         case yellowSheet
-        case maps
+        case search
         case more
 
         var id: String { rawValue }
@@ -94,7 +94,7 @@ final class AppNavigationViewModel: ObservableObject {
             case .dashboard:   return .dashboard
             case .timesheets:  return .timesheets
             case .yellowSheet: return .yellowSheet
-            case .maps:        return .maps
+            case .search:      return .search
             case .more:        return .more
             }
         }
@@ -126,8 +126,8 @@ final class AppNavigationViewModel: ObservableObject {
         case .yellowSheet:
             activeDestination = .yellowSheet
             morePath.removeAll()
-        case .maps:
-            activeDestination = .maps
+        case .search:
+            activeDestination = .search
             morePath.removeAll()
         case .more:
             if !activeDestination.isMoreStackDestination {

@@ -62,11 +62,11 @@ private struct PrimaryTabContainer: View {
                           systemImage: AppNavigationViewModel.PrimaryDestination.yellowSheet.systemImage)
                 }
 
-            MapsView()
-                .tag(AppNavigationViewModel.PrimaryDestination.maps)
+            JobSearchView()
+                .tag(AppNavigationViewModel.PrimaryDestination.search)
                 .tabItem {
-                    Label(AppNavigationViewModel.PrimaryDestination.maps.title,
-                          systemImage: AppNavigationViewModel.PrimaryDestination.maps.systemImage)
+                    Label(AppNavigationViewModel.PrimaryDestination.search.title,
+                          systemImage: AppNavigationViewModel.PrimaryDestination.search.systemImage)
                 }
 
             MoreTabView()
@@ -140,8 +140,9 @@ private struct MoreMenuList: View {
             }
 
             Section("Resources") {
-                NavigationLink(value: AppNavigationViewModel.Destination.search) {
-                    Label("Job Search", systemImage: AppNavigationViewModel.Destination.search.systemImage)
+                NavigationLink(value: AppNavigationViewModel.Destination.maps) {
+                    Label(AppNavigationViewModel.Destination.maps.title,
+                          systemImage: AppNavigationViewModel.Destination.maps.systemImage)
                 }
             }
 
@@ -193,6 +194,8 @@ private struct MoreDestinationView: View {
             ProfileView()
         case .search:
             JobSearchView()
+        case .maps:
+            MapsView()
         case .findPartner:
             FindPartnerView()
         case .supervisor:
