@@ -19,7 +19,7 @@ enum DeepLinkRouter {
             #if DEBUG
             print("[DeepLink] Ignored non-jobtracker scheme: \(url.scheme ?? "nil")")
             #endif
-            return
+            return nil
         }
 
         // Accept both forms:
@@ -33,7 +33,7 @@ enum DeepLinkRouter {
             #if DEBUG
             print("[DeepLink] Unknown route. host=\(host ?? "nil"), path=\(path)")
             #endif
-            return
+            return nil
         }
 
         let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
