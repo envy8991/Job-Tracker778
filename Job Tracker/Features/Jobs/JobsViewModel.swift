@@ -255,7 +255,12 @@ class JobsViewModel: ObservableObject {
             if let readErr = readErr {
                 print("updateJob: failed to read existing doc: \(readErr)")
             }
-            let existingParticipants = (snap?.data()?["participants"] as? [String]) ?? []
+            let documentParticipants = (snap?.data()?["participants"] as? [String]) ?? []
+            let jobParticipants = job.participants ?? []
+            let cleanedDocumentParticipants = documentParticipants.filter { !$0.isEmpty }
+            let cleanedJobParticipants = jobParticipants.filter { !$0.isEmpty }
+            let preservedParticipantsSet = Set(cleanedDocumentParticipants).union(Set(cleanedJobParticipants))
+            let preservedParticipants = Array(preservedParticipantsSet).sorted()
 
             // 2) Merge-write the updated fields (never a blind overwrite)
             do {
@@ -265,8 +270,8 @@ class JobsViewModel: ObservableObject {
                         return
                     }
                     // 3) Re-assert participants if they existed (protects against encoder omitting/clearing them)
-                    if !existingParticipants.isEmpty {
-                        ref.updateData(["participants": existingParticipants]) { patchErr in
+                    if !preservedParticipants.isEmpty {
+                        ref.updateData(["participants": preservedParticipants]) { patchErr in
                             if let patchErr = patchErr {
                                 print("updateJob: failed to preserve participants: \(patchErr)")
                             }
@@ -282,10 +287,9 @@ class JobsViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     var copy = self.jobs
                     copy[index] = job
-                    // Ensure our local copy keeps participants so list query still matches
-                    if !existingParticipants.isEmpty {
-                        // If the Job model has a `participants` property, set it here reflectively.
-                        // Since we can't guarantee the model API here, we rely on the server-side preserve above.
+                    if !preservedParticipants.isEmpty {
+                        // Mirror the preserved participants locally so follow-up edits keep partner visibility.
+                        copy[index].participants = preservedParticipants
                     }
                     self.jobs = copy
                     self.notifyJobsChanged()

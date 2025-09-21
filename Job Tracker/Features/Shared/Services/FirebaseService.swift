@@ -258,12 +258,55 @@ class FirebaseService {
                 handler(partner)
             }
     }
-    
+
+    /// Builds the full participant list for a job by including the creator/assignee and
+    /// any active partners. The resulting array is sorted to keep writes deterministic.
+    private func gatherParticipants(for job: Job, completion: @escaping ([String]) -> Void) {
+        var baseIDs = Set<String>()
+        if let assignee = job.assignedTo, !assignee.isEmpty {
+            baseIDs.insert(assignee)
+        }
+        if let creator = job.createdBy, !creator.isEmpty {
+            baseIDs.insert(creator)
+        }
+
+        guard !baseIDs.isEmpty else {
+            completion([])
+            return
+        }
+
+        var participants = baseIDs
+        let syncQueue = DispatchQueue(label: "com.jobtracker.firebaseService.participantsQueue")
+        let group = DispatchGroup()
+
+        for uid in baseIDs {
+            group.enter()
+            fetchPartnerId(for: uid) { partner in
+                guard let partner = partner, !partner.isEmpty else {
+                    group.leave()
+                    return
+                }
+                syncQueue.async {
+                    participants.insert(partner)
+                    group.leave()
+                }
+            }
+        }
+
+        group.notify(queue: DispatchQueue.global(qos: .userInitiated)) {
+            var finalized: [String] = []
+            syncQueue.sync {
+                finalized = Array(participants)
+            }
+            completion(finalized.sorted())
+        }
+    }
+
     // MARK: - Jobs
-    
+
     /// Creation visibility invariant:
-    /// - Only the assignee should see the job on their dashboard.
-    /// - On create, we set `participants = [assignedTo]` (if present) and do NOT include `createdBy` or partner.
+    /// - Ensure the primary user(s) (creator and/or assignee) and their active partners can see the job.
+    /// - On create, compute `participants` from those user IDs so partner devices stay in sync.
     /// - Updates must not modify `participants` unless intentionally changing access.
     func createJob(_ job: Job, completion: @escaping (Result<Void, Error>) -> Void) {
         do {
@@ -273,28 +316,18 @@ class FirebaseService {
                     completion(.failure(err))
                     return
                 }
-                // New visibility logic:
-                if let assignee = job.assignedTo, !assignee.isEmpty {
-                    // Assigned job: only the assignee should see it
-                    docRef.updateData(["participants": [assignee]]) { patchErr in
+                self.gatherParticipants(for: job) { participants in
+                    guard !participants.isEmpty else {
+                        completion(.success(()))
+                        return
+                    }
+                    docRef.updateData(["participants": participants]) { patchErr in
                         if let patchErr = patchErr {
                             completion(.failure(patchErr))
                         } else {
                             completion(.success(()))
                         }
                     }
-                } else if let creator = job.createdBy, !creator.isEmpty {
-                    // Unassigned (e.g. Pending) but created by a user on-device: make it visible to the creator only
-                    docRef.updateData(["participants": [creator]]) { patchErr in
-                        if let patchErr = patchErr {
-                            completion(.failure(patchErr))
-                        } else {
-                            completion(.success(()))
-                        }
-                    }
-                } else {
-                    // No assignee and no creator — leave participants unset
-                    completion(.success(()))
                 }
             }
         } catch {
@@ -303,8 +336,7 @@ class FirebaseService {
     }
     
     /// Creation visibility invariant:
-    /// - Only the assignee should see the job on their dashboard.
-    /// - On create, we set `participants = [assignedTo]` (if present) and do NOT include `createdBy` or partner.
+    /// - Participant access is established at creation for the primary user(s) and their partners.
     /// - Updates must not modify `participants` unless intentionally changing access.
     func updateJob(_ job: Job, completion: @escaping (Result<Void, Error>) -> Void) {
         do {
@@ -807,8 +839,8 @@ extension FirebaseService: AdminPanelService {}
 @available(iOS 15.0, *)
 extension FirebaseService {
     /// Creation visibility invariant:
-    /// - Only the assignee should see the job on their dashboard.
-    /// - On create, we set `participants = [assignedTo]` (if present) and do NOT include `createdBy` or partner.
+    /// - Ensure the primary user(s) (creator and/or assignee) and their active partners can see the job.
+    /// - On create, compute `participants` from those user IDs so partner devices stay in sync.
     /// - Updates must not modify `participants` unless intentionally changing access.
     func createJobAsync(_ job: Job) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -819,28 +851,18 @@ extension FirebaseService {
                         continuation.resume(throwing: err)
                         return
                     }
-                    // New visibility logic:
-                    if let assignee = job.assignedTo, !assignee.isEmpty {
-                        // Assigned job: only the assignee should see it
-                        docRef.updateData(["participants": [assignee]]) { updateErr in
+                    self.gatherParticipants(for: job) { participants in
+                        guard !participants.isEmpty else {
+                            continuation.resume(returning: ())
+                            return
+                        }
+                        docRef.updateData(["participants": participants]) { updateErr in
                             if let updateErr = updateErr {
                                 continuation.resume(throwing: updateErr)
                             } else {
                                 continuation.resume(returning: ())
                             }
                         }
-                    } else if let creator = job.createdBy, !creator.isEmpty {
-                        // Unassigned (e.g. Pending) self-created job: visible to creator only
-                        docRef.updateData(["participants": [creator]]) { updateErr in
-                            if let updateErr = updateErr {
-                                continuation.resume(throwing: updateErr)
-                            } else {
-                                continuation.resume(returning: ())
-                            }
-                        }
-                    } else {
-                        // No assignee/creator present
-                        continuation.resume(returning: ())
                     }
                 }
             } catch {
