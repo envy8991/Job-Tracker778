@@ -169,8 +169,9 @@ class FirebaseService {
         doc.setData(payload) { err in completion(err == nil) }
     }
 
-    func listenIncomingRequests(for uid: String, handler: @escaping ([PartnerRequest]) -> Void) {
-        db.collection("partnerRequests")
+    @discardableResult
+    func listenIncomingRequests(for uid: String, handler: @escaping ([PartnerRequest]) -> Void) -> ListenerRegistration {
+        return db.collection("partnerRequests")
             .whereField("toUid", isEqualTo: uid)
             .whereField("status", isEqualTo: "pending")
             .addSnapshotListener { snap, _ in
@@ -179,8 +180,9 @@ class FirebaseService {
             }
     }
 
-    func listenOutgoingRequests(for uid: String, handler: @escaping ([PartnerRequest]) -> Void) {
-        db.collection("partnerRequests")
+    @discardableResult
+    func listenOutgoingRequests(for uid: String, handler: @escaping ([PartnerRequest]) -> Void) -> ListenerRegistration {
+        return db.collection("partnerRequests")
             .whereField("fromUid", isEqualTo: uid)
             .whereField("status", isEqualTo: "pending")
             .addSnapshotListener { snap, _ in
