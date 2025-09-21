@@ -190,3 +190,74 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
         return job
     }
 }
+
+// MARK: - Timesheet sorting support
+
+extension Job {
+    fileprivate var trimmedJobNumberForTimesheet: String? {
+        guard let raw = jobNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return nil
+        }
+        return raw
+    }
+
+    fileprivate var normalizedJobNumberForTimesheet: String? {
+        trimmedJobNumberForTimesheet?.uppercased()
+    }
+
+    static func timesheetSortComparator(_ lhs: Job, _ rhs: Job) -> Bool {
+        let lhsNumber = lhs.trimmedJobNumberForTimesheet
+        let rhsNumber = rhs.trimmedJobNumberForTimesheet
+
+        switch (lhsNumber, rhsNumber) {
+        case let (.some(lhsString), .some(rhsString)):
+            let lhsInt = Int(lhsString)
+            let rhsInt = Int(rhsString)
+            if let lhsInt, let rhsInt, lhsInt != rhsInt {
+                return lhsInt < rhsInt
+            }
+
+            let lhsNormalized = lhs.normalizedJobNumberForTimesheet ?? lhsString.uppercased()
+            let rhsNormalized = rhs.normalizedJobNumberForTimesheet ?? rhsString.uppercased()
+            if lhsNormalized != rhsNormalized {
+                return lhsNormalized < rhsNormalized
+            }
+
+            if lhs.date != rhs.date {
+                return lhs.date < rhs.date
+            }
+
+            let addressComparison = lhs.address.localizedCaseInsensitiveCompare(rhs.address)
+            if addressComparison != .orderedSame {
+                return addressComparison == .orderedAscending
+            }
+
+            return lhs.id < rhs.id
+
+        case (.none, .none):
+            if lhs.date != rhs.date {
+                return lhs.date < rhs.date
+            }
+
+            let addressComparison = lhs.address.localizedCaseInsensitiveCompare(rhs.address)
+            if addressComparison != .orderedSame {
+                return addressComparison == .orderedAscending
+            }
+
+            return lhs.id < rhs.id
+
+        case (.none, .some):
+            return false
+
+        case (.some, .none):
+            return true
+        }
+    }
+}
+
+extension Sequence where Element == Job {
+    /// Returns the jobs sorted in the same order used by the weekly timesheet UI/PDF.
+    func sortedForTimesheet() -> [Job] {
+        sorted(by: Job.timesheetSortComparator)
+    }
+}
