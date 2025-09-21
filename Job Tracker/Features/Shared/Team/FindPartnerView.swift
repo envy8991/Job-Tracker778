@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import FirebaseFirestore
 
 struct FindPartnerView: View {
     @EnvironmentObject var usersViewModel: UsersViewModel
@@ -17,6 +18,8 @@ struct FindPartnerView: View {
     @State private var isLoading = false
     @State private var errorText: String? = nil
     @State private var cancellingRequestIDs: Set<String> = []
+    @State private var incomingListener: ListenerRegistration? = nil
+    @State private var outgoingListener: ListenerRegistration? = nil
 
     var body: some View {
         ZStack {
@@ -141,23 +144,41 @@ struct FindPartnerView: View {
         .navigationTitle("Find a Partner")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: startListening)
+        .onDisappear(perform: stopListening)
     }
 
     // MARK: - Actions
     private func startListening() {
+        stopListening()
         guard let uid = authViewModel.currentUser?.id else { return }
-        isLoading = true
+        updatePartnerId(showLoading: true)
+        incomingListener = FirebaseService.shared.listenIncomingRequests(for: uid) { reqs in
+            DispatchQueue.main.async { self.incoming = reqs }
+        }
+        outgoingListener = FirebaseService.shared.listenOutgoingRequests(for: uid) { reqs in
+            DispatchQueue.main.async { self.outgoing = reqs }
+        }
+    }
+
+    private func stopListening() {
+        incomingListener?.remove()
+        incomingListener = nil
+        outgoingListener?.remove()
+        outgoingListener = nil
+    }
+
+    private func updatePartnerId(showLoading: Bool) {
+        guard let uid = authViewModel.currentUser?.id else { return }
+        if showLoading {
+            isLoading = true
+        }
         FirebaseService.shared.fetchPartnerId(for: uid) { id in
             DispatchQueue.main.async {
                 self.partnerUid = id
-                self.isLoading = false
+                if showLoading {
+                    self.isLoading = false
+                }
             }
-        }
-        FirebaseService.shared.listenIncomingRequests(for: uid) { reqs in
-            DispatchQueue.main.async { self.incoming = reqs }
-        }
-        FirebaseService.shared.listenOutgoingRequests(for: uid) { reqs in
-            DispatchQueue.main.async { self.outgoing = reqs }
         }
     }
 
@@ -172,8 +193,13 @@ struct FindPartnerView: View {
     private func accept(_ req: PartnerRequest) {
         errorText = nil
         FirebaseService.shared.acceptPartnerRequest(request: req) { ok in
-            if !ok { DispatchQueue.main.async { self.errorText = "Failed to approve request." } }
-            startListening()
+            DispatchQueue.main.async {
+                if ok {
+                    self.updatePartnerId(showLoading: false)
+                } else {
+                    self.errorText = "Failed to approve request."
+                }
+            }
         }
     }
 
