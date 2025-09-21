@@ -11,6 +11,7 @@ import SwiftUI
 struct TutorialView: View {
     @AppStorage("hasSeenTutorial") private var hasSeenTutorial: Bool = false
     @AppStorage("addressSuggestionProvider") private var suggestionProviderRaw: String = "apple" // "apple" or "google"
+    var onComplete: (() -> Void)? = nil
     
     var body: some View {
         TabView {
@@ -121,7 +122,10 @@ struct TutorialView: View {
                 Text("Start tracking your jobs now.")
                     .padding()
                 Spacer()
-                Button(action: { hasSeenTutorial = true }) {
+                Button(action: {
+                    hasSeenTutorial = true
+                    onComplete?()
+                }) {
                     Text("Get Started")
                         .bold()
                         .frame(maxWidth: .infinity)

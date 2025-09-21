@@ -98,7 +98,15 @@ struct AuthFlowView: View {
         }
         .sheet(isPresented: $showingTutorial) {
             NavigationStack {
-                TutorialView()
+                TutorialView(onComplete: {
+                    if reduceMotion {
+                        showingTutorial = false
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showingTutorial = false
+                        }
+                    }
+                })
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Close") { showingTutorial = false }
