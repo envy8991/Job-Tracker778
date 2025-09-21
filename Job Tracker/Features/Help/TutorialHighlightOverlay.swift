@@ -261,11 +261,11 @@ struct TutorialHighlightOverlay: View {
 }
 
 private struct AnyShape: Shape {
-    private let pathBuilder: (CGRect) -> Path
+    private let pathBuilder: @Sendable (CGRect) -> Path
 
     init<S: Shape>(_ wrapped: S) {
         pathBuilder = { rect in
-            Path(wrapped.path(in: rect))
+            wrapped.path(in: rect)
         }
     }
 
