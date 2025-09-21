@@ -50,6 +50,7 @@ struct JobTrackerApp: App {
     @State private var showImportSuccess: Bool = false
     @State private var importFailureMessage: String? = nil
     @State private var didWireWatchBridge = false
+    @State private var pendingSharedJobPreview: SharedJobPreview?
 
     // Background/foreground location switching
     @Environment(\.scenePhase) private var scenePhase
@@ -137,9 +138,42 @@ struct JobTrackerApp: App {
             .environmentObject(themeManager)
             .preferredColorScheme(themeManager.theme.colorScheme)
             .tint(themeManager.theme.accentColor)
+            .sheet(item: $pendingSharedJobPreview) { preview in
+                JobImportPreviewView(
+                    preview: preview,
+                    onImportCompleted: {
+                        pendingSharedJobPreview = nil
+                    },
+                    onCancel: {
+                        pendingSharedJobPreview = nil
+                    }
+                )
+            }
             // Deep links
             .onOpenURL { url in
-                DeepLinkRouter.handle(url)
+                guard let route = DeepLinkRouter.handle(url) else { return }
+
+                switch route {
+                case let .importJob(token):
+                    Task {
+                        await MainActor.run {
+                            pendingSharedJobPreview = nil
+                        }
+                        do {
+                            let preview = try await SharedJobService.shared.loadSharedJob(token: token)
+                            await MainActor.run {
+                                pendingSharedJobPreview = preview
+                            }
+                        } catch {
+                            #if DEBUG
+                            print("[DeepLink] Failed to load shared job: \(error.localizedDescription)")
+                            #endif
+                            await MainActor.run {
+                                NotificationCenter.default.post(name: .jobImportFailed, object: error)
+                            }
+                        }
+                    }
+                }
             }
             // Import banners + watch sync
             .onReceive(NotificationCenter.default.publisher(for: .jobImportSucceeded)) { _ in

@@ -4,10 +4,13 @@
 //
 
 import Foundation
-import SwiftUI
+
+enum DeepLinkRoute: Equatable {
+    case importJob(token: String)
+}
 
 enum DeepLinkRouter {
-    static func handle(_ url: URL) {
+    static func handle(_ url: URL) -> DeepLinkRoute? {
         #if DEBUG
         print("[DeepLink] Received URL: \(url.absoluteString)")
         #endif
@@ -52,27 +55,10 @@ enum DeepLinkRouter {
                     )
                 )
             }
-            return
+            return nil
         }
 
-        Task {
-            do {
-                #if DEBUG
-                print("[DeepLink] Importing token: \(token)")
-                #endif
-                _ = try await SharedJobService.shared.importJob(using: token)
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: .jobImportSucceeded, object: nil)
-                }
-            } catch {
-                #if DEBUG
-                print("[DeepLink] Import failed: \(error.localizedDescription)")
-                #endif
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: .jobImportFailed, object: error)
-                }
-            }
-        }
+        return .importJob(token: token)
     }
 }
 

@@ -30,6 +30,13 @@ struct SharedJobPayload: Codable {
     let senderIsCan: Bool
 }
 
+struct SharedJobPreview: Identifiable, Equatable {
+    let token: String
+    let payload: SharedJobPayload
+
+    var id: String { token }
+}
+
 final class SharedJobService {
     static let shared = SharedJobService()
     private init() {}
@@ -80,9 +87,8 @@ final class SharedJobService {
         return url
     }
 
-    /// Consumes a token, creates a new Job for the current user and returns it.
-    @discardableResult
-    func importJob(using token: String) async throws -> Job {
+    /// Loads a shared job without mutating remote state.
+    func loadSharedJob(token: String) async throws -> SharedJobPreview {
         let db = Firestore.firestore()
         let ref = db.collection("sharedJobs").document(token)
         let snap = try await ref.getDocument()
@@ -100,6 +106,18 @@ final class SharedJobService {
         }
 
         let payload = try Firestore.Decoder().decode(SharedJobPayload.self, from: data)
+
+        return SharedJobPreview(token: token, payload: payload)
+    }
+
+    /// Consumes a token, creates a new Job for the current user and returns it.
+    @discardableResult
+    func importJob(using token: String) async throws -> Job {
+        let preview = try await loadSharedJob(token: token)
+        let payload = preview.payload
+
+        let db = Firestore.firestore()
+        let ref = db.collection("sharedJobs").document(token)
 
         // Build the recipient’s Job. Keep only shared fields.
         // (Adjust initializer to your actual Job model)
