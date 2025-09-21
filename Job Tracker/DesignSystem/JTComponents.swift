@@ -115,17 +115,12 @@ struct JTPrimaryButtonStyle: ButtonStyle {
 }
 
 @MainActor
-extension ButtonStyle where Self == JTPrimaryButtonStyle {
-    static var jtPrimary: JTPrimaryButtonStyle { JTPrimaryButtonStyle.jtPrimary }
-}
-
-@MainActor
 struct JTPrimaryPrimitiveButtonStyle: PrimitiveButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         Button(role: configuration.role, action: configuration.trigger) {
             configuration.label
         }
-        .buttonStyle(JTPrimaryButtonStyle.jtPrimary)
+        .buttonStyle(JTPrimaryButtonStyle())
     }
 }
 
