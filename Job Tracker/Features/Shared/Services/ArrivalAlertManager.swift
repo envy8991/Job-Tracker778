@@ -47,7 +47,7 @@ final class ArrivalAlertManager: ObservableObject {
         locationService: LocationService,
         notificationCenter: UNUserNotificationCenter = .current(),
         userDefaults: UserDefaults = .standard,
-        calendar: Calendar = .current()
+        calendar: Calendar = .current
     ) {
         self.locationService = locationService
         self.notificationCenter = notificationCenter
@@ -158,7 +158,7 @@ final class ArrivalAlertManager: ObservableObject {
             return
         }
 
-        let locationStatus = CLLocationManager.authorizationStatus()
+        let locationStatus = CLLocationManager().authorizationStatus
         guard locationStatus == .authorizedAlways || locationStatus == .authorizedWhenInUse else {
             stopAllMonitors()
             switch locationStatus {
