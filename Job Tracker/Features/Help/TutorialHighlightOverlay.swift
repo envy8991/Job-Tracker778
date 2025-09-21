@@ -185,7 +185,9 @@ struct TutorialHighlightOverlay: View {
         }
 
         private func computeCalloutSize(for message: String, maxWidth: CGFloat) -> CGSize {
-            let constrainedWidth = min(maxWidth, 260)
+            let minimumWidth: CGFloat = 160
+            let usableWidth = max(maxWidth, minimumWidth)
+            let constrainedWidth = min(usableWidth, 260)
             let text = NSString(string: message)
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: UIFont.preferredFont(forTextStyle: .subheadline)
@@ -196,9 +198,9 @@ struct TutorialHighlightOverlay: View {
                 attributes: attributes,
                 context: nil
             )
-            let width = max(bounds.width + 24, 160)
+            let width = min(max(bounds.width + 24, minimumWidth), constrainedWidth)
             let height = bounds.height + 20
-            return CGSize(width: min(width, constrainedWidth), height: height)
+            return CGSize(width: width, height: height)
         }
 
         private func calloutPosition(for item: TutorialHighlightItem,
