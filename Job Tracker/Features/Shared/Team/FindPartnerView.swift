@@ -16,6 +16,7 @@ struct FindPartnerView: View {
     @State private var outgoing: [PartnerRequest] = []
     @State private var partnerUid: String? = nil
     @State private var isLoading = false
+    @State private var searchText: String = ""
     @State private var errorText: String? = nil
     @State private var cancellingRequestIDs: Set<String> = []
     @State private var incomingListener: ListenerRegistration? = nil
@@ -103,24 +104,28 @@ struct FindPartnerView: View {
 
                 // All users
                 Section(header: Text("Find a Partner")) {
-                    let me = authViewModel.currentUser?.id
-                    ForEach(usersViewModel.allUsers.filter { $0.id != me }) { user in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text("\(user.firstName) \(user.lastName)")
-                                Text(user.email).font(.footnote).foregroundColor(.secondary)
-                            }
-                            Spacer()
+                    if visibleUsers.isEmpty {
+                        Text(isSearchActive ? "No teammates match your search." : "No teammates available.")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(visibleUsers) { user in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text("\(user.firstName) \(user.lastName)")
+                                    Text(user.email).font(.footnote).foregroundColor(.secondary)
+                                }
+                                Spacer()
 
-                            if partnerUid == user.id {
-                                Label("Partnered", systemImage: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                            } else if outgoing.contains(where: { $0.toUid == user.id }) {
-                                Text("Requested").foregroundColor(.secondary)
-                            } else if incoming.contains(where: { $0.fromUid == user.id }) {
-                                Text("Requested you").foregroundColor(.secondary)
-                            } else {
-                                Button("Request") { request(user.id) }
+                                if partnerUid == user.id {
+                                    Label("Partnered", systemImage: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                } else if outgoing.contains(where: { $0.toUid == user.id }) {
+                                    Text("Requested").foregroundColor(.secondary)
+                                } else if incoming.contains(where: { $0.fromUid == user.id }) {
+                                    Text("Requested you").foregroundColor(.secondary)
+                                } else {
+                                    Button("Request") { request(user.id) }
+                                }
                             }
                         }
                     }
@@ -136,6 +141,7 @@ struct FindPartnerView: View {
             }
             .scrollContentBackground(.hidden)
             .listStyle(.insetGrouped)
+            .searchable(text: $searchText, prompt: Text("Search teammates"))
             .padding(.top, 28) // spacing for hamburger overlay (iOS 16-safe)
         }
         .overlay(alignment: .center) {
@@ -145,6 +151,24 @@ struct FindPartnerView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: startListening)
         .onDisappear(perform: stopListening)
+    }
+
+    private var trimmedSearchQuery: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isSearchActive: Bool { !trimmedSearchQuery.isEmpty }
+
+    private var visibleUsers: [AppUser] {
+        let me = authViewModel.currentUser?.id
+        let base = usersViewModel.allUsers.filter { $0.id != me }
+        guard isSearchActive else { return base }
+
+        let loweredQuery = trimmedSearchQuery.lowercased()
+        return base.filter { user in
+            let fullName = "\(user.firstName) \(user.lastName)".lowercased()
+            return fullName.contains(loweredQuery) || user.email.lowercased().contains(loweredQuery)
+        }
     }
 
     // MARK: - Actions
