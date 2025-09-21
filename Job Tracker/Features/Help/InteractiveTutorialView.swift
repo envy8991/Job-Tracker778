@@ -70,6 +70,7 @@ extension TutorialStage {
     }
 }
 
+@MainActor
 final class InteractiveTutorialViewModel: ObservableObject {
     @Published private(set) var stages: [TutorialStage]
     @Published var currentStageIndex: Int
@@ -116,6 +117,7 @@ final class InteractiveTutorialViewModel: ObservableObject {
 
 // MARK: - Stage Models
 
+@MainActor
 final class AuthTutorialStageModel: ObservableObject {
     enum Step: String, CaseIterable, Identifiable {
         case signIn
@@ -166,6 +168,7 @@ final class AuthTutorialStageModel: ObservableObject {
     }
 }
 
+@MainActor
 final class DashboardTutorialStageModel: ObservableObject {
     struct Job: Identifiable, Equatable {
         let id = UUID()
@@ -228,6 +231,7 @@ final class DashboardTutorialStageModel: ObservableObject {
     }
 }
 
+@MainActor
 final class CreateJobTutorialStageModel: ObservableObject {
     enum StatusOption: String, CaseIterable, Identifiable {
         case pending = "Pending"
@@ -271,6 +275,7 @@ final class CreateJobTutorialStageModel: ObservableObject {
     }
 }
 
+@MainActor
 final class TimesheetTutorialStageModel: ObservableObject {
     struct Entry: Identifiable, Equatable {
         let id = UUID()
@@ -312,6 +317,7 @@ final class TimesheetTutorialStageModel: ObservableObject {
 
 // MARK: - Interactive Tutorial View
 
+@MainActor
 struct InteractiveTutorialView: View {
     private enum StorageKeys {
         static let stageIndex = "interactiveTutorialCurrentStage"
@@ -562,6 +568,7 @@ struct InteractiveTutorialView: View {
 
 // MARK: - Stage Summary Header
 
+@MainActor
 private struct StageSummaryView: View {
     let stage: TutorialStage
     let index: Int
@@ -583,6 +590,7 @@ private struct StageSummaryView: View {
 
 // MARK: - Stage Practice Views
 
+@MainActor
 private struct AuthTutorialStageView: View {
     @ObservedObject var model: AuthTutorialStageModel
     var completionChanged: (Bool) -> Void
@@ -694,6 +702,7 @@ private struct AuthTutorialStageView: View {
     }
 }
 
+@MainActor
 private struct DashboardTutorialStageView: View {
     @ObservedObject var model: DashboardTutorialStageModel
     var completionChanged: (Bool) -> Void
@@ -840,6 +849,7 @@ private struct DashboardTutorialStageView: View {
     }
 }
 
+@MainActor
 private struct CreateJobTutorialStageView: View {
     @ObservedObject var model: CreateJobTutorialStageModel
     var completionChanged: (Bool) -> Void
@@ -936,6 +946,7 @@ private struct CreateJobTutorialStageView: View {
     }
 }
 
+@MainActor
 private struct TimesheetTutorialStageView: View {
     @ObservedObject var model: TimesheetTutorialStageModel
     var completionChanged: (Bool) -> Void
