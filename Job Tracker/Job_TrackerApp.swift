@@ -91,7 +91,7 @@ struct JobTrackerApp: App {
                             }
                     } else {
                         // First-run tutorial onboarding
-                        TutorialView()
+                        InteractiveTutorialView()
                             .onAppear {
                                 if !didWireWatchBridge {
                                     PhoneWatchSyncManager.shared.configure(jobsViewModel: jobsViewModel)
