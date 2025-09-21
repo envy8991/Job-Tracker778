@@ -17,6 +17,7 @@ struct SettingsView: View {
     // MARK: - Dependencies
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject private var themeManager: JTThemeManager
+    @EnvironmentObject private var arrivalAlertManager: ArrivalAlertManager
 
     // Persisted settings
     @AppStorage("smartRoutingEnabled") private var smartRoutingEnabled = false
@@ -104,6 +105,13 @@ struct SettingsView: View {
                             SectionHeader(title: "Notifications")
                             Toggle("Notify me on arrival (today only)", isOn: $arrivalAlertsEnabledToday)
                                 .toggleStyle(.switch)
+                            if !arrivalAlertManager.status.message.isEmpty {
+                                Text(arrivalAlertManager.status.message)
+                                    .font(.footnote)
+                                    .foregroundStyle(color(for: arrivalAlertManager.status.kind))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .accessibilityLabel("Arrival alerts status: \(arrivalAlertManager.status.message)")
+                            }
                         }
                         .padding(16)
                     }
@@ -259,6 +267,21 @@ struct SettingsView: View {
                 isPresented: $showThemeEditor
             )
             .environmentObject(themeManager)
+        }
+    }
+}
+
+private extension SettingsView {
+    func color(for kind: ArrivalAlertManager.Status.Kind) -> Color {
+        switch kind {
+        case .active:
+            return .green
+        case .warning:
+            return .orange
+        case .error:
+            return .red
+        case .inactive:
+            return .secondary
         }
     }
 }

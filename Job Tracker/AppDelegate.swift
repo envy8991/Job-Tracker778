@@ -25,12 +25,42 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         #if canImport(GooglePlaces)
         GMSPlacesClient.provideAPIKey("AIzaSyABtSWf7_UPKKD-O83BYmhUlslXZHdp7U0")
         #endif
-        // Notifications feature disabled — skip UNUserNotificationCenter setup
+
+        configureNotifications()
         return true
     }
 
     func applicationWillResignActive(_ application: UIApplication) { }
     func applicationWillEnterForeground(_ application: UIApplication) { }
 
-    // Notifications feature disabled — notification permission and delegate methods removed.
+    private func configureNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error = error {
+                print("Notification authorization error: \(error)")
+            }
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .arrivalNotificationAuthorizationDidChange, object: granted)
+            }
+        }
+    }
+}
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        completionHandler()
+    }
 }

@@ -12,11 +12,14 @@ import SwiftUI
 
 final class LocationService: NSObject, ObservableObject {
     @Published var current: CLLocation?
-    
+    let regionEventsPublisher: AnyPublisher<RegionEvent, Never>
+
     private let manager = CLLocationManager()
     private var smartRoutingCancellable: AnyCancellable?
-    
+    private let regionEventSubject = PassthroughSubject<RegionEvent, Never>()
+
     override init() {
+        regionEventsPublisher = regionEventSubject.eraseToAnyPublisher()
         super.init()
         manager.delegate = self
 
@@ -111,6 +114,24 @@ final class LocationService: NSObject, ObservableObject {
         manager.stopUpdatingLocation()
         manager.stopMonitoringSignificantLocationChanges()
     }
+
+    // MARK: - Region Monitoring
+
+    func startMonitoring(region: CLCircularRegion) {
+        manager.startMonitoring(for: region)
+    }
+
+    func stopMonitoringRegion(withIdentifier identifier: String) {
+        for region in manager.monitoredRegions where region.identifier == identifier {
+            manager.stopMonitoring(for: region)
+        }
+    }
+
+    func stopMonitoringRegions(withPrefix prefix: String) {
+        for region in manager.monitoredRegions where region.identifier.hasPrefix(prefix) {
+            manager.stopMonitoring(for: region)
+        }
+    }
 }
 
 extension LocationService: CLLocationManagerDelegate {
@@ -146,9 +167,34 @@ extension LocationService: CLLocationManagerDelegate {
             break
         }
     }
+
+    func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
+        guard region is CLCircularRegion else { return }
+        DispatchQueue.main.async {
+            self.regionEventSubject.send(.entered(identifier: region.identifier))
+        }
+    }
+
+    func locationManager(
+        _ manager: CLLocationManager,
+        monitoringDidFailFor region: CLRegion?,
+        withError error: Error
+    ) {
+        DispatchQueue.main.async {
+            self.regionEventSubject.send(.monitoringFailed(identifier: region?.identifier, error: error))
+        }
+    }
 }
 
 // Allow Combine KVO on the toggle
 extension UserDefaults {
     @objc dynamic var smartRoutingEnabled: Bool { bool(forKey: "smartRoutingEnabled") }
+    @objc dynamic var arrivalAlertsEnabledToday: Bool { bool(forKey: "arrivalAlertsEnabledToday") }
+}
+
+extension LocationService {
+    enum RegionEvent {
+        case entered(identifier: String)
+        case monitoringFailed(identifier: String?, error: Error)
+    }
 }
