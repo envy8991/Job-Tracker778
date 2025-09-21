@@ -14,7 +14,7 @@ import FirebaseAuth
 /// We removed the old includeMaterials/Notes/Photos flags. Now we only share:
 ///  - address, date, status, jobNumber
 ///  - assignment (but only applied if sender **and** receiver are CAN users)
-struct SharedJobPayload: Codable {
+struct SharedJobPayload: Codable, Equatable {
     let v: Int               // schema version
     let createdAt: Timestamp
     let fromUserId: String?
@@ -28,6 +28,20 @@ struct SharedJobPayload: Codable {
     // Conditional field: carried in payload but only applied when allowed
     let assignment: String?
     let senderIsCan: Bool
+
+    static func == (lhs: SharedJobPayload, rhs: SharedJobPayload) -> Bool {
+        lhs.v == rhs.v &&
+        lhs.createdAt.seconds == rhs.createdAt.seconds &&
+        lhs.createdAt.nanoseconds == rhs.createdAt.nanoseconds &&
+        lhs.fromUserId == rhs.fromUserId &&
+        lhs.address == rhs.address &&
+        lhs.date.seconds == rhs.date.seconds &&
+        lhs.date.nanoseconds == rhs.date.nanoseconds &&
+        lhs.status == rhs.status &&
+        lhs.jobNumber == rhs.jobNumber &&
+        lhs.assignment == rhs.assignment &&
+        lhs.senderIsCan == rhs.senderIsCan
+    }
 }
 
 struct SharedJobPreview: Identifiable, Equatable {
