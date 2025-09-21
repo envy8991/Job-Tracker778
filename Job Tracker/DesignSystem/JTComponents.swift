@@ -113,8 +113,23 @@ private struct JTPrimaryButtonStyle: ButtonStyle {
 }
 
 @MainActor
-extension PrimitiveButtonStyle where Self == JTPrimaryButtonStyle {
+extension ButtonStyle where Self == JTPrimaryButtonStyle {
     static var jtPrimary: JTPrimaryButtonStyle { JTPrimaryButtonStyle() }
+}
+
+@MainActor
+private struct JTPrimaryPrimitiveButtonStyle: PrimitiveButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button(role: configuration.role, action: configuration.trigger) {
+            configuration.label
+        }
+        .buttonStyle(JTPrimaryButtonStyle())
+    }
+}
+
+@MainActor
+extension PrimitiveButtonStyle where Self == JTPrimaryPrimitiveButtonStyle {
+    static var jtPrimary: JTPrimaryPrimitiveButtonStyle { JTPrimaryPrimitiveButtonStyle() }
 }
 
 /// Text input that sits on top of the glass surface styling.
