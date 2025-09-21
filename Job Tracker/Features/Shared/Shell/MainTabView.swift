@@ -340,9 +340,17 @@ struct AdminPanelView: View {
         }
         .confirmationDialog(
             "Confirm role change",
-            item: $pendingToggle,
-            titleVisibility: .visible,
-            actions: { pending in
+            isPresented: Binding(
+                get: { pendingToggle != nil },
+                set: { newValue in
+                    if !newValue {
+                        pendingToggle = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let pending = pendingToggle {
                 Button(role: .destructive) {
                     finalizePendingToggle(pending)
                 } label: {
@@ -353,14 +361,13 @@ struct AdminPanelView: View {
                         Text("Remove supervisor for \(pending.user.firstName)")
                     }
                 }
-                Button("Cancel", role: .cancel) {
-                    pendingToggle = nil
-                }
-            },
-            message: { _ in
-                Text("This updates Firebase immediately and may change the user's access right away.")
             }
-        )
+            Button("Cancel", role: .cancel) {
+                pendingToggle = nil
+            }
+        } message: {
+            Text("This updates Firebase immediately and may change the user's access right away.")
+        }
         .confirmationDialog(
             "Run participants backfill?",
             isPresented: $showingBackfillConfirmation,
