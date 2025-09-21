@@ -125,7 +125,7 @@ final class AdminPanelViewModel: ObservableObject {
 
         service.adminBackfillParticipantsForAllJobs(progress: { [weak self] update in
             guard let self else { return }
-            Swift.Task { @MainActor in
+            Task { @MainActor in
                 var status = self.maintenanceStatus
                 status.isRunning = true
                 status.progress = MaintenanceStatus.Progress(
@@ -138,7 +138,7 @@ final class AdminPanelViewModel: ObservableObject {
             }
         }, completion: { [weak self] result in
             guard let self else { return }
-            Swift.Task { @MainActor in
+            Task { @MainActor in
                 var status = self.maintenanceStatus
                 status.isRunning = false
                 status.progress = nil
@@ -199,7 +199,7 @@ final class AdminPanelViewModel: ObservableObject {
 
         service.updateUserFlags(uid: userID, isAdmin: admin, isSupervisor: supervisor) { [weak self] result in
             guard let self else { return }
-            Swift.Task { @MainActor in
+            Task { @MainActor in
                 self.updatingAdminIDs.remove(userID)
                 self.updatingSupervisorIDs.remove(userID)
 
