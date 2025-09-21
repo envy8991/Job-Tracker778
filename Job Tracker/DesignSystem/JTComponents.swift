@@ -113,7 +113,7 @@ private struct JTPrimaryButtonStyle: ButtonStyle {
 }
 
 @MainActor
-extension PrimitiveButtonStyle where Self == JTPrimaryButtonStyle {
+extension ButtonStyle where Self == JTPrimaryButtonStyle {
     static var jtPrimary: JTPrimaryButtonStyle { JTPrimaryButtonStyle() }
 }
 
