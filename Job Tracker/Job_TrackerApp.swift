@@ -50,10 +50,17 @@ struct JobTrackerApp: App {
     @State private var showImportSuccess: Bool = false
     @State private var importFailureMessage: String? = nil
     @State private var didWireWatchBridge = false
-    
+
     // Background/foreground location switching
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var locationService = LocationService()
+    @StateObject private var locationService: LocationService
+    @StateObject private var arrivalAlertManager: ArrivalAlertManager
+
+    init() {
+        let locationService = LocationService()
+        _locationService = StateObject(wrappedValue: locationService)
+        _arrivalAlertManager = StateObject(wrappedValue: ArrivalAlertManager(locationService: locationService))
+    }
     
     
     var body: some Scene {
@@ -73,11 +80,13 @@ struct JobTrackerApp: App {
                                 // Ensure the watch has the latest on first appearance
                                 PhoneWatchSyncManager.shared.pushSnapshotToWatch()
                             }
-                            .onReceive(jobsViewModel.$jobs) { _ in
+                            .onReceive(jobsViewModel.$jobs) { jobs in
                                 PhoneWatchSyncManager.shared.pushSnapshotToWatch()
+                                arrivalAlertManager.updateJobs(jobs)
                             }
                             .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
                                 PhoneWatchSyncManager.shared.pushSnapshotToWatch()
+                                arrivalAlertManager.updateJobs(jobsViewModel.jobs)
                             }
                     } else {
                         // First-run tutorial onboarding
@@ -89,6 +98,7 @@ struct JobTrackerApp: App {
                                 }
                                 locationService.startStandardUpdates()
                                 PhoneWatchSyncManager.shared.pushSnapshotToWatch()
+                                arrivalAlertManager.updateJobs(jobsViewModel.jobs)
                             }
                     }
                 }
@@ -123,6 +133,7 @@ struct JobTrackerApp: App {
             .environmentObject(usersViewModel)
             .environmentObject(navigationViewModel)
             .environmentObject(locationService)
+            .environmentObject(arrivalAlertManager)
             .environmentObject(themeManager)
             .preferredColorScheme(themeManager.theme.colorScheme)
             .tint(themeManager.theme.accentColor)
