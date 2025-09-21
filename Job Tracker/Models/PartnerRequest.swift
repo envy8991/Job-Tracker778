@@ -14,6 +14,6 @@ struct PartnerRequest: Identifiable, Hashable {
     var id: String?            // Firestore document ID
     let fromUid: String
     let toUid: String
-    var status: String         // "pending", "accepted", or "declined"
+    var status: String         // "pending", "accepted", "declined", or "cancelled"
     let createdAt: Date
 }

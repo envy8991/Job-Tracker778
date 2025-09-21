@@ -16,6 +16,7 @@ struct FindPartnerView: View {
     @State private var partnerUid: String? = nil
     @State private var isLoading = false
     @State private var errorText: String? = nil
+    @State private var cancellingRequestIDs: Set<String> = []
 
     var body: some View {
         ZStack {
@@ -73,14 +74,25 @@ struct FindPartnerView: View {
                     } else {
                         ForEach(outgoing) { req in
                             if let u = usersViewModel.user(id: req.toUid) {
+                                let isCancelling = req.id.map { cancellingRequestIDs.contains($0) } ?? false
                                 HStack {
                                     VStack(alignment: .leading) {
                                         Text("\(u.firstName) \(u.lastName)")
                                         Text(u.email).font(.footnote).foregroundColor(.secondary)
                                     }
                                     Spacer()
-                                    Text("Pending").foregroundColor(.secondary)
+                                    Button(role: .destructive) {
+                                        cancel(req)
+                                    } label: {
+                                        if isCancelling {
+                                            ProgressView()
+                                        } else {
+                                            Text("Cancel")
+                                        }
+                                    }
+                                    .disabled(isCancelling || req.id == nil)
                                 }
+                                .opacity(isCancelling ? 0.5 : 1.0)
                             }
                         }
                     }
@@ -169,6 +181,25 @@ struct FindPartnerView: View {
         errorText = nil
         FirebaseService.shared.declinePartnerRequest(request: req) { ok in
             if !ok { DispatchQueue.main.async { self.errorText = "Failed to decline request." } }
+        }
+    }
+
+    private func cancel(_ req: PartnerRequest) {
+        guard let reqId = req.id else {
+            errorText = "Unable to cancel request."
+            return
+        }
+        errorText = nil
+        cancellingRequestIDs.insert(reqId)
+        FirebaseService.shared.cancelPartnerRequest(request: req) { ok in
+            DispatchQueue.main.async {
+                self.cancellingRequestIDs.remove(reqId)
+                if ok {
+                    self.outgoing.removeAll { $0.id == reqId }
+                } else {
+                    self.errorText = "Failed to cancel request."
+                }
+            }
         }
     }
 

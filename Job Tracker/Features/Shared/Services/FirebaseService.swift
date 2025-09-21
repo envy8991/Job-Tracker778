@@ -209,6 +209,20 @@ class FirebaseService {
         }
     }
 
+    func cancelPartnerRequest(request: PartnerRequest, completion: @escaping (Bool) -> Void) {
+        guard let reqId = request.id else { completion(false); return }
+        let ref = db.collection("partnerRequests").document(reqId)
+        ref.delete { err in
+            if let _ = err {
+                ref.updateData(["status": "cancelled"]) { updateErr in
+                    completion(updateErr == nil)
+                }
+            } else {
+                completion(true)
+            }
+        }
+    }
+
     func unpair(uid: String, partnerUid: String, completion: @escaping (Bool) -> Void) {
         let pairId = [uid, partnerUid].sorted().joined(separator: "_")
         db.collection("partnerships").document(pairId).delete { err in
