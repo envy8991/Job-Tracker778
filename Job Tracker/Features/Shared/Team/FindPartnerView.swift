@@ -21,6 +21,7 @@ struct FindPartnerView: View {
     @State private var cancellingRequestIDs: Set<String> = []
     @State private var incomingListener: ListenerRegistration? = nil
     @State private var outgoingListener: ListenerRegistration? = nil
+    @State private var partnerListener: ListenerRegistration? = nil
 
     var body: some View {
         ZStack {
@@ -175,7 +176,13 @@ struct FindPartnerView: View {
     private func startListening() {
         stopListening()
         guard let uid = authViewModel.currentUser?.id else { return }
-        updatePartnerId(showLoading: true)
+        isLoading = true
+        partnerListener = FirebaseService.shared.listenPartnerId(for: uid) { id in
+            DispatchQueue.main.async {
+                self.partnerUid = id
+                self.isLoading = false
+            }
+        }
         incomingListener = FirebaseService.shared.listenIncomingRequests(for: uid) { reqs in
             DispatchQueue.main.async { self.incoming = reqs }
         }
@@ -185,25 +192,12 @@ struct FindPartnerView: View {
     }
 
     private func stopListening() {
+        partnerListener?.remove()
+        partnerListener = nil
         incomingListener?.remove()
         incomingListener = nil
         outgoingListener?.remove()
         outgoingListener = nil
-    }
-
-    private func updatePartnerId(showLoading: Bool) {
-        guard let uid = authViewModel.currentUser?.id else { return }
-        if showLoading {
-            isLoading = true
-        }
-        FirebaseService.shared.fetchPartnerId(for: uid) { id in
-            DispatchQueue.main.async {
-                self.partnerUid = id
-                if showLoading {
-                    self.isLoading = false
-                }
-            }
-        }
     }
 
     private func request(_ toUid: String) {
@@ -218,9 +212,7 @@ struct FindPartnerView: View {
         errorText = nil
         FirebaseService.shared.acceptPartnerRequest(request: req) { ok in
             DispatchQueue.main.async {
-                if ok {
-                    self.updatePartnerId(showLoading: false)
-                } else {
+                if !ok {
                     self.errorText = "Failed to approve request."
                 }
             }

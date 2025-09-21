@@ -241,6 +241,23 @@ class FirebaseService {
             completion(partner)
         }
     }
+
+    @discardableResult
+    func listenPartnerId(for uid: String, handler: @escaping (String?) -> Void) -> ListenerRegistration {
+        return db.collection("partnerships")
+            .whereField("members", arrayContains: uid)
+            .limit(to: 1)
+            .addSnapshotListener { snapshot, error in
+                guard error == nil,
+                      let doc = snapshot?.documents.first,
+                      let members = doc["members"] as? [String],
+                      let partner = members.first(where: { $0 != uid }) else {
+                    handler(nil)
+                    return
+                }
+                handler(partner)
+            }
+    }
     
     // MARK: - Jobs
     
