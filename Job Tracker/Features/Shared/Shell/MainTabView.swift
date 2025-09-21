@@ -313,17 +313,229 @@ private struct PrimaryDestinationMenu: View {
 // MARK: - Placeholder screens
 
 struct AdminPanelView: View {
-    @EnvironmentObject var authViewModel: AuthViewModel
+    @EnvironmentObject private var authViewModel: AuthViewModel
+    @EnvironmentObject private var usersViewModel: UsersViewModel
+    @StateObject private var viewModel = AdminPanelViewModel()
+    @State private var pendingToggle: PendingToggle?
+    @State private var showingBackfillConfirmation = false
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("Admin Panel")
-                .font(.title2).bold()
-            Text("Use this area to manage users, flags, and global settings.")
-                .font(.footnote)
-                .foregroundColor(.secondary)
+        List {
+            rosterSection
+            maintenanceSection
         }
-        .padding()
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(
+            JTGradients.background(stops: 4)
+                .ignoresSafeArea()
+        )
         .navigationTitle("Admin")
+        .alert(item: $viewModel.alert) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: Text(alert.message),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+        .confirmationDialog(
+            "Confirm role change",
+            item: $pendingToggle,
+            titleVisibility: .visible,
+            actions: { pending in
+                Button(role: .destructive) {
+                    finalizePendingToggle(pending)
+                } label: {
+                    switch pending.flag {
+                    case .admin:
+                        Text("Remove admin for \(pending.user.firstName)")
+                    case .supervisor:
+                        Text("Remove supervisor for \(pending.user.firstName)")
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingToggle = nil
+                }
+            },
+            message: { _ in
+                Text("This updates Firebase immediately and may change the user's access right away.")
+            }
+        )
+        .confirmationDialog(
+            "Run participants backfill?",
+            isPresented: $showingBackfillConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Run Backfill", role: .destructive) {
+                showingBackfillConfirmation = false
+                viewModel.runParticipantsBackfill()
+            }
+            Button("Cancel", role: .cancel) {
+                showingBackfillConfirmation = false
+            }
+        } message: {
+            Text("Merges legacy job creators and assignees into each job's participants array. Only run when you understand the impact.")
+        }
+        .onAppear {
+            viewModel.attach(usersViewModel: usersViewModel)
+            viewModel.refreshRosterSnapshot()
+            let authVM = authViewModel
+            viewModel.onUserFlagsUpdated = { uid in
+                if authVM.currentUser?.id == uid {
+                    authVM.refreshCurrentUser()
+                }
+            }
+            authViewModel.refreshCurrentUser()
+        }
+    }
+
+    @ViewBuilder
+    private var rosterSection: some View {
+        Section("Roster") {
+            if viewModel.roster.isEmpty {
+                Text("No teammates found.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(viewModel.roster) { user in
+                    VStack(alignment: .leading, spacing: 12) {
+                        header(for: user)
+                        Toggle(isOn: Binding(
+                            get: { user.isAdmin },
+                            set: { newValue in requestAdminChange(for: user, newValue: newValue) }
+                        )) {
+                            Label("Admin", systemImage: "person.crop.badge.shield")
+                                .font(.subheadline)
+                        }
+                        .disabled(viewModel.isMutating(userID: user.id))
+
+                        Toggle(isOn: Binding(
+                            get: { user.isSupervisor },
+                            set: { newValue in requestSupervisorChange(for: user, newValue: newValue) }
+                        )) {
+                            Label("Supervisor", systemImage: "person.2.badge.gearshape")
+                                .font(.subheadline)
+                        }
+                        .disabled(viewModel.isMutating(userID: user.id))
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var maintenanceSection: some View {
+        Section("Maintenance") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Backfill job participants")
+                    .font(.headline)
+                Text("Ensure every job document contains a participants array by merging legacy creators and assignees.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                if viewModel.maintenanceStatus.isRunning, let progress = viewModel.maintenanceStatus.progress {
+                    if let fraction = progress.fractionComplete {
+                        ProgressView(value: fraction) {
+                            Text(progress.message)
+                                .font(.subheadline)
+                        } currentValueLabel: {
+                            Text("\(progress.processed)/\(progress.total)")
+                                .font(.caption.monospacedDigit())
+                        }
+                    } else {
+                        ProgressView(progress.message)
+                    }
+                }
+
+                if let lastCount = viewModel.maintenanceStatus.lastRunCount, !viewModel.maintenanceStatus.isRunning {
+                    Text("Last run updated \(lastCount) job\(lastCount == 1 ? "" : "s").")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let error = viewModel.maintenanceStatus.lastErrorMessage {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+
+                Button(role: .destructive) {
+                    showingBackfillConfirmation = true
+                } label: {
+                    Label("Run Backfill", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .disabled(viewModel.maintenanceStatus.isRunning)
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func header(for user: AppUser) -> some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(user.firstName) \(user.lastName)")
+                    .font(.headline)
+                Text(user.email)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if !user.position.isEmpty {
+                    Text(user.position)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            if viewModel.isMutating(userID: user.id) {
+                ProgressView()
+            } else if authViewModel.currentUser?.id == user.id {
+                Label("You", systemImage: "person.fill")
+                    .font(.caption)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.accentColor.opacity(0.15), in: Capsule())
+            }
+        }
+    }
+
+    private func requestAdminChange(for user: AppUser, newValue: Bool) {
+        guard !viewModel.isMutating(userID: user.id) else { return }
+        if newValue {
+            viewModel.setAdmin(true, for: user)
+        } else {
+            pendingToggle = PendingToggle(user: user, flag: .admin, newValue: false)
+        }
+    }
+
+    private func requestSupervisorChange(for user: AppUser, newValue: Bool) {
+        guard !viewModel.isMutating(userID: user.id) else { return }
+        if newValue {
+            viewModel.setSupervisor(true, for: user)
+        } else {
+            pendingToggle = PendingToggle(user: user, flag: .supervisor, newValue: false)
+        }
+    }
+
+    private func finalizePendingToggle(_ pending: PendingToggle) {
+        switch pending.flag {
+        case .admin:
+            viewModel.setAdmin(pending.newValue, for: pending.user)
+        case .supervisor:
+            viewModel.setSupervisor(pending.newValue, for: pending.user)
+        }
+        pendingToggle = nil
+    }
+
+    private struct PendingToggle: Identifiable {
+        enum Flag {
+            case admin
+            case supervisor
+        }
+
+        let id = UUID()
+        let user: AppUser
+        let flag: Flag
+        let newValue: Bool
     }
 }

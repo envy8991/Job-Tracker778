@@ -17,10 +17,16 @@ import FirebaseStorage
 class FirebaseService {
     static let shared = FirebaseService()
     private init() { }
-    
+
     private let auth = Auth.auth()
     private let db = Firestore.firestore()
     private let storage = Storage.storage()
+
+    struct AdminMaintenanceProgress: Equatable {
+        let processed: Int
+        let total: Int
+        let message: String
+    }
     
     // MARK: - Authentication
     
@@ -586,12 +592,58 @@ class FirebaseService {
         }
     }
 
+    func updateUserFlags(uid: String, isAdmin: Bool, isSupervisor: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
+        let payload: [String: Any] = [
+            "isAdmin": isAdmin,
+            "isSupervisor": isSupervisor
+        ]
+        db.collection("users").document(uid).setData(payload, merge: true) { error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        }
+    }
+
+    func refreshCustomClaims(for uid: String?, completion: ((Error?) -> Void)? = nil) {
+        guard let currentUser = auth.currentUser else {
+            DispatchQueue.main.async {
+                completion?(nil)
+            }
+            return
+        }
+
+        if let uid, uid != currentUser.uid {
+            DispatchQueue.main.async {
+                completion?(nil)
+            }
+            return
+        }
+
+        currentUser.getIDTokenResult(forcingRefresh: true) { _, error in
+            DispatchQueue.main.async {
+                completion?(error)
+            }
+        }
+    }
+
     // GLOBAL migration: backfill `participants` for ALL jobs in the collection.
     // NOTE: This runs client-side and assumes your Firestore Rules allow the signed-in user to perform these updates.
     // Consider running this as a server-side (Callable Cloud Function) migration for very large datasets or stricter security.
-    func adminBackfillParticipantsForAllJobs(completion: @escaping (Result<Int, Error>) -> Void) {
+    func adminBackfillParticipantsForAllJobs(
+        progress: ((AdminMaintenanceProgress) -> Void)? = nil,
+        completion: @escaping (Result<Int, Error>) -> Void
+    ) {
         self.db.collection("jobs").getDocuments { snapshot, error in
-            if let error = error { completion(.failure(error)); return }
+            if let error = error {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+                return
+            }
             let docs = snapshot?.documents ?? []
             var updates: [(DocumentReference, [String: Any])] = []
             for doc in docs {
@@ -604,12 +656,24 @@ class FirebaseService {
                 if ps.isEmpty { continue }
                 updates.append((doc.reference, ["participants": Array(ps)]))
             }
-            if updates.isEmpty { completion(.success(0)); return }
+            if updates.isEmpty {
+                DispatchQueue.main.async {
+                    progress?(AdminMaintenanceProgress(processed: 0, total: 0, message: "No updates required."))
+                    completion(.success(0))
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                progress?(AdminMaintenanceProgress(processed: 0, total: updates.count, message: "Starting updates…"))
+            }
             // Commit in chunks (<=450 per batch for safety)
             var updatedCount = 0
             func commitChunk(from start: Int) {
                 if start >= updates.count {
-                    completion(.success(updatedCount)); return
+                    DispatchQueue.main.async {
+                        completion(.success(updatedCount))
+                    }
+                    return
                 }
                 let end = min(start + 450, updates.count)
                 let batch = self.db.batch()
@@ -618,8 +682,16 @@ class FirebaseService {
                     batch.updateData(payload, forDocument: ref)
                 }
                 batch.commit { err in
-                    if let err = err { completion(.failure(err)); return }
+                    if let err = err {
+                        DispatchQueue.main.async {
+                            completion(.failure(err))
+                        }
+                        return
+                    }
                     updatedCount += (end - start)
+                    DispatchQueue.main.async {
+                        progress?(AdminMaintenanceProgress(processed: updatedCount, total: updates.count, message: "Updated \(updatedCount) of \(updates.count)"))
+                    }
                     commitChunk(from: end)
                 }
             }
@@ -694,6 +766,8 @@ class FirebaseService {
         }
     }
 }
+
+extension FirebaseService: AdminPanelService {}
 
 // MARK: - Async/Await Extension
 // Ensure your deployment target is iOS 15+ for withCheckedThrowingContinuation.
