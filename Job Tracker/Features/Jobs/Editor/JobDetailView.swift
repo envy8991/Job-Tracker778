@@ -49,6 +49,7 @@ struct JobDetailView: View {
     @State private var selectedMaterialAriel = "None"
     @State private var selectedMaterialNid = ""
     @State private var preformCount = 0
+    @State private var jHooksCount = 0
     @State private var canFootage = ""     // CAN footage
     @State private var nidFootage = ""
 
@@ -414,6 +415,7 @@ private let fiberChoices = ["Flat", "Round", "Mainline"]
                     switch position {
                     case "Ariel":
                         preformCount = 0
+                        jHooksCount = 0
                         parseAerialMaterials(from: materials)
                     case "Nid":
                         parseNidMaterials(from: materials)
@@ -513,6 +515,15 @@ extension JobDetailView {
                     Text("Preforms")
                     Spacer()
                     Text("\(preformCount)")
+                        .foregroundColor(.secondary)
+                }
+            }
+            // J Hooks
+            Stepper(value: $jHooksCount, in: 0...50) {
+                HStack {
+                    Text("J Hooks")
+                    Spacer()
+                    Text("\(jHooksCount)")
                         .foregroundColor(.secondary)
                 }
             }
@@ -809,6 +820,7 @@ extension JobDetailView {
                     parts.append(selectedMaterialAriel) // Weatherhead or Rams Head
                 }
                 if preformCount > 0 { parts.append("Preforms: \(preformCount)") }
+                if jHooksCount > 0 { parts.append("J Hooks: \(jHooksCount)") }
                 if uGuardCount > 0 { parts.append("U-Guard: \(uGuardCount)") }
                 if storageBracket { parts.append("Storage Bracket") }
                 job.materialsUsed = parts.isEmpty ? nil : parts.joined(separator: ", ")
@@ -934,7 +946,7 @@ extension JobDetailView {
     // MARK: - Materials Parsing Helpers
     /// Parse an Aerial materials string we previously saved to restore UI state.
     private func parseAerialMaterials(from text: String) {
-        // Expected tokens like: "Weatherhead" or "Rams Head", "Preforms: N", "U-Guard: N", "Storage Bracket"
+        // Expected tokens like: "Weatherhead" or "Rams Head", "Preforms: N", "J Hooks: N", "U-Guard: N", "Storage Bracket"
         selectedMaterialAriel = "None"
         let lower = text.lowercased()
         if lower.contains("weatherhead") {
@@ -948,6 +960,7 @@ extension JobDetailView {
         }
 
         if let n = captureInt(after: "preforms:", in: lower) { preformCount = n }
+        if let n = captureInt(after: "j hooks:", in: lower) { jHooksCount = n }
         if let n = captureInt(after: "u-guard:", in: lower) { uGuardCount = n }
         storageBracket = lower.contains("storage bracket")
     }
