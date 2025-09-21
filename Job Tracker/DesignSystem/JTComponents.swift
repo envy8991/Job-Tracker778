@@ -98,6 +98,8 @@ struct JTPrimaryButton: View {
 
 @MainActor
 private struct JTPrimaryButtonStyle: ButtonStyle {
+    static var jtPrimary: Self { .init() }
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(JTColors.onAccent)
@@ -113,17 +115,12 @@ private struct JTPrimaryButtonStyle: ButtonStyle {
 }
 
 @MainActor
-extension ButtonStyle where Self == JTPrimaryButtonStyle {
-    static var jtPrimary: JTPrimaryButtonStyle { JTPrimaryButtonStyle() }
-}
-
-@MainActor
 private struct JTPrimaryPrimitiveButtonStyle: PrimitiveButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         Button(role: configuration.role, action: configuration.trigger) {
             configuration.label
         }
-        .buttonStyle(JTPrimaryButtonStyle())
+        .buttonStyle(JTPrimaryButtonStyle.jtPrimary)
     }
 }
 
