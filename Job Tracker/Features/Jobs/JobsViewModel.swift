@@ -2,7 +2,7 @@ import SwiftUI
 import FirebaseFirestore
 import FirebaseAuth
 import Combine
-import FirebaseFirestoreSwift
+
 
 class JobsViewModel: ObservableObject {
     // Main data
