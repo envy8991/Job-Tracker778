@@ -488,12 +488,14 @@ extension WeeklyTimesheetView {
     private func jobsForTimesheet() -> [Job] {
         guard let me = authViewModel.currentUser?.id else { return [] }
         let other = partnerUid
-        return timesheetJobsVM.jobs.filter { job in
-            let mine = (job.createdBy == me || job.assignedTo == me)
-            let partners = (other != nil) && (job.createdBy == other || job.assignedTo == other)
-            return (mine || partners)
-                && job.status.lowercased() != "pending"
-        }
+        return timesheetJobsVM.jobs
+            .filter { job in
+                let mine = (job.createdBy == me || job.assignedTo == me)
+                let partners = (other != nil) && (job.createdBy == other || job.assignedTo == other)
+                return (mine || partners)
+                    && job.status.lowercased() != "pending"
+            }
+            .sortedForTimesheet()
     }
     
     private func bindingFor(day: Date) -> Binding<String> {

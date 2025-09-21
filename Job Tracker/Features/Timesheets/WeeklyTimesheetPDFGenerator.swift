@@ -334,15 +334,17 @@ extension WeeklyTimesheetPDFGenerator {
             return ids
         }()
 
-        return jobs.filter { job in
-            guard job.status.lowercased() != "pending" else { return false }
+        return jobs
+            .filter { job in
+                guard job.status.lowercased() != "pending" else { return false }
 
-            let createdByAllowed = job.createdBy.flatMap { allowedUserIDs.contains($0) } ?? false
-            let assignedToAllowed = job.assignedTo.flatMap { allowedUserIDs.contains($0) } ?? false
-            guard createdByAllowed || assignedToAllowed else { return false }
+                let createdByAllowed = job.createdBy.flatMap { allowedUserIDs.contains($0) } ?? false
+                let assignedToAllowed = job.assignedTo.flatMap { allowedUserIDs.contains($0) } ?? false
+                guard createdByAllowed || assignedToAllowed else { return false }
 
-            return Calendar.current.isDate(job.date, inSameDayAs: date)
-        }
+                return Calendar.current.isDate(job.date, inSameDayAs: date)
+            }
+            .sortedForTimesheet()
     }
 
     // Basic text drawing helpers.
