@@ -39,6 +39,8 @@ struct AuthFlowView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var themeManager: JTThemeManager
     @AppStorage("hasSeenTutorial") private var hasSeenTutorial: Bool = false
+    @AppStorage("interactiveTutorialCurrentStage") private var tutorialStageIndex: Int = 0
+    @AppStorage("interactiveTutorialCompletedStages") private var tutorialCompletedStages: String = ""
 
     @State private var selection: Step
     @State private var showingTutorial = false
@@ -97,29 +99,14 @@ struct AuthFlowView: View {
             }
         }
         .sheet(isPresented: $showingTutorial) {
-            NavigationStack {
-                TutorialView(onComplete: {
-                    if reduceMotion {
+            InteractiveTutorialView {
+                if reduceMotion {
+                    showingTutorial = false
+                } else {
+                    withAnimation(.easeInOut(duration: 0.2)) {
                         showingTutorial = false
-                    } else {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showingTutorial = false
-                        }
                     }
-                })
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Close") { showingTutorial = false }
-                        }
-                        ToolbarItem(placement: .confirmationAction) {
-                            if !hasSeenTutorial {
-                                Button("Mark Complete") {
-                                    hasSeenTutorial = true
-                                    showingTutorial = false
-                                }
-                            }
-                        }
-                    }
+                }
             }
             .preferredColorScheme(themeManager.theme.colorScheme)
         }
@@ -165,6 +152,8 @@ struct AuthFlowView: View {
                 Button {
                     withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                         hasSeenTutorial = false
+                        tutorialStageIndex = 0
+                        tutorialCompletedStages = ""
                     }
                 } label: {
                     Text("Reset tutorial progress for this device")
