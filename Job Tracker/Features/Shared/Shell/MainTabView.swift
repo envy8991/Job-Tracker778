@@ -155,6 +155,13 @@ private struct MoreMenuList: View {
                 }
             }
 
+            Section("Jobs") {
+                NavigationLink(value: AppNavigationViewModel.Destination.recentCrewJobs) {
+                    Label(AppNavigationViewModel.Destination.recentCrewJobs.title,
+                          systemImage: AppNavigationViewModel.Destination.recentCrewJobs.systemImage)
+                }
+            }
+
             Section("Resources") {
                 NavigationLink(value: AppNavigationViewModel.Destination.maps) {
                     Label(AppNavigationViewModel.Destination.maps.title,
@@ -218,6 +225,8 @@ private struct MoreDestinationView: View {
             SettingsView()
         case .helpCenter:
             HelpCenterView()
+        case .recentCrewJobs:
+            RecentCrewJobsView()
         case .more:
             MoreMenuList()
         default:
