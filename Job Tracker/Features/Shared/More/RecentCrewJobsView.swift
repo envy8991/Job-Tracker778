@@ -276,7 +276,7 @@ private struct CrewJobChip: View {
     }
 }
 
-private func statusTint(for status: String) -> Color {
+@MainActor private func statusTint(for status: String) -> Color {
     let lower = status.lowercased()
     if lower.contains("done") || lower.contains("complete") {
         return JTColors.success
