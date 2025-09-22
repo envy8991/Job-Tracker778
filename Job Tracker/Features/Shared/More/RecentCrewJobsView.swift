@@ -306,9 +306,7 @@ private struct RecentCrewJobDetailSheet: View {
                 VStack(alignment: .leading, spacing: JTSpacing.lg) {
                     summaryCard
                     metadataCard
-                    if let notesCard = notesCard {
-                        notesCard
-                    }
+                    notesCard
                 }
                 .padding(.horizontal, JTSpacing.lg)
                 .padding(.top, JTSpacing.lg)
@@ -393,22 +391,22 @@ private struct RecentCrewJobDetailSheet: View {
         }
     }
 
-    private var notesCard: some View? {
-        guard let notes = job.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty else {
-            return nil
-        }
-
-        return GlassCard {
-            VStack(alignment: .leading, spacing: JTSpacing.sm) {
-                Text("Notes")
-                    .font(JTTypography.headline)
-                    .foregroundStyle(JTColors.textPrimary)
-                Text(notes)
-                    .font(JTTypography.body)
-                    .foregroundStyle(JTColors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
+    @ViewBuilder private var notesCard: some View {
+        if let notes = job.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
+            GlassCard {
+                VStack(alignment: .leading, spacing: JTSpacing.sm) {
+                    Text("Notes")
+                        .font(JTTypography.headline)
+                        .foregroundStyle(JTColors.textPrimary)
+                    Text(notes)
+                        .font(JTTypography.body)
+                        .foregroundStyle(JTColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(JTSpacing.lg)
             }
-            .padding(JTSpacing.lg)
+        } else {
+            EmptyView()
         }
     }
 
