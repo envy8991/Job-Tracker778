@@ -238,15 +238,17 @@ private struct MoreDestinationView: View {
 // MARK: - Action buttons & menu
 
 struct ShellActionButtons: View {
-    var onShowMenu: () -> Void
+    var onShowMenu: (() -> Void)? = nil
     var onOpenHelp: () -> Void
     var horizontalPadding: CGFloat = 16
     var topPadding: CGFloat = 12
 
     var body: some View {
         HStack(spacing: 12) {
-            RoundedActionButton(icon: "line.3.horizontal", label: "Menu", action: onShowMenu)
-            Spacer()
+            if let onShowMenu {
+                RoundedActionButton(icon: "line.3.horizontal", label: "Menu", action: onShowMenu)
+            }
+            Spacer(minLength: 0)
             RoundedActionButton(icon: "questionmark.circle", label: "Help", action: onOpenHelp)
         }
         .padding(.horizontal, horizontalPadding)
