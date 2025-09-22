@@ -330,16 +330,16 @@ extension RecentCrewJob {
 
         let lower = trimmed.lowercased()
         if lower.contains("underground") || lower == "ug" || lower.contains("ug crew") || lower.contains("u/g") {
-            return CrewRoleFilter.underground.rawValue
+            return RecentCrewJobsViewModel.CrewRoleFilter.underground.rawValue
         }
         if lower.contains("aerial") || lower.contains("ariel") {
-            return CrewRoleFilter.aerial.rawValue
+            return RecentCrewJobsViewModel.CrewRoleFilter.aerial.rawValue
         }
         if lower.contains("can") {
-            return CrewRoleFilter.can.rawValue
+            return RecentCrewJobsViewModel.CrewRoleFilter.can.rawValue
         }
         if lower.contains("nid") {
-            return CrewRoleFilter.nid.rawValue
+            return RecentCrewJobsViewModel.CrewRoleFilter.nid.rawValue
         }
         return nil
     }
