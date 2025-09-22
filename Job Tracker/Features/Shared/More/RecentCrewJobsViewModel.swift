@@ -266,6 +266,30 @@ struct RecentCrewJob: Identifiable, Codable, Hashable {
         }
     }
 
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(jobNumber, forKey: .jobNumber)
+        try container.encode(address, forKey: .address)
+        try container.encode(status, forKey: .status)
+        try container.encode(date, forKey: .date)
+        try container.encodeIfPresent(notes, forKey: .notes)
+        try container.encodeIfPresent(createdBy, forKey: .createdBy)
+        try container.encodeIfPresent(assignedTo, forKey: .assignedTo)
+        try container.encodeIfPresent(hours, forKey: .hours)
+        try container.encodeIfPresent(materialsUsed, forKey: .materialsUsed)
+        try container.encodeIfPresent(canFootage, forKey: .canFootage)
+        try container.encodeIfPresent(nidFootage, forKey: .nidFootage)
+        try container.encodeIfPresent(photos, forKey: .photos)
+        try container.encodeIfPresent(participants, forKey: .participants)
+        try container.encodeIfPresent(crewLead, forKey: .crewLead)
+        try container.encodeIfPresent(crewName, forKey: .crewName)
+        try container.encodeIfPresent(crewRoleRaw, forKey: .crewRole)
+        try container.encodeIfPresent(crewRaw, forKey: .crew)
+        try container.encodeIfPresent(roleRaw, forKey: .role)
+    }
+
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
