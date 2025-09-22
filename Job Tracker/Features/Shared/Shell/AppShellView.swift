@@ -87,6 +87,8 @@ private struct AppShellDetailView: View {
             WeeklyTimesheetView()
         case .yellowSheet:
             YellowSheetView()
+        case .recentCrewJobs:
+            RecentCrewJobsView()
         case .search:
             JobSearchView(viewModel: JobSearchViewModel(jobsViewModel: jobsViewModel, usersViewModel: usersViewModel))
         case .maps:
