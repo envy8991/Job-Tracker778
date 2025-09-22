@@ -31,6 +31,7 @@ struct WeeklyTimesheetView: View {
     // Top padding to provide breathing room above the week picker and action buttons.
     private let topContentPadding: CGFloat = 20
     @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @EnvironmentObject private var navigation: AppNavigationViewModel
     // Use an independent view model for timesheet jobs.
     @StateObject private var timesheetJobsVM = TimesheetJobsViewModel()
@@ -170,7 +171,7 @@ struct WeeklyTimesheetView: View {
 
                         // Global quick actions placed below the week picker to avoid overlaps.
                         ShellActionButtons(
-                            onShowMenu: { navigation.isPrimaryMenuPresented = true },
+                            onShowMenu: horizontalSizeClass == .compact ? nil : { navigation.isPrimaryMenuPresented = true },
                             onOpenHelp: { navigation.navigate(to: .helpCenter) },
                             horizontalPadding: 0,
                             topPadding: 0
