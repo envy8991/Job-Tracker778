@@ -21,8 +21,11 @@ class UsersViewModel: ObservableObject {
     
     private var listenerRegistration: ListenerRegistration?
     
-    init() {
-        listenToAllUsers()
+    init(shouldListen: Bool = true, seedUsers: [String: AppUser] = [:]) {
+        self.usersDict = seedUsers
+        if shouldListen {
+            listenToAllUsers()
+        }
     }
     
     deinit {

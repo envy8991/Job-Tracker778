@@ -307,6 +307,7 @@ private struct RecentCrewJobDetailSheet: View {
     let job: RecentCrewJob
 
     @EnvironmentObject private var jobsViewModel: JobsViewModel
+    @EnvironmentObject private var usersViewModel: UsersViewModel
     @EnvironmentObject private var authViewModel: AuthViewModel
     @Environment(\.dismiss) private var dismiss
 
@@ -405,7 +406,7 @@ private struct RecentCrewJobDetailSheet: View {
     }
 
     @ViewBuilder private var notesCard: some View {
-        if let notes = normalizedNonEmpty(job.notes) {
+        if let notes = Self.normalizedNonEmpty(job.notes) {
             GlassCard {
                 VStack(alignment: .leading, spacing: JTSpacing.sm) {
                     Text("Notes")
@@ -424,6 +425,10 @@ private struct RecentCrewJobDetailSheet: View {
     }
 
     private var detailItems: [DetailItem] {
+        Self.makeDetailItems(for: job, usersViewModel: usersViewModel)
+    }
+
+    static func makeDetailItems(for job: RecentCrewJob, usersViewModel: UsersViewModel) -> [DetailItem] {
         var items: [DetailItem] = []
 
         if let jobNumber = job.trimmedJobNumber {
@@ -437,11 +442,11 @@ private struct RecentCrewJobDetailSheet: View {
         items.append(DetailItem(icon: "calendar", title: "Date", value: job.formattedDate))
         items.append(DetailItem(icon: "flag.fill", title: "Status", value: job.status))
 
-        if let crewName = normalizedNonEmpty(job.crewName) {
+        if let crewName = Self.displayName(for: job.crewName, usersViewModel: usersViewModel) {
             items.append(DetailItem(icon: "person.2", title: "Crew Name", value: crewName))
         }
 
-        if let crewLead = normalizedNonEmpty(job.crewLead) {
+        if let crewLead = Self.displayName(for: job.crewLead, usersViewModel: usersViewModel) {
             items.append(DetailItem(icon: "person.crop.circle.badge.checkmark", title: "Crew Lead", value: crewLead))
         }
 
@@ -449,27 +454,55 @@ private struct RecentCrewJobDetailSheet: View {
             items.append(DetailItem(icon: "clock", title: "Hours", value: String(format: "%.1f", hours)))
         }
 
-        if let materials = normalizedNonEmpty(job.materialsUsed) {
+        if let materials = Self.normalizedNonEmpty(job.materialsUsed) {
             items.append(DetailItem(icon: "shippingbox", title: "Materials Used", value: materials))
         }
 
-        if let canFootage = normalizedNonEmpty(job.canFootage) {
+        if let canFootage = Self.normalizedNonEmpty(job.canFootage) {
             items.append(DetailItem(icon: "ruler", title: "CAN Footage", value: canFootage))
         }
 
-        if let nidFootage = normalizedNonEmpty(job.nidFootage) {
+        if let nidFootage = Self.normalizedNonEmpty(job.nidFootage) {
             items.append(DetailItem(icon: "ruler", title: "NID Footage", value: nidFootage))
         }
 
-        if let createdBy = normalizedNonEmpty(job.createdBy) {
+        if let createdBy = Self.displayName(for: job.createdBy, usersViewModel: usersViewModel) {
             items.append(DetailItem(icon: "person.badge.key", title: "Created By", value: createdBy))
         }
 
-        if let assignedTo = normalizedNonEmpty(job.assignedTo) {
+        if let assignedTo = Self.displayName(for: job.assignedTo, usersViewModel: usersViewModel) {
             items.append(DetailItem(icon: "person.crop.circle.badge.exclam", title: "Assigned To", value: assignedTo))
         }
 
         return items
+    }
+
+    static func displayName(for rawValue: String?, usersViewModel: UsersViewModel) -> String? {
+        guard let trimmed = Self.normalizedNonEmpty(rawValue) else { return nil }
+        if let user = usersViewModel.user(id: trimmed) {
+            let components = [Self.normalizedNonEmpty(user.firstName), Self.normalizedNonEmpty(user.lastName)].compactMap { $0 }
+            if !components.isEmpty {
+                return components.joined(separator: " ")
+            }
+            if let email = Self.normalizedNonEmpty(user.email) {
+                return email
+            }
+        }
+        return trimmed
+    }
+
+    static func normalizedNonEmpty(_ value: String?) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
+    }
+
+    struct DetailItem: Identifiable {
+        let id = UUID()
+        let icon: String
+        let title: String
+        let value: String
     }
 
     private func addToDashboard() {
@@ -506,17 +539,4 @@ private struct RecentCrewJobDetailSheet: View {
         }
     }
 
-    private func normalizedNonEmpty(_ value: String?) -> String? {
-        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
-            return nil
-        }
-        return trimmed
-    }
-
-    private struct DetailItem: Identifiable {
-        let id = UUID()
-        let icon: String
-        let title: String
-        let value: String
-    }
 }
