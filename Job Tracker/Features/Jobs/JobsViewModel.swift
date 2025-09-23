@@ -25,6 +25,9 @@ class JobsViewModel: ObservableObject {
     private var listenerRegistration: ListenerRegistration?
     private var searchListenerRegistration: ListenerRegistration?
     private let db = Firestore.firestore()
+    private var lastBroadcastPendingWriteIDs: Set<String> = []
+    private var syncTotalCount: Int = 0
+    private var syncDoneCount: Int = 0
 
     private func currentUserID() -> String? {
         return Auth.auth().currentUser?.uid
@@ -48,6 +51,57 @@ class JobsViewModel: ObservableObject {
         }
     }
 
+    private func postSyncStateChange(metadata: SnapshotMetadata? = nil) {
+        assert(Thread.isMainThread, "Sync state updates must occur on the main thread")
+
+        let currentPending = pendingWriteIDs
+        let metadataHasPendingWrites = metadata?.hasPendingWrites ?? hasPendingWrites
+
+        let newlyAdded = currentPending.subtracting(lastBroadcastPendingWriteIDs)
+        if !newlyAdded.isEmpty {
+            syncTotalCount += newlyAdded.count
+        }
+
+        let resolved = lastBroadcastPendingWriteIDs.subtracting(currentPending)
+        if !resolved.isEmpty {
+            syncDoneCount += resolved.count
+        }
+
+        var inFlight = currentPending.count
+        if metadataHasPendingWrites && inFlight == 0 {
+            inFlight = 1
+        }
+
+        if !metadataHasPendingWrites && currentPending.isEmpty {
+            syncDoneCount = max(syncDoneCount, syncTotalCount)
+        }
+
+        let minimumTotal = syncDoneCount + inFlight
+        if minimumTotal > syncTotalCount {
+            syncTotalCount = minimumTotal
+        }
+
+        let total = syncTotalCount
+        let done = min(syncDoneCount, max(total - inFlight, 0))
+
+        let info: [AnyHashable: Any] = [
+            "total": total,
+            "done": done,
+            "uploaded": done,
+            "inFlight": inFlight
+        ]
+
+        NotificationCenter.default.post(name: .jobsSyncStateDidChange, object: nil, userInfo: info)
+
+        lastBroadcastPendingWriteIDs = currentPending
+
+        if !metadataHasPendingWrites && currentPending.isEmpty {
+            syncTotalCount = 0
+            syncDoneCount = 0
+            lastBroadcastPendingWriteIDs = []
+        }
+    }
+
     // MARK: - Fetch
 
     func fetchJobs(startDate: Date? = nil, endDate: Date? = nil) {
@@ -64,6 +118,7 @@ class JobsViewModel: ObservableObject {
                 self.lastServerSync = nil
                 self.hasLoadedInitialJobs = true
                 self.searchJobs = []
+                self.postSyncStateChange()
                 self.rebuildSearchIndexEntries()
                 self.notifyJobsChanged()
             }
@@ -136,7 +191,7 @@ class JobsViewModel: ObservableObject {
 
                 self.rebuildSearchIndexEntries()
                 self.notifyJobsChanged()
-                NotificationCenter.default.post(name: .jobsSyncStateDidChange, object: nil)
+                self.postSyncStateChange(metadata: snapshot.metadata)
             }
         }
     }
@@ -230,6 +285,7 @@ class JobsViewModel: ObservableObject {
         DispatchQueue.main.async {
             self.pendingWriteIDs.insert(docRef.documentID)
             self.hasPendingWrites = true
+            self.postSyncStateChange()
         }
 
         FirebaseService.shared.createJob(newJob) { result in
@@ -317,7 +373,7 @@ class JobsViewModel: ObservableObject {
                 self.pendingWriteIDs.insert(docID)
                 self.hasPendingWrites = true
                 self.notifyJobsChanged()
-                NotificationCenter.default.post(name: .jobsSyncStateDidChange, object: nil)
+                self.postSyncStateChange()
             }
         }
 
