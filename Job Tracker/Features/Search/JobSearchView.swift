@@ -3,6 +3,7 @@ import SwiftUI
 struct JobSearchView: View {
     @EnvironmentObject private var jobsViewModel: JobsViewModel
     @EnvironmentObject private var usersViewModel: UsersViewModel
+    @EnvironmentObject private var authViewModel: AuthViewModel
     @EnvironmentObject private var navigation: AppNavigationViewModel
     @Environment(\.shellChromeHeight) private var shellChromeHeight
 
@@ -42,7 +43,9 @@ struct JobSearchView: View {
             .navigationDestination(for: JobSearchViewModel.Result.self) { result in
                 if let job = viewModel.job(for: result.id) {
                     JobSearchDetailView(job: job, metadata: result)
+                        .environmentObject(jobsViewModel)
                         .environmentObject(usersViewModel)
+                        .environmentObject(authViewModel)
                 } else {
                     MissingSearchResultView()
                 }
