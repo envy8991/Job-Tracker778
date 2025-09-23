@@ -392,7 +392,7 @@ private struct RecentCrewJobDetailSheet: View {
     }
 
     @ViewBuilder private var notesCard: some View {
-        if let notes = job.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
+        if let notes = normalizedNonEmpty(job.notes) {
             GlassCard {
                 VStack(alignment: .leading, spacing: JTSpacing.sm) {
                     Text("Notes")
