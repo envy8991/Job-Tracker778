@@ -9,6 +9,7 @@ import Foundation
 import CoreLocation
 import Firebase
 import FirebaseFirestore
+import FirebaseFirestoreSwift
 import FirebaseAuth
 
 /// What we allow to travel across users when sharing a job (minimal & privacy-safe).
@@ -69,7 +70,8 @@ final class SharedJobService {
         let db = Firestore.firestore()
 
         // Determine if the SENDER is a CAN user
-        let senderIsCan = await currentUserIsCAN()
+        let senderRole = await currentUserNormalizedRole()
+        let senderIsCan = senderRole == "can"
 
         // Map your Job -> payload here (adjust if your Job fields differ)
         let payload = SharedJobPayload(
@@ -136,7 +138,8 @@ final class SharedJobService {
         let ref = db.collection("sharedJobs").document(token)
 
         // Assignment handling: only apply if sender **and** receiver are CAN
-        let receiverIsCan = await currentUserIsCAN()
+        let receiverRole = await currentUserNormalizedRole()
+        let receiverIsCan = receiverRole == "can"
         let myID = Auth.auth().currentUser?.uid
 
         let newJob = await makeJob(
@@ -202,19 +205,22 @@ final class SharedJobService {
         return String((0..<length).compactMap { _ in chars.randomElement() })
     }
 
-    /// Reads the current user’s role and returns true if it includes "can".
-    /// Adjust the collection/name/key to match your schema.
-    private func currentUserIsCAN() async -> Bool {
-        guard let uid = Auth.auth().currentUser?.uid else { return false }
+    /// Reads the current user’s normalized role (lowercased) from `/users/{uid}`.
+    private func currentUserNormalizedRole() async -> String? {
+        guard let uid = Auth.auth().currentUser?.uid else { return nil }
         do {
             let doc = try await Firestore.firestore().collection("users").document(uid).getDocument()
-            let role = (doc.data()?["role"] as? String)?.lowercased() ?? ""
-            return role.contains("can")
+            guard doc.exists else { return nil }
+            var user = try doc.data(as: AppUser.self)
+            if user.id.isEmpty {
+                user.id = doc.documentID
+            }
+            return user.normalizedPosition.lowercased()
         } catch {
             #if DEBUG
             print("[Share] Failed to fetch user role: \(error.localizedDescription)")
             #endif
-            return false
+            return nil
         }
     }
 }
