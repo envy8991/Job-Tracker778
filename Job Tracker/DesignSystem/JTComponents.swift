@@ -34,6 +34,9 @@ private struct JTNavigationBarModifier: ViewModifier {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarBackground(backgroundStyle, for: .navigationBar)
             .toolbarColorScheme(themeManager.theme.colorScheme, for: .navigationBar)
+            .toolbarBackground(.visible, for: .tabBar)
+            .toolbarBackground(backgroundStyle, for: .tabBar)
+            .toolbarColorScheme(themeManager.theme.colorScheme, for: .tabBar)
     }
 }
 

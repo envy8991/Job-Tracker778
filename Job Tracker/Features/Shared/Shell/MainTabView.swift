@@ -58,6 +58,7 @@ private struct PrimaryTabContainer: View {
                           systemImage: AppNavigationViewModel.PrimaryDestination.more.systemImage)
                 }
         }
+        .jtNavigationBarStyle()
     }
 }
 
