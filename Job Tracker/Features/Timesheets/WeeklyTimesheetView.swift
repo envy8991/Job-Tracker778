@@ -28,11 +28,10 @@ private struct SaveStatusAlert: Identifiable, Equatable {
 }
 
 struct WeeklyTimesheetView: View {
-    // Top padding to provide breathing room above the week picker and action buttons.
+    // Top padding to provide breathing room above the week picker.
     private let topContentPadding: CGFloat = 20
     @EnvironmentObject var authViewModel: AuthViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @EnvironmentObject private var navigation: AppNavigationViewModel
     // Use an independent view model for timesheet jobs.
     @StateObject private var timesheetJobsVM = TimesheetJobsViewModel()
     @StateObject private var timesheetVM = TimesheetViewModel()
@@ -169,14 +168,6 @@ struct WeeklyTimesheetView: View {
                         // Minimal week picker.
                         minimalWeekPicker
 
-                        // Global quick actions placed below the week picker to avoid overlaps.
-                        ShellActionButtons(
-                            onShowMenu: horizontalSizeClass == .compact ? nil : { navigation.isPrimaryMenuPresented = true },
-                            onOpenHelp: { navigation.navigate(to: .helpCenter) },
-                            horizontalPadding: 0,
-                            topPadding: 0
-                        )
-
                         // Timesheet header.
                         timesheetHeader
                         
@@ -208,7 +199,7 @@ struct WeeklyTimesheetView: View {
                         
                         Spacer().frame(height: 100)
                     }
-                    // Provide consistent spacing above the week picker and action buttons
+                    // Provide consistent spacing above the week picker
                     .padding(.top, topContentPadding)
                     .padding()
                 }

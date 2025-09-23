@@ -1,52 +1,9 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @EnvironmentObject private var navigation: AppNavigationViewModel
-    @State private var measuredShellChromeHeight: CGFloat = 0
-
-    private var menuPresentation: Binding<Bool> {
-        Binding(
-            get: { navigation.isPrimaryMenuPresented },
-            set: { navigation.isPrimaryMenuPresented = $0 }
-        )
-    }
-
-    private var shouldShowShellButtons: Bool {
-        guard navigation.selectedPrimary != .timesheets else { return false }
-
-        if navigation.selectedPrimary == .search,
-           !navigation.shouldShowShellChrome {
-            return false
-        }
-
-        if navigation.selectedPrimary == .more,
-           navigation.activeDestination.isMoreStackDestination,
-           navigation.activeDestination != .more {
-            return false
-        }
-
-        return true
-    }
-
     var body: some View {
         PrimaryTabContainer()
-            .environment(\.shellChromeHeight, shouldShowShellButtons ? measuredShellChromeHeight : 0)
-            .safeAreaInset(edge: .top) {
-                if shouldShowShellButtons {
-                    ShellActionButtons(
-                        onShowMenu: { navigation.isPrimaryMenuPresented = true },
-                        onOpenHelp: { navigation.navigate(to: .helpCenter) }
-                    )
-                    .measureShellChromeHeight()
-                }
-            }
-            .sheet(isPresented: menuPresentation) {
-                PrimaryDestinationMenu()
-                    .presentationDetents([.medium, .large])
-            }
-            .onPreferenceChange(ShellChromeHeightPreferenceKey.self) { height in
-                measuredShellChromeHeight = height
-            }
+            .environment(\.shellChromeHeight, 0)
     }
 }
 
@@ -231,92 +188,6 @@ private struct MoreDestinationView: View {
             MoreMenuList()
         default:
             EmptyView()
-        }
-    }
-}
-
-// MARK: - Action buttons & menu
-
-struct ShellActionButtons: View {
-    var onShowMenu: (() -> Void)? = nil
-    var onOpenHelp: () -> Void
-    var horizontalPadding: CGFloat = 16
-    var topPadding: CGFloat = 12
-
-    var body: some View {
-        HStack(spacing: 12) {
-            if let onShowMenu {
-                RoundedActionButton(icon: "line.3.horizontal", label: "Menu", action: onShowMenu)
-            }
-            Spacer(minLength: 0)
-            RoundedActionButton(icon: "questionmark.circle", label: "Help", action: onOpenHelp)
-        }
-        .padding(.horizontal, horizontalPadding)
-        .padding(.top, topPadding)
-        .background(Color.clear)
-    }
-}
-
-struct RoundedActionButton: View {
-    let icon: String
-    let label: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Label(label, systemImage: icon)
-                .font(.subheadline.bold())
-                .foregroundStyle(JTColors.textPrimary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule()
-                        .fill(JTColors.glassHighlight)
-                        .overlay(
-                            Capsule()
-                                .stroke(JTColors.glassStroke, lineWidth: 1)
-                        )
-                )
-        }
-        .buttonStyle(.plain)
-        .shadow(color: Color.black.opacity(0.18), radius: 12, x: 0, y: 6)
-    }
-}
-
-private struct PrimaryDestinationMenu: View {
-    @EnvironmentObject private var navigation: AppNavigationViewModel
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Primary Destinations") {
-                    ForEach(navigation.primaryDestinations, id: \.self) { destination in
-                        Button {
-                            navigation.navigate(to: destination)
-                            dismiss()
-                        } label: {
-                            HStack {
-                                Label(destination.title, systemImage: destination.systemImage)
-                                Spacer()
-                                if navigation.activeDestination.primaryDestination == destination.primaryDestination {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.blue)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .navigationTitle("Navigate")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                }
-            }
         }
     }
 }
