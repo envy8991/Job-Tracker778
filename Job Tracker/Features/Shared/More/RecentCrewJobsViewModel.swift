@@ -19,6 +19,12 @@ final class RecentCrewJobsViewModel: ObservableObject {
 
     private var listener: ListenerRegistration?
     private let db = Firestore.firestore()
+    private let userLookup: () -> [String: AppUser]
+
+    init(userLookup: @escaping () -> [String: AppUser] = { [:] }, initialJobs: [RecentCrewJob] = []) {
+        self.userLookup = userLookup
+        self.jobs = enrich(jobs: initialJobs)
+    }
 
     deinit {
         listener?.remove()
@@ -70,8 +76,10 @@ final class RecentCrewJobsViewModel: ObservableObject {
             }
             .filter { $0.status.lowercased() != "pending" }
 
+            let enriched = self.enrich(jobs: decoded)
+
             DispatchQueue.main.async {
-                self.jobs = decoded.sorted { $0.date > $1.date }
+                self.jobs = enriched.sorted { $0.date > $1.date }
                 self.isLoading = false
             }
         }
@@ -107,6 +115,26 @@ final class RecentCrewJobsViewModel: ObservableObject {
         }
 
         return mapped.sorted { $0.latestDate > $1.latestDate }
+    }
+    private func enrich(jobs: [RecentCrewJob]) -> [RecentCrewJob] {
+        var lookup: [String: AppUser] = [:]
+        if Thread.isMainThread {
+            lookup = userLookup()
+        } else {
+            lookup = DispatchQueue.main.sync { userLookup() }
+        }
+
+        guard !lookup.isEmpty else { return jobs }
+
+        return jobs.map { job in
+            guard !job.hasDocumentCrewRole,
+                  let creatorId = job.createdBy,
+                  let user = lookup[creatorId] else {
+                return job
+            }
+
+            return job.enrichingSubmitterRole(with: user.normalizedPosition)
+        }
     }
 }
 
@@ -159,6 +187,7 @@ struct RecentCrewJob: Identifiable, Codable, Hashable {
     private let crewRaw: String?
     private let roleRaw: String?
     private let extraRoleValues: [String]
+    private var submitterFallbackRole: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -207,7 +236,8 @@ struct RecentCrewJob: Identifiable, Codable, Hashable {
         crewRoleRaw: String?,
         crewRaw: String?,
         roleRaw: String?,
-        extraRoleValues: [String]
+        extraRoleValues: [String],
+        submitterFallbackRole: String? = nil
     ) {
         self.id = id
         self.jobNumber = jobNumber
@@ -229,6 +259,7 @@ struct RecentCrewJob: Identifiable, Codable, Hashable {
         self.crewRaw = crewRaw
         self.roleRaw = roleRaw
         self.extraRoleValues = extraRoleValues
+        self.submitterFallbackRole = submitterFallbackRole
     }
 
     init(from decoder: Decoder) throws {
@@ -264,6 +295,8 @@ struct RecentCrewJob: Identifiable, Codable, Hashable {
             guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
             return trimmed
         }
+
+        self.submitterFallbackRole = nil
     }
 
     func encode(to encoder: Encoder) throws {
@@ -300,7 +333,7 @@ struct RecentCrewJob: Identifiable, Codable, Hashable {
 }
 
 extension RecentCrewJob {
-    private var rawRoleCandidates: [String] {
+    private var documentRoleCandidates: [String] {
         var values: [String] = []
         for candidate in [crewRoleRaw, crewRaw, roleRaw] {
             if let trimmed = candidate?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty {
@@ -312,7 +345,7 @@ extension RecentCrewJob {
     }
 
     var normalizedCrewRole: String? {
-        for candidate in rawRoleCandidates {
+        for candidate in documentRoleCandidates {
             if let normalized = RecentCrewJob.normalizeRole(candidate) {
                 return normalized
             }
@@ -321,7 +354,22 @@ extension RecentCrewJob {
     }
 
     var displayCrewRole: String? {
-        normalizedCrewRole ?? rawRoleCandidates.first
+        if let normalized = normalizedCrewRole {
+            return normalized
+        }
+        if let firstCandidate = documentRoleCandidates.first {
+            return firstCandidate
+        }
+        return normalizedSubmitterFallbackRole ?? submitterFallbackRole
+    }
+
+    fileprivate var hasDocumentCrewRole: Bool {
+        !documentRoleCandidates.isEmpty
+    }
+
+    private var normalizedSubmitterFallbackRole: String? {
+        guard let fallback = submitterFallbackRole else { return nil }
+        return RecentCrewJob.normalizeRole(fallback) ?? fallback.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func normalizeRole(_ value: String) -> String? {
@@ -346,8 +394,22 @@ extension RecentCrewJob {
 
     func matches(_ filter: RecentCrewJobsViewModel.CrewRoleFilter) -> Bool {
         guard filter != .all else { return true }
-        guard let normalized = normalizedCrewRole else { return false }
-        return normalized.caseInsensitiveCompare(filter.rawValue) == .orderedSame
+        if let normalized = normalizedCrewRole {
+            return normalized.caseInsensitiveCompare(filter.rawValue) == .orderedSame
+        }
+        if let fallback = normalizedSubmitterFallbackRole {
+            return fallback.caseInsensitiveCompare(filter.rawValue) == .orderedSame
+        }
+        return false
+    }
+
+    fileprivate func enrichingSubmitterRole(with role: String) -> RecentCrewJob {
+        let trimmed = role.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return self }
+
+        var copy = self
+        copy.submitterFallbackRole = trimmed
+        return copy
     }
 
     var trimmedJobNumber: String? {

@@ -1,9 +1,21 @@
 import SwiftUI
 
 struct RecentCrewJobsView: View {
-    @StateObject private var viewModel = RecentCrewJobsViewModel()
+    @EnvironmentObject private var usersViewModel: UsersViewModel
+
+    var body: some View {
+        RecentCrewJobsContent(userLookup: { usersViewModel.usersDict })
+    }
+}
+
+private struct RecentCrewJobsContent: View {
+    @StateObject private var viewModel: RecentCrewJobsViewModel
     @State private var selectedFilter: RecentCrewJobsViewModel.CrewRoleFilter = .all
     @State private var selectedJob: RecentCrewJob?
+
+    init(userLookup: @escaping () -> [String: AppUser]) {
+        _viewModel = StateObject(wrappedValue: RecentCrewJobsViewModel(userLookup: userLookup))
+    }
 
     var body: some View {
         ZStack {
