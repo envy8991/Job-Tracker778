@@ -1,6 +1,7 @@
 import XCTest
 import CoreLocation
 import FirebaseFirestore
+import FirebaseFirestoreSwift
 @testable import Job_Tracker
 
 final class SharedJobServiceTests: XCTestCase {
@@ -17,6 +18,7 @@ final class SharedJobServiceTests: XCTestCase {
             v: 2,
             createdAt: Timestamp(date: Date()),
             fromUserId: "sender-123",
+            fromUserName: "Sender Example",
             address: "1 Infinite Loop, Cupertino, CA",
             date: Timestamp(date: Date()),
             status: "Pending",
@@ -46,6 +48,7 @@ final class SharedJobServiceTests: XCTestCase {
             v: 2,
             createdAt: Timestamp(date: Date()),
             fromUserId: "sender-123",
+            fromUserName: nil,
             address: "Unknown",
             date: Timestamp(date: Date()),
             status: "Pending",
@@ -62,6 +65,49 @@ final class SharedJobServiceTests: XCTestCase {
 
         XCTAssertNil(job.latitude)
         XCTAssertNil(job.longitude)
+    }
+
+    func testSharedJobPayloadRoundTripsSenderNameThroughFirestore() throws {
+        let payload = SharedJobPayload(
+            v: 2,
+            createdAt: Timestamp(date: Date()),
+            fromUserId: "user-42",
+            fromUserName: "Pat Smith",
+            address: "123 Main St",
+            date: Timestamp(date: Date()),
+            status: "Scheduled",
+            jobNumber: "JT-500",
+            assignment: "Crew A",
+            senderIsCan: true
+        )
+
+        let encoded = try Firestore.Encoder().encode(payload)
+        let decoded = try Firestore.Decoder().decode(SharedJobPayload.self, from: encoded)
+        let preview = SharedJobPreview(token: "token-1", payload: decoded)
+
+        XCTAssertEqual(decoded.fromUserName, "Pat Smith")
+        XCTAssertEqual(decoded.senderDisplayName, "Pat Smith")
+        XCTAssertEqual(preview.payload.senderDisplayName, "Pat Smith")
+    }
+
+    func testSharedJobPayloadSenderDisplayNameFallsBackToUserId() {
+        let payload = SharedJobPayload(
+            v: 2,
+            createdAt: Timestamp(date: Date()),
+            fromUserId: "user-42",
+            fromUserName: nil,
+            address: "123 Main St",
+            date: Timestamp(date: Date()),
+            status: "Scheduled",
+            jobNumber: nil,
+            assignment: nil,
+            senderIsCan: false
+        )
+
+        XCTAssertEqual(payload.senderDisplayName, "user-42")
+
+        let preview = SharedJobPreview(token: "token-1", payload: payload)
+        XCTAssertEqual(preview.payload.senderDisplayName, "user-42")
     }
 }
 

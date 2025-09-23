@@ -18,6 +18,10 @@ struct JobImportPreviewView: View {
         return jobNumber
     }
 
+    private var sharedByText: String? {
+        payload.senderDisplayName
+    }
+
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .full
@@ -41,6 +45,10 @@ struct JobImportPreviewView: View {
 
                             GlassCard {
                                 VStack(alignment: .leading, spacing: JTSpacing.lg) {
+                                    if let sharedByText {
+                                        detailRow(title: "Shared by", value: sharedByText)
+                                        Divider().overlay(JTColors.glassStroke)
+                                    }
                                     detailRow(title: "Address", value: payload.address)
                                     Divider().overlay(JTColors.glassStroke)
                                     detailRow(title: "Scheduled date", value: scheduledDateText)
