@@ -34,6 +34,7 @@ struct ProfileView: View {
             }
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
+            .jtNavigationBarStyle()
         }
         .onAppear {
             if let user = authViewModel.currentUser {

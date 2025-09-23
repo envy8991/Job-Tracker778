@@ -1025,6 +1025,7 @@ struct MapsView: View {
                         }
                     }
                 }
+                .jtNavigationBarStyle()
             }
             .sheet(isPresented: $showInviteShare) {
                 if let code = sessionID {
@@ -1701,6 +1702,7 @@ struct MapsView: View {
                     }
                 }
             }
+            .jtNavigationBarStyle()
         }
     }
 
@@ -1926,6 +1928,7 @@ struct MapsView: View {
                     }
                 }
             }
+            .jtNavigationBarStyle()
         }
 
         // tiny wrapper for fullScreenCover

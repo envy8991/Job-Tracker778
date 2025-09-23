@@ -419,6 +419,7 @@ struct CreateJobView: View {
             }
             .navigationTitle("Create Job")
             .navigationBarTitleDisplayMode(.inline)
+            .jtNavigationBarStyle()
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") { dismiss() }

@@ -465,6 +465,7 @@ private struct ThemeEditorSheet: View {
             }
             .navigationTitle("Custom Theme")
             .navigationBarTitleDisplayMode(.inline)
+            .jtNavigationBarStyle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { isPresented = false }

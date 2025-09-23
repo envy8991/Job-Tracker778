@@ -232,8 +232,7 @@ struct WeeklyTimesheetView: View {
             }
             .navigationTitle("Timesheet")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .jtNavigationBarStyle()
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button {
@@ -364,6 +363,7 @@ struct WeeklyTimesheetView: View {
                     })
                     .padding()
             }
+            .jtNavigationBarStyle()
         }
     }
 }
@@ -750,6 +750,7 @@ struct PDFPreviewSheet: View {
                     }
                 }
         }
+        .jtNavigationBarStyle()
     }
 }
 

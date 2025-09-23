@@ -278,12 +278,14 @@ struct HelpCenterView: View {
         }
         .sheet(isPresented: $showingCreateJob) {
             NavigationStack { CreateJobView() }
+            .jtNavigationBarStyle()
         }
         .sheet(item: $selectedTopic) { topic in
             TopicDetailSheet(topic: topic)
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(navigationBarVisibility, for: .navigationBar)
+        .jtNavigationBarStyle()
     }
 
     // Topic detail sheet
@@ -327,6 +329,7 @@ struct HelpCenterView: View {
                     }
                 }
             }
+            .jtNavigationBarStyle()
         }
     }
 }

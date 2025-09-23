@@ -39,6 +39,7 @@ struct PastYellowSheetsView: View {
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle("Past Yellow Sheets")
+            .jtNavigationBarStyle()
             .onAppear {
                 if let user = authViewModel.currentUser {
                     yellowSheetsVM.fetchYellowSheets(for: user.id)

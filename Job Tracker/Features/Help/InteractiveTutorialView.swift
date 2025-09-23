@@ -378,6 +378,7 @@ struct InteractiveTutorialView: View {
             }
             .navigationTitle("Interactive Tutorial")
             .navigationBarTitleDisplayMode(.inline)
+            .jtNavigationBarStyle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     if onComplete != nil {
