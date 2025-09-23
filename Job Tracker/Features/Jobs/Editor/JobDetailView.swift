@@ -261,9 +261,8 @@ private let fiberChoices = ["Flat", "Round", "Mainline"]
                 .scrollContentBackground(.hidden)   // keep gradient visible
                 .navigationTitle("Job Detail")
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+                .jtNavigationBarStyle()
                 .navBarBackgroundVisibilityIfAvailable(.visible)
-                .toolbarColorScheme(.dark, for: .navigationBar)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button("Cancel") { dismiss() }

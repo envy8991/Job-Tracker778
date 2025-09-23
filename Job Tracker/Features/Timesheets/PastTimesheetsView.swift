@@ -40,6 +40,7 @@ struct PastTimesheetsView: View {
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle("Past Timesheets")
+            .jtNavigationBarStyle()
             .onAppear {
                 if let user = authViewModel.currentUser {
                     timesheetListVM.fetchTimesheets(for: user.id)

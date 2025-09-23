@@ -142,6 +142,7 @@ struct DashboardView: View {
                 .padding(.top, JTSpacing.md)
             }
             .toolbar(navigationBarVisibility, for: .navigationBar)
+            .jtNavigationBarStyle()
             .safeAreaInset(edge: .top) {
                 Color.clear.frame(height: shellChromeHeight)
             }

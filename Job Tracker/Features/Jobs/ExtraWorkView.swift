@@ -56,6 +56,7 @@ struct ExtraWorkView: View {
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle("Extra Work")
+            .jtNavigationBarStyle()
             .sheet(item: $selectedJob) { job in
                 if let index = jobsViewModel.jobs.firstIndex(where: { $0.id == job.id }) {
                     JobDetailView(job: $jobsViewModel.jobs[index])

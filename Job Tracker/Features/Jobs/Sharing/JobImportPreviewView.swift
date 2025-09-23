@@ -92,6 +92,7 @@ struct JobImportPreviewView: View {
                 }
                 .navigationTitle("Import Job")
                 .navigationBarTitleDisplayMode(.inline)
+                .jtNavigationBarStyle()
                 .interactiveDismissDisabled(isImporting)
 
                 if isImporting {

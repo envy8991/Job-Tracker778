@@ -82,6 +82,7 @@ struct MoreTabView: View {
                     MoreDestinationView(destination: destination)
                 }
         }
+        .jtNavigationBarStyle()
         .background(JTGradients.background(stops: 4).ignoresSafeArea())
         .onAppear {
             if !navigation.activeDestination.isMoreStackDestination {

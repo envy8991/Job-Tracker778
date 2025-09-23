@@ -208,6 +208,7 @@ struct SupervisorJobImportView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .jtNavigationBarStyle()
         }
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(image: $pickedImage)

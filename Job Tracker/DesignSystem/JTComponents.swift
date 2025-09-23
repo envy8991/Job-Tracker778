@@ -17,6 +17,26 @@ private struct JTGlassBackgroundModifier<S: Shape>: ViewModifier {
     }
 }
 
+@MainActor
+private struct JTNavigationBarModifier: ViewModifier {
+    @EnvironmentObject private var themeManager: JTThemeManager
+
+    private var backgroundStyle: LinearGradient {
+        LinearGradient(
+            colors: themeManager.theme.backgroundGradientStops(count: 3),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(backgroundStyle, for: .navigationBar)
+            .toolbarColorScheme(themeManager.theme.colorScheme, for: .navigationBar)
+    }
+}
+
 @MainActor public extension View {
     func jtGlassBackground(cornerRadius: CGFloat = JTShapes.cardCornerRadius,
                            strokeColor: Color? = nil,
@@ -38,6 +58,10 @@ private struct JTGlassBackgroundModifier<S: Shape>: ViewModifier {
                 strokeWidth: strokeWidth
             )
         )
+    }
+
+    func jtNavigationBarStyle() -> some View {
+        modifier(JTNavigationBarModifier())
     }
 }
 

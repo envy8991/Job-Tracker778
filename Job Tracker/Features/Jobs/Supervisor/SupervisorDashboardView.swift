@@ -765,6 +765,7 @@ struct SupervisorCreateJobView: View {
             }
             .navigationTitle("New Job")
             .navigationBarTitleDisplayMode(.inline)
+            .jtNavigationBarStyle()
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") { dismiss() }
@@ -889,6 +890,7 @@ private struct UserSelectSheet: View {
                     Button("Close") { dismiss() }
                 }
             }
+            .jtNavigationBarStyle()
         }
     }
 

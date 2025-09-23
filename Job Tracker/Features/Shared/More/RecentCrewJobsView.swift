@@ -353,6 +353,7 @@ private struct RecentCrewJobDetailSheet: View {
                 Text(errorMessage ?? "Unknown error")
             }
         }
+        .jtNavigationBarStyle()
     }
 
     private var summaryCard: some View {

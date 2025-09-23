@@ -257,6 +257,7 @@ struct JobCard: View {
                             }
                         }
                     }
+                    .jtNavigationBarStyle()
                 }
                 .presentationDetents([.medium])
             }

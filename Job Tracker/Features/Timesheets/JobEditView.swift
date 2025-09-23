@@ -27,6 +27,7 @@ struct JobEditView: View {
                 }
             }
             .navigationTitle("Edit Job")
+            .jtNavigationBarStyle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

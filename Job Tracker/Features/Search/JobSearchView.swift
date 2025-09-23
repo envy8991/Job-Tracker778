@@ -48,6 +48,7 @@ struct JobSearchView: View {
                 }
             }
         }
+        .jtNavigationBarStyle()
         .safeAreaInset(edge: .top) {
             Color.clear.frame(height: shellChromeHeight)
         }

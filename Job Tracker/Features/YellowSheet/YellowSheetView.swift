@@ -63,6 +63,7 @@ struct YellowSheetView: View {
                 .padding(.top, topContentPadding)
             }
             .navigationTitle("     ")
+            .jtNavigationBarStyle()
             .onAppear {
                 if let me = authViewModel.currentUser?.id {
                     FirebaseService.shared.fetchPartnerId(for: me) { pid in
@@ -101,6 +102,7 @@ struct YellowSheetView: View {
                     })
                     .padding()
             }
+            .jtNavigationBarStyle()
         }
     }
     
