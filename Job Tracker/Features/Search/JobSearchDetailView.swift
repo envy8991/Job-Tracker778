@@ -5,21 +5,37 @@ struct JobSearchDetailView: View {
     let job: Job
     let metadata: JobSearchViewModel.Result
 
+    @EnvironmentObject private var jobsViewModel: JobsViewModel
     @EnvironmentObject private var usersViewModel: UsersViewModel
+    @EnvironmentObject private var authViewModel: AuthViewModel
+    @Environment(\.dismiss) private var dismiss
     @AppStorage("addressSuggestionProvider") private var suggestionProviderRaw = "apple"
 
     @State private var isGeneratingShareLink = false
     @State private var shareURL: URL? = nil
     @State private var showShareSheet = false
-    @State private var shareErrorMessage: String? = nil
+    @State private var isAdding = false
+    @State private var errorMessage: String? = nil
+    @State private var alertState: AlertState?
 
-    private var shareErrorBinding: Binding<Bool> {
-        Binding(
-            get: { shareErrorMessage != nil },
-            set: { newValue in
-                if !newValue { shareErrorMessage = nil }
+    private struct AlertState: Identifiable {
+        enum Kind {
+            case share
+            case add
+        }
+
+        let id = UUID()
+        let kind: Kind
+        let message: String
+
+        var title: String {
+            switch kind {
+            case .share:
+                return "Couldn't Share Job"
+            case .add:
+                return "Unable to add job"
             }
-        )
+        }
     }
 
     private var assignedToText: String? {
@@ -102,18 +118,35 @@ struct JobSearchDetailView: View {
         }
         .navigationTitle("Job Details")
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: JTSpacing.sm) {
+                JTPrimaryButton(isAdding ? "Adding…" : "Add to Dashboard", systemImage: "plus.circle") {
+                    addToDashboard()
+                }
+                .disabled(isAdding)
+            }
+            .padding(.horizontal, JTSpacing.lg)
+            .padding(.top, JTSpacing.md)
+            .padding(.bottom, JTSpacing.lg)
+            .background(.ultraThinMaterial)
+        }
         .sheet(isPresented: $showShareSheet, onDismiss: { shareURL = nil }) {
             if let url = shareURL {
                 let subject = metadata.address.primary
                 ActivityView(activityItems: [url], subject: "Job link for \(subject)")
             }
         }
-        .alert("Couldn't Share Job", isPresented: shareErrorBinding) {
-            Button("OK", role: .cancel) { shareErrorMessage = nil }
-        } message: {
-            if let shareErrorMessage {
-                Text(shareErrorMessage)
-            }
+        .alert(item: $alertState) { state in
+            Alert(
+                title: Text(state.title),
+                message: Text(state.message),
+                dismissButton: .default(Text("OK")) {
+                    if state.kind == .add {
+                        errorMessage = nil
+                    }
+                    alertState = nil
+                }
+            )
         }
     }
 
@@ -211,7 +244,7 @@ struct JobSearchDetailView: View {
 
     private func share(job: Job) {
         guard !isGeneratingShareLink else { return }
-        shareErrorMessage = nil
+        alertState = nil
         shareURL = nil
         isGeneratingShareLink = true
 
@@ -225,9 +258,65 @@ struct JobSearchDetailView: View {
                 }
             } catch {
                 await MainActor.run {
-                    shareErrorMessage = error.localizedDescription
+                    let description = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let message = description.isEmpty ? "We couldn’t share the job right now. Please try again." : description
+                    alertState = AlertState(kind: .share, message: message)
                     isGeneratingShareLink = false
                 }
+            }
+        }
+    }
+
+    private func addToDashboard() {
+        guard !isAdding else { return }
+
+        isAdding = true
+        errorMessage = nil
+        alertState = nil
+
+        let trimmedAddress = job.address.trimmingCharacters(in: .whitespacesAndNewlines)
+        let combinedAddress: String
+        if trimmedAddress.isEmpty {
+            if let secondary = metadata.address.secondary, !secondary.isEmpty {
+                combinedAddress = "\(metadata.address.primary), \(secondary)"
+            } else {
+                combinedAddress = metadata.address.primary
+            }
+        } else {
+            combinedAddress = trimmedAddress
+        }
+
+        let normalizedJobNumber = displayValue(metadata.jobNumber) ?? displayValue(job.jobNumber)
+
+        var newJob = Job(
+            address: combinedAddress,
+            date: Date(),
+            status: "Pending",
+            assignedTo: nil,
+            createdBy: authViewModel.currentUser?.id,
+            notes: job.notes ?? "",
+            jobNumber: normalizedJobNumber,
+            assignments: job.assignments,
+            materialsUsed: job.materialsUsed,
+            photos: job.photos,
+            participants: nil,
+            hours: 0.0,
+            nidFootage: job.nidFootage,
+            canFootage: job.canFootage,
+            latitude: job.latitude,
+            longitude: job.longitude
+        )
+
+        newJob.notes = job.notes
+
+        jobsViewModel.createJob(newJob) { success in
+            isAdding = false
+            if success {
+                dismiss()
+            } else {
+                let message = "We couldn’t add the job to your dashboard. Please try again."
+                errorMessage = message
+                alertState = AlertState(kind: .add, message: message)
             }
         }
     }
