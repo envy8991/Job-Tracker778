@@ -20,6 +20,7 @@ struct SharedJobPayload: Codable, Equatable {
     let v: Int               // schema version
     let createdAt: Timestamp
     let fromUserId: String?
+    let fromUserName: String?
 
     // Core fields (adjust to your Job model as needed)
     let address: String
@@ -36,6 +37,7 @@ struct SharedJobPayload: Codable, Equatable {
         lhs.createdAt.seconds == rhs.createdAt.seconds &&
         lhs.createdAt.nanoseconds == rhs.createdAt.nanoseconds &&
         lhs.fromUserId == rhs.fromUserId &&
+        lhs.fromUserName == rhs.fromUserName &&
         lhs.address == rhs.address &&
         lhs.date.seconds == rhs.date.seconds &&
         lhs.date.nanoseconds == rhs.date.nanoseconds &&
@@ -43,6 +45,18 @@ struct SharedJobPayload: Codable, Equatable {
         lhs.jobNumber == rhs.jobNumber &&
         lhs.assignment == rhs.assignment &&
         lhs.senderIsCan == rhs.senderIsCan
+    }
+
+    var senderDisplayName: String? {
+        if let name = fromUserName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            return name
+        }
+
+        if let userId = fromUserId?.trimmingCharacters(in: .whitespacesAndNewlines), !userId.isEmpty {
+            return userId
+        }
+
+        return nil
     }
 }
 
@@ -68,16 +82,34 @@ final class SharedJobService {
     ) async throws -> URL {
         let token = Self.randomToken(length: 24)
         let db = Firestore.firestore()
+        let authUser = Auth.auth().currentUser
 
-        // Determine if the SENDER is a CAN user
-        let senderRole = await currentUserNormalizedRole()
-        let senderIsCan = senderRole == "can"
+        let senderProfile = await currentUserProfile()
+        let senderIsCan = senderProfile?.normalizedPosition.lowercased() == "can"
+
+        var fromUserName: String?
+        if let senderProfile {
+            let components = [senderProfile.firstName, senderProfile.lastName]
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            let combined = components.joined(separator: " ")
+            if !combined.isEmpty {
+                fromUserName = combined
+            }
+        }
+
+        if fromUserName == nil,
+           let fallbackName = authUser?.displayName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !fallbackName.isEmpty {
+            fromUserName = fallbackName
+        }
 
         // Map your Job -> payload here (adjust if your Job fields differ)
         let payload = SharedJobPayload(
             v: 2, // bump schema version
             createdAt: Timestamp(date: Date()),
-            fromUserId: Auth.auth().currentUser?.uid,
+            fromUserId: authUser?.uid,
+            fromUserName: fromUserName,
             address: job.address,
             date: Timestamp(date: job.date),
             status: job.status,
@@ -206,7 +238,7 @@ final class SharedJobService {
     }
 
     /// Reads the current user’s normalized role (lowercased) from `/users/{uid}`.
-    private func currentUserNormalizedRole() async -> String? {
+    private func currentUserProfile() async -> AppUser? {
         guard let uid = Auth.auth().currentUser?.uid else { return nil }
         do {
             let doc = try await Firestore.firestore().collection("users").document(uid).getDocument()
@@ -215,13 +247,18 @@ final class SharedJobService {
             if user.id.isEmpty {
                 user.id = doc.documentID
             }
-            return user.normalizedPosition.lowercased()
+            return user
         } catch {
             #if DEBUG
-            print("[Share] Failed to fetch user role: \(error.localizedDescription)")
+            print("[Share] Failed to fetch user profile: \(error.localizedDescription)")
             #endif
             return nil
         }
+    }
+
+    private func currentUserNormalizedRole() async -> String? {
+        guard let user = await currentUserProfile() else { return nil }
+        return user.normalizedPosition.lowercased()
     }
 }
 
