@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreLocation
 import Firebase
 import FirebaseFirestore
 import FirebaseAuth
@@ -53,6 +54,7 @@ struct SharedJobPreview: Identifiable, Equatable {
 
 final class SharedJobService {
     static let shared = SharedJobService()
+    var geocoder: SharedJobGeocoding = CLSharedJobGeocoder()
     private init() {}
 
     /// Creates a one-time token in Firestore and returns a deep link the user can share.
@@ -133,25 +135,15 @@ final class SharedJobService {
         let db = Firestore.firestore()
         let ref = db.collection("sharedJobs").document(token)
 
-        // Build the recipient’s Job. Keep only shared fields.
-        // (Adjust initializer to your actual Job model)
-        var newJob = Job(
-            address: payload.address,
-            date: payload.date.dateValue(),
-            status: payload.status
-        )
-        newJob.jobNumber = payload.jobNumber
-
         // Assignment handling: only apply if sender **and** receiver are CAN
         let receiverIsCan = await currentUserIsCAN()
-        if payload.senderIsCan, receiverIsCan, let assignment = payload.assignment, !assignment.isEmpty {
-            newJob.assignments = assignment
-        }
-
-        // Ensure the imported job appears for the current user’s dashboard filters
         let myID = Auth.auth().currentUser?.uid
-        newJob.createdBy = myID
-        newJob.assignedTo = myID
+
+        let newJob = await makeJob(
+            from: payload,
+            receiverIsCAN: receiverIsCan,
+            currentUserID: myID
+        )
 
         try await FirebaseService.shared.createJobAsync(newJob)
 
@@ -163,6 +155,46 @@ final class SharedJobService {
         ])
 
         return newJob
+    }
+
+    func makeJob(
+        from payload: SharedJobPayload,
+        receiverIsCAN: Bool,
+        currentUserID: String?
+    ) async -> Job {
+        // Build the recipient’s Job. Keep only shared fields.
+        // (Adjust initializer to your actual Job model)
+        var newJob = Job(
+            address: payload.address,
+            date: payload.date.dateValue(),
+            status: payload.status
+        )
+        newJob.jobNumber = payload.jobNumber
+
+        if payload.senderIsCan, receiverIsCAN, let assignment = payload.assignment, !assignment.isEmpty {
+            newJob.assignments = assignment
+        }
+
+        newJob.createdBy = currentUserID
+        newJob.assignedTo = currentUserID
+
+        if let coordinate = await geocodeCoordinate(for: payload.address) {
+            newJob.latitude = coordinate.latitude
+            newJob.longitude = coordinate.longitude
+        }
+
+        return newJob
+    }
+
+    private func geocodeCoordinate(for address: String) async -> CLLocationCoordinate2D? {
+        do {
+            return try await geocoder.coordinate(for: address)
+        } catch {
+            #if DEBUG
+            print("[Share] Failed to geocode address \(address): \(error.localizedDescription)")
+            #endif
+            return nil
+        }
     }
 
     private static func randomToken(length: Int) -> String {
@@ -183,6 +215,31 @@ final class SharedJobService {
             print("[Share] Failed to fetch user role: \(error.localizedDescription)")
             #endif
             return false
+        }
+    }
+}
+
+protocol SharedJobGeocoding: AnyObject {
+    func coordinate(for address: String) async throws -> CLLocationCoordinate2D?
+}
+
+final class CLSharedJobGeocoder: SharedJobGeocoding {
+    private let geocoder = CLGeocoder()
+
+    func coordinate(for address: String) async throws -> CLLocationCoordinate2D? {
+        try await withCheckedThrowingContinuation { continuation in
+            geocoder.geocodeAddressString(address) { placemarks, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                if let coordinate = placemarks?.first?.location?.coordinate {
+                    continuation.resume(returning: coordinate)
+                } else {
+                    continuation.resume(returning: nil)
+                }
+            }
         }
     }
 }
