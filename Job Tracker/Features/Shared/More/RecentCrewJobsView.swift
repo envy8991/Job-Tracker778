@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 struct RecentCrewJobsView: View {
     @EnvironmentObject private var usersViewModel: UsersViewModel
@@ -506,6 +507,31 @@ private struct RecentCrewJobDetailSheet: View {
         let value: String
     }
 
+    static func makeDashboardJob(
+        from crewJob: RecentCrewJob,
+        userID: String?,
+        coordinate: CLLocationCoordinate2D?
+    ) -> Job {
+        Job(
+            address: crewJob.address,
+            date: Date(),
+            status: "Pending",
+            assignedTo: nil,
+            createdBy: userID,
+            notes: "",
+            jobNumber: crewJob.trimmedJobNumber,
+            assignments: nil,
+            materialsUsed: nil,
+            photos: [],
+            participants: nil,
+            hours: 0.0,
+            nidFootage: nil,
+            canFootage: nil,
+            latitude: coordinate?.latitude,
+            longitude: coordinate?.longitude
+        )
+    }
+
     private func addToDashboard() {
         guard !isAdding else { return }
 
@@ -513,29 +539,25 @@ private struct RecentCrewJobDetailSheet: View {
         errorMessage = nil
 
         let userID = authViewModel.currentUser?.id
-        let newJob = Job(
-            address: job.address,
-            date: Date(),
-            status: "Pending",
-            assignedTo: nil,
-            createdBy: userID,
-            notes: "",
-            jobNumber: job.trimmedJobNumber,
-            assignments: nil,
-            materialsUsed: nil,
-            photos: [],
-            participants: nil,
-            hours: 0.0,
-            nidFootage: nil,
-            canFootage: nil
-        )
 
-        jobsViewModel.createJob(newJob) { success in
-            isAdding = false
-            if success {
-                dismiss()
-            } else {
-                errorMessage = "We couldn’t add the job to your dashboard. Please try again."
+        let finishCreation: (CLLocationCoordinate2D?) -> Void = { coordinate in
+            let newJob = Self.makeDashboardJob(from: job, userID: userID, coordinate: coordinate)
+
+            jobsViewModel.createJob(newJob) { success in
+                isAdding = false
+                if success {
+                    dismiss()
+                } else {
+                    errorMessage = "We couldn’t add the job to your dashboard. Please try again."
+                }
+            }
+        }
+
+        CLGeocoder().geocodeAddressString(job.address) { placemarks, _ in
+            let coordinate = placemarks?.first?.location?.coordinate
+
+            DispatchQueue.main.async {
+                finishCreation(coordinate)
             }
         }
     }

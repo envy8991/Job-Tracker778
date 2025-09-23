@@ -1,4 +1,5 @@
 import XCTest
+import CoreLocation
 @testable import Job_Tracker
 
 final class RecentCrewJobDetailSheetTests: XCTestCase {
@@ -64,5 +65,19 @@ final class RecentCrewJobDetailSheetTests: XCTestCase {
             items.first(where: { $0.title == "Assigned To" })?.value,
             "unknown-user"
         )
+    }
+
+    func testDashboardJobIncludesResolvedCoordinates() {
+        let coordinate = CLLocationCoordinate2D(latitude: 37.3349, longitude: -122.0090)
+        let crewJob = makeJob()
+
+        let job = RecentCrewJobDetailSheet.makeDashboardJob(
+            from: crewJob,
+            userID: "user-1",
+            coordinate: coordinate
+        )
+
+        XCTAssertEqual(job.latitude, coordinate.latitude, accuracy: 0.0001)
+        XCTAssertEqual(job.longitude, coordinate.longitude, accuracy: 0.0001)
     }
 }
