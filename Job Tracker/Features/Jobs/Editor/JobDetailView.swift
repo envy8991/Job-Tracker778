@@ -419,7 +419,7 @@ private let fiberChoices = ["Flat", "Round", "Mainline"]
                     case "Nid":
                         parseNidMaterials(from: materials)
                     case "Can":
-                        canMaterialsText = materials
+                        canMaterialsText = sanitizeCanMaterialsTokens(from: materials).joined(separator: ", ")
                         if let n = captureInt(after: "u-guard:", in: materials.lowercased()) { uGuardCount = n }
                     case "Underground":
                         undergroundMaterialsText = materials
@@ -837,10 +837,20 @@ extension JobDetailView {
 
             case "Can":
                 var parts: [String] = []
-                if !fiberType.isEmpty { parts.append("Fiber: \(fiberType)") }
-                let text = canMaterialsText.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !text.isEmpty { parts.append(text) }
-                if uGuardCount > 0 { parts.append("U-Guard: \(uGuardCount)") }
+                var seenTokens = Set<String>()
+                func appendUnique(_ token: String) {
+                    let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    let key = trimmed.lowercased()
+                    guard !seenTokens.contains(key) else { return }
+                    seenTokens.insert(key)
+                    parts.append(trimmed)
+                }
+
+                if !fiberType.isEmpty { appendUnique("Fiber: \(fiberType)") }
+                let customTokens = sanitizeCanMaterialsTokens(from: canMaterialsText)
+                customTokens.forEach { appendUnique($0) }
+                if uGuardCount > 0 { appendUnique("U-Guard: \(uGuardCount)") }
                 job.materialsUsed = parts.isEmpty ? nil : parts.joined(separator: ", ")
                 job.canFootage = canFootage.isEmpty ? nil : canFootage
                 job.nidFootage = nidFootage.isEmpty ? nil : nidFootage
@@ -977,6 +987,24 @@ extension JobDetailView {
         let tail = haystack[range.upperBound...]
         let digits = tail.drop(while: { $0 == " " }).prefix { $0.isNumber }
         return Int(digits)
+    }
+
+    /// Split CAN materials free text into clean tokens, filtering out reserved prefixes and duplicates.
+    private func sanitizeCanMaterialsTokens(from raw: String) -> [String] {
+        var seen = Set<String>()
+        var cleaned: [String] = []
+
+        for token in raw.split(separator: ",") {
+            let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let lower = trimmed.lowercased()
+            guard !lower.hasPrefix("fiber:"), !lower.hasPrefix("u-guard:") else { continue }
+            if seen.insert(lower).inserted {
+                cleaned.append(trimmed)
+            }
+        }
+
+        return cleaned
     }
 
     // MARK: - Assignment Helpers
