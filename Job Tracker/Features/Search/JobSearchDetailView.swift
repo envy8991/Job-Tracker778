@@ -288,26 +288,15 @@ struct JobSearchDetailView: View {
 
         let normalizedJobNumber = displayValue(metadata.jobNumber) ?? displayValue(job.jobNumber)
 
-        var newJob = Job(
+        let newJob = Job(
             address: combinedAddress,
             date: Date(),
             status: "Pending",
-            assignedTo: nil,
             createdBy: authViewModel.currentUser?.id,
-            notes: job.notes ?? "",
             jobNumber: normalizedJobNumber,
-            assignments: job.assignments,
-            materialsUsed: job.materialsUsed,
-            photos: job.photos,
-            participants: nil,
-            hours: 0.0,
-            nidFootage: job.nidFootage,
-            canFootage: job.canFootage,
             latitude: job.latitude,
             longitude: job.longitude
         )
-
-        newJob.notes = job.notes
 
         jobsViewModel.createJob(newJob) { success in
             isAdding = false
