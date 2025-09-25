@@ -93,6 +93,8 @@ private struct AppShellDetailView: View {
             JobSearchView(viewModel: JobSearchViewModel(jobsViewModel: jobsViewModel, usersViewModel: usersViewModel))
         case .maps:
             MapsView()
+        case .spliceAssist:
+            SpliceAssistView()
         case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter:
             MoreTabView()
         }
