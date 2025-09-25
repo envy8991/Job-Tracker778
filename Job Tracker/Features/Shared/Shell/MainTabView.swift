@@ -128,6 +128,13 @@ private struct MoreMenuList: View {
                 }
             }
 
+            Section("Splice Assist") {
+                NavigationLink(value: AppNavigationViewModel.Destination.spliceAssist) {
+                    Label(AppNavigationViewModel.Destination.spliceAssist.title,
+                          systemImage: AppNavigationViewModel.Destination.spliceAssist.systemImage)
+                }
+            }
+
             if authViewModel.isSupervisorFlag {
                 Section("Supervisor") {
                     NavigationLink(value: AppNavigationViewModel.Destination.supervisor) {
@@ -186,6 +193,8 @@ private struct MoreDestinationView: View {
             HelpCenterView()
         case .recentCrewJobs:
             RecentCrewJobsView()
+        case .spliceAssist:
+            SpliceAssistView()
         case .more:
             MoreMenuList()
         default:
