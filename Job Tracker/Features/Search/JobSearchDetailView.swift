@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import CoreLocation
 
 struct JobSearchDetailView: View {
     let job: Job
@@ -288,24 +289,36 @@ struct JobSearchDetailView: View {
 
         let normalizedJobNumber = displayValue(metadata.jobNumber) ?? displayValue(job.jobNumber)
 
-        let newJob = Job(
-            address: combinedAddress,
-            date: Date(),
-            status: "Pending",
-            createdBy: authViewModel.currentUser?.id,
-            jobNumber: normalizedJobNumber,
-            latitude: job.latitude,
-            longitude: job.longitude
-        )
+        let finishCreation: (CLLocationCoordinate2D?) -> Void = { coordinate in
+            let resolvedLatitude = coordinate?.latitude ?? job.latitude
+            let resolvedLongitude = coordinate?.longitude ?? job.longitude
 
-        jobsViewModel.createJob(newJob) { success in
-            isAdding = false
-            if success {
-                dismiss()
-            } else {
-                let message = "We couldn’t add the job to your dashboard. Please try again."
-                errorMessage = message
-                alertState = AlertState(kind: .add, message: message)
+            let newJob = Job(
+                address: combinedAddress,
+                date: Date(),
+                status: "Pending",
+                createdBy: authViewModel.currentUser?.id,
+                jobNumber: normalizedJobNumber,
+                latitude: resolvedLatitude,
+                longitude: resolvedLongitude
+            )
+
+            jobsViewModel.createJob(newJob) { success in
+                isAdding = false
+                if success {
+                    dismiss()
+                } else {
+                    let message = "We couldn’t add the job to your dashboard. Please try again."
+                    errorMessage = message
+                    alertState = AlertState(kind: .add, message: message)
+                }
+            }
+        }
+
+        CLGeocoder().geocodeAddressString(combinedAddress) { placemarks, _ in
+            let coordinate = placemarks?.first?.location?.coordinate
+            DispatchQueue.main.async {
+                finishCreation(coordinate)
             }
         }
     }
