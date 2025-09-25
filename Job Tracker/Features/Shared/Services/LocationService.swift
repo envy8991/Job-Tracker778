@@ -59,7 +59,7 @@ final class LocationService: NSObject, ObservableObject {
                 manager.startUpdatingLocation()
             } else {
                 // Background/inactive: significant-change only
-                manager.allowsBackgroundLocationUpdates = false
+                manager.allowsBackgroundLocationUpdates = true
                 manager.stopUpdatingLocation()
                 manager.startMonitoringSignificantLocationChanges()
             }
@@ -101,18 +101,32 @@ final class LocationService: NSObject, ObservableObject {
         guard status == .authorizedAlways || status == .authorizedWhenInUse else {
             stopSignificantChangeUpdates(); return
         }
-        manager.allowsBackgroundLocationUpdates = false
+        manager.allowsBackgroundLocationUpdates = true
         manager.stopUpdatingLocation()
         manager.startMonitoringSignificantLocationChanges()
     }
 
     func stopSignificantChangeUpdates() {
+        manager.allowsBackgroundLocationUpdates = false
         manager.stopMonitoringSignificantLocationChanges()
     }
 
     func stopAllUpdates() {
+        manager.allowsBackgroundLocationUpdates = false
         manager.stopUpdatingLocation()
         manager.stopMonitoringSignificantLocationChanges()
+    }
+
+    func requestAlwaysAuthorizationIfNeeded() {
+        let status = manager.authorizationStatus
+        switch status {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse:
+            manager.requestAlwaysAuthorization()
+        default:
+            break
+        }
     }
 
     // MARK: - Region Monitoring
