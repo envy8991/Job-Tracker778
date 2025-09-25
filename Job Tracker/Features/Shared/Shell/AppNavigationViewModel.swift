@@ -16,6 +16,7 @@ final class AppNavigationViewModel: ObservableObject {
         case admin
         case settings
         case helpCenter
+        case spliceAssist
 
         var id: String { title }
 
@@ -34,7 +35,8 @@ final class AppNavigationViewModel: ObservableObject {
             case .admin:       return "Admin"
             case .settings:    return "Settings"
             case .helpCenter:  return "Help Center"
-            }
+            case .spliceAssist: return "Splice Assist"
+        }
         }
 
         var systemImage: String {
@@ -52,7 +54,8 @@ final class AppNavigationViewModel: ObservableObject {
             case .admin:       return "gearshape.2"
             case .settings:    return "gearshape"
             case .helpCenter:  return "questionmark.circle"
-            }
+            case .spliceAssist: return "wand.and.stars"
+        }
         }
 
         var primaryDestination: PrimaryDestination {
@@ -69,14 +72,15 @@ final class AppNavigationViewModel: ObservableObject {
                  .supervisor,
                  .admin,
                  .settings,
-                 .helpCenter:
+                 .helpCenter,
+                 .spliceAssist:
                 return .more
-            }
+        }
         }
 
         var isMoreStackDestination: Bool {
             switch self {
-            case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter, .maps, .recentCrewJobs:
+            case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter, .maps, .recentCrewJobs, .spliceAssist:
                 return true
             default:
                 return false
