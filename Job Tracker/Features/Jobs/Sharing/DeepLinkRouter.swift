@@ -22,21 +22,32 @@ enum DeepLinkRouter {
             return nil
         }
 
-        // Accept both forms:
-        // jobtracker://importJob?token=XYZ  (host = "importJob")
-        // jobtracker:/importJob?token=XYZ   (host = nil, path = "/importJob")
-        let host = url.host?.lowercased()
-        let path = url.path.lowercased()
-        let isImport = (host == "importjob") || path.hasSuffix("/importjob")
-
-        guard isImport else {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             #if DEBUG
-            print("[DeepLink] Unknown route. host=\(host ?? "nil"), path=\(path)")
+            print("[DeepLink] Failed to parse URL components")
             #endif
             return nil
         }
 
-        let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+        // Accept variations such as:
+        // jobtracker://importJob?token=XYZ  (host = "importJob")
+        // jobtracker:/importJob?token=XYZ   (no host, path = "/importJob")
+        // jobtracker:importJob?token=XYZ    (no host, path = "importJob")
+        let host = (components.host ?? url.host)?.lowercased()
+        let pathSegments = components.path
+            .split(separator: "/")
+            .map { $0.lowercased() }
+        let lastSegment = pathSegments.last
+        let isImport = (host == "importjob") || (lastSegment == "importjob")
+
+        guard isImport else {
+            #if DEBUG
+            print("[DeepLink] Unknown route. host=\(host ?? "nil"), path=\(url.path)")
+            #endif
+            return nil
+        }
+
+        let token = components
             .queryItems?
             .first(where: { $0.name.lowercased() == "token" })?
             .value
