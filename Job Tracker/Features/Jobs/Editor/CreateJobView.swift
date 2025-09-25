@@ -170,7 +170,7 @@ struct CreateJobView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
 
     // Form fields
-    @State private var address = ""
+    @State private var addresses: [String] = [""]
     @State private var date = Date()
     @State private var status = "Pending"
     @State private var notes = ""
@@ -179,11 +179,11 @@ struct CreateJobView: View {
     @State private var customStatusText = ""
     @State private var assignmentsText: String = ""
     @FocusState private var isAssignmentsFocused: Bool
-    @FocusState private var isAddressFocused: Bool
+    @FocusState private var focusedAddressIndex: Int?
     @StateObject private var addressSearch = AddressSearchCompleter()
     @StateObject private var locationProvider = LocationProvider()
 
-    @State private var showAlert = false
+    @State private var alertMessage: String?
 
     let statusOptions = ["Pending","Aerial","UG","Nid","Can","Done","Talk to Rick","Custom"]
 
@@ -206,90 +206,24 @@ struct CreateJobView: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
-                        // Address
-                        SectionCard(title: "Address") {
-                            ZStack(alignment: .topLeading) {
-                                TextField("Enter address", text: $address)
-                                    .disableAutocorrection(true)
-                                    .textInputAutocapitalization(.never)
-                                    .focused($isAddressFocused)
-                                    .padding(12)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(Color(.systemBackground).opacity(0.9))
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                                    )
-                                    .onChange(of: address) { newValue in
-                                        if newValue.trimmingCharacters(in: .whitespaces).count >= 3 {
-                                            addressSearch.update(query: newValue)
-                                        } else {
-                                            addressSearch.results = []
-                                        }
-                                    }
-                                    .onAppear { locationProvider.request() }
-                                    .onChange(of: addressSearch.results) { _ in
-                                        addressSearch.updateDistances(from: locationProvider.location)
-                                    }
-                                    .onChange(of: locationProvider.location) { _ in
-                                        addressSearch.updateDistances(from: locationProvider.location)
-                                    }
-
-                                // Suggestions dropdown
-                                if isAddressFocused && !addressSearch.results.isEmpty {
-                                    VStack(alignment: .leading, spacing: 0) {
-                                        ForEach(Array(addressSearch.results.prefix(6).enumerated()), id: \.offset) { _, item in
-                                            Button {
-                                                address = item.subtitle.isEmpty ? item.title : "\(item.title) \(item.subtitle)"
-                                                addressSearch.results = []
-                                                isAddressFocused = false
-                                                UIApplication.shared.endEditing()
-                                            } label: {
-                                                HStack(alignment: .center, spacing: 10) {
-                                                    VStack(alignment: .leading, spacing: 2) {
-                                                        Text(item.title)
-                                                            .font(.body)
-                                                        if !item.subtitle.isEmpty {
-                                                            Text(item.subtitle)
-                                                                .font(.caption)
-                                                                .foregroundStyle(.secondary)
-                                                        }
-                                                    }
-                                                    Spacer()
-                                                    let key = item.subtitle.isEmpty ? item.title : "\(item.title) \(item.subtitle)"
-                                                    if let miles = addressSearch.distances[key] {
-                                                        Text(String(format: "%.1f mi", miles))
-                                                            .font(.caption.bold())
-                                                            .padding(.vertical, 5)
-                                                            .padding(.horizontal, 8)
-                                                            .background(Capsule().fill(Color(.secondarySystemBackground)))
-                                                            .overlay(Capsule().stroke(Color.gray.opacity(0.25)))
-                                                    }
-                                                }
-                                                .padding(.vertical, 10)
-                                                .padding(.horizontal, 12)
-                                            }
-                                            .buttonStyle(.plain)
-
-                                            if item != addressSearch.results.prefix(6).last {
-                                                Divider().padding(.leading, 12)
-                                            }
-                                        }
-                                    }
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(Color(.systemBackground))
-                                            .shadow(radius: 6)
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                                    )
-                                    .padding(.top, 58)
+                        // Addresses
+                        SectionCard(title: addresses.count > 1 ? "Addresses" : "Address") {
+                            VStack(spacing: 12) {
+                                ForEach(Array(addresses.enumerated()), id: \.offset) { index, _ in
+                                    addressField(for: index)
                                 }
+
+                                Button {
+                                    addresses.append("")
+                                    focusedAddressIndex = addresses.count - 1
+                                } label: {
+                                    Label("Add Another Address", systemImage: "plus.circle")
+                                        .font(.subheadline.weight(.semibold))
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.top, 4)
                             }
+                            .onAppear { locationProvider.request() }
                         }
 
                         // Date
@@ -395,15 +329,11 @@ struct CreateJobView: View {
 
                         // Save Button (prominent)
                         Button {
-                            if jobNumber.isEmpty {
-                                showAlert = true
-                            } else {
-                                saveJob()
-                            }
+                            attemptSave()
                         } label: {
                             HStack {
                                 Image(systemName: "checkmark.circle.fill")
-                                Text("Save Job")
+                                Text(validAddressCount > 1 ? "Save Jobs" : "Save Job")
                                     .fontWeight(.semibold)
                             }
                             .frame(maxWidth: .infinity)
@@ -426,26 +356,22 @@ struct CreateJobView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        if jobNumber.isEmpty {
-                            showAlert = true
-                        } else {
-                            saveJob()
-                        }
+                        attemptSave()
                     }
                 }
             }
-            .alert(isPresented: $showAlert) {
-                Alert(
-                    title: Text("Missing Job Number"),
-                    message: Text("Please enter a Job Number before saving."),
-                    dismissButton: .default(Text("OK"))
-                )
-            }
+            .alert(alertTitle, isPresented: alertBinding, actions: {
+                Button("OK", role: .cancel) { alertMessage = nil }
+            }, message: {
+                if let alertMessage {
+                    Text(alertMessage)
+                }
+            })
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
-                    if isAddressFocused {
+                    if focusedAddressIndex != nil {
                         Spacer()
-                        Button("Done") { isAddressFocused = false }
+                        Button("Done") { focusedAddressIndex = nil }
                     }
                     if isAssignmentsFocused {
                         Button(decimalSeparator) { assignmentsText.append(decimalSeparator) }
@@ -454,12 +380,44 @@ struct CreateJobView: View {
                     }
                 }
             }
+            .onChange(of: addressSearch.results) { _ in
+                addressSearch.updateDistances(from: locationProvider.location)
+            }
+            .onChange(of: locationProvider.location) { _ in
+                addressSearch.updateDistances(from: locationProvider.location)
+            }
+            .onChange(of: focusedAddressIndex) { newValue in
+                guard let newValue else {
+                    addressSearch.results = []
+                    return
+                }
+                let current = addresses[safe: newValue] ?? ""
+                handleAddressQueryChange(current)
+            }
         }
     }
 
     // MARK: - Save
 
-    private func saveJob() {
+    private func attemptSave() {
+        let trimmedAddresses = addresses
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        if jobNumber.isEmpty {
+            alertMessage = "Please enter a Job Number before saving."
+            return
+        }
+
+        if trimmedAddresses.isEmpty {
+            alertMessage = "Please enter at least one address before saving."
+            return
+        }
+
+        saveJobs(addressesToSave: trimmedAddresses)
+    }
+
+    private func saveJobs(addressesToSave: [String]) {
         guard let userID = authViewModel.currentUser?.id else { dismiss(); return }
 
         // Normalize legacy spelling ("Ariel" -> "Aerial") before saving
@@ -468,30 +426,47 @@ struct CreateJobView: View {
             : status
         let finalStatus = baseStatus.caseInsensitiveCompare("Ariel") == .orderedSame ? "Aerial" : baseStatus
 
-        CLGeocoder().geocodeAddressString(address) { placemarks, _ in
-            let coord = placemarks?.first?.location?.coordinate
+        let sanitizedAssign = sanitizeAssignment(assignmentsText)
+        let assignmentsValue = sanitizedAssign.isEmpty || !isValidAssignment(sanitizedAssign) ? nil : sanitizedAssign
 
-            let sanitizedAssign = sanitizeAssignment(assignmentsText)
-            let assignmentsValue = sanitizedAssign.isEmpty || !isValidAssignment(sanitizedAssign) ? nil : sanitizedAssign
+        let geocoder = CLGeocoder()
 
-            let job = Job(
-                address: address,
-                date: date,
-                status: finalStatus,
-                assignedTo: finalStatus == "Pending" ? nil : userID,
-                createdBy: userID,
-                notes: notes,
-                jobNumber: jobNumber.isEmpty ? nil : jobNumber,
-                assignments: assignmentsValue,
-                materialsUsed: materialsUsed,
-                latitude: coord?.latitude,
-                longitude: coord?.longitude
-            )
-            DispatchQueue.main.async {
-                jobsViewModel.createJob(job)
-                dismiss()
+        func processAddress(at index: Int) {
+            if index >= addressesToSave.count {
+                DispatchQueue.main.async { dismiss() }
+                return
+            }
+
+            let currentAddress = addressesToSave[index]
+            geocoder.geocodeAddressString(currentAddress) { placemarks, _ in
+                let coord = placemarks?.first?.location?.coordinate
+
+                let job = Job(
+                    address: currentAddress,
+                    date: date,
+                    status: finalStatus,
+                    assignedTo: finalStatus == "Pending" ? nil : userID,
+                    createdBy: userID,
+                    notes: notes,
+                    jobNumber: jobNumber.isEmpty ? nil : jobNumber,
+                    assignments: assignmentsValue,
+                    materialsUsed: materialsUsed,
+                    latitude: coord?.latitude,
+                    longitude: coord?.longitude
+                )
+
+                DispatchQueue.main.async {
+                    jobsViewModel.createJob(job)
+                    if index == addressesToSave.count - 1 {
+                        dismiss()
+                    } else {
+                        processAddress(at: index + 1)
+                    }
+                }
             }
         }
+
+        processAddress(at: 0)
     }
 
     // MARK: - Assignments helpers
@@ -521,4 +496,147 @@ struct CreateJobView: View {
     }
 
     private var decimalSeparator: String { Locale.current.decimalSeparator ?? "." }
+
+    private var validAddressCount: Int {
+        addresses
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .count
+    }
+
+    private var alertTitle: String {
+        "Cannot Save"
+    }
+
+    private var alertBinding: Binding<Bool> {
+        Binding(
+            get: { alertMessage != nil },
+            set: { newValue in
+                if !newValue { alertMessage = nil }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func addressField(for index: Int) -> some View {
+        ZStack(alignment: .topLeading) {
+            TextField("Enter address", text: Binding(
+                get: { addresses[index] },
+                set: { newValue in
+                    addresses[index] = newValue
+                    if focusedAddressIndex == index {
+                        handleAddressQueryChange(newValue)
+                    }
+                }
+            ))
+            .disableAutocorrection(true)
+            .textInputAutocapitalization(.never)
+            .focused($focusedAddressIndex, equals: index)
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(.systemBackground).opacity(0.9))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+            )
+
+            if focusedAddressIndex == index && !addressSearch.results.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(addressSearch.results.prefix(6).enumerated()), id: \.offset) { _, item in
+                        Button {
+                            let composed = item.subtitle.isEmpty ? item.title : "\(item.title) \(item.subtitle)"
+                            addresses[index] = composed
+                            addressSearch.results = []
+                            focusedAddressIndex = nil
+                            UIApplication.shared.endEditing()
+                        } label: {
+                            HStack(alignment: .center, spacing: 10) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.title)
+                                        .font(.body)
+                                    if !item.subtitle.isEmpty {
+                                        Text(item.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                let key = item.subtitle.isEmpty ? item.title : "\(item.title) \(item.subtitle)"
+                                if let miles = addressSearch.distances[key] {
+                                    Text(String(format: "%.1f mi", miles))
+                                        .font(.caption.bold())
+                                        .padding(.vertical, 5)
+                                        .padding(.horizontal, 8)
+                                        .background(Capsule().fill(Color(.secondarySystemBackground)))
+                                        .overlay(Capsule().stroke(Color.gray.opacity(0.25)))
+                                }
+                            }
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 12)
+                        }
+                        .buttonStyle(.plain)
+
+                        if item != addressSearch.results.prefix(6).last {
+                            Divider().padding(.leading, 12)
+                        }
+                    }
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color(.systemBackground))
+                        .shadow(radius: 6)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                )
+                .padding(.top, 58)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if addresses.count > 1 {
+                Button {
+                    removeAddress(at: index)
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .foregroundStyle(.red)
+                }
+                .padding(8)
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func handleAddressQueryChange(_ query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count >= 3 {
+            addressSearch.update(query: query)
+        } else {
+            addressSearch.results = []
+        }
+    }
+
+    private func removeAddress(at index: Int) {
+        guard addresses.indices.contains(index) else { return }
+        addresses.remove(at: index)
+        if addresses.isEmpty {
+            addresses = [""]
+        }
+
+        if let focusedIndex = focusedAddressIndex {
+            if focusedIndex == index {
+                focusedAddressIndex = nil
+            } else if focusedIndex > index {
+                focusedAddressIndex = focusedIndex - 1
+            }
+        }
+    }
+}
+
+private extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
 }
