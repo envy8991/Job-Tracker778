@@ -18,6 +18,7 @@ struct SettingsView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject private var themeManager: JTThemeManager
     @EnvironmentObject private var arrivalAlertManager: ArrivalAlertManager
+    @EnvironmentObject private var locationService: LocationService
 
     // Persisted settings
     @AppStorage("smartRoutingEnabled") private var smartRoutingEnabled = false
@@ -105,6 +106,10 @@ struct SettingsView: View {
                             SectionHeader(title: "Notifications")
                             Toggle("Notify me on arrival (today only)", isOn: $arrivalAlertsEnabledToday)
                                 .toggleStyle(.switch)
+                                .onChange(of: arrivalAlertsEnabledToday) { enabled in
+                                    guard enabled else { return }
+                                    locationService.requestAlwaysAuthorizationIfNeeded()
+                                }
                             if !arrivalAlertManager.status.message.isEmpty {
                                 Text(arrivalAlertManager.status.message)
                                     .font(.footnote)
