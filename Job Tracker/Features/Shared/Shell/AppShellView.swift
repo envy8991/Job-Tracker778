@@ -2,7 +2,6 @@ import SwiftUI
 
 struct AppShellView: View {
     @EnvironmentObject private var navigation: AppNavigationViewModel
-    @EnvironmentObject private var authViewModel: AuthViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
@@ -14,20 +13,6 @@ struct AppShellView: View {
             }
         }
     }
-
-    private var splitLayout: some View {
-        NavigationSplitView {
-            SidebarList()
-        } detail: {
-            AppShellDetailView(destination: navigation.activeDestination)
-        }
-        .navigationSplitViewColumnWidth(min: 260, ideal: 300)
-    }
-}
-
-private struct SidebarList: View {
-    @EnvironmentObject private var navigation: AppNavigationViewModel
-    @EnvironmentObject private var authViewModel: AuthViewModel
 
     private var sidebarSelection: Binding<AppNavigationViewModel.Destination?> {
         Binding(
@@ -46,8 +31,24 @@ private struct SidebarList: View {
         )
     }
 
+    private var splitLayout: some View {
+        NavigationSplitView(selection: sidebarSelection) {
+            SidebarList(selection: sidebarSelection)
+        } detail: { selectedDestination in
+            AppShellDetailView(destination: selectedDestination ?? navigation.activeDestination)
+        }
+        .navigationSplitViewColumnWidth(min: 260, ideal: 300)
+    }
+}
+
+private struct SidebarList: View {
+    let selection: Binding<AppNavigationViewModel.Destination?>
+
+    @EnvironmentObject private var navigation: AppNavigationViewModel
+    @EnvironmentObject private var authViewModel: AuthViewModel
+
     var body: some View {
-        List(selection: sidebarSelection) {
+        List(selection: selection) {
             if let user = authViewModel.currentUser {
                 Section {
                     VStack(alignment: .leading, spacing: 4) {
