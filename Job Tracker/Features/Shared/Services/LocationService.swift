@@ -18,6 +18,11 @@ final class LocationService: NSObject, ObservableObject {
     private var smartRoutingCancellable: AnyCancellable?
     private let regionEventSubject = PassthroughSubject<RegionEvent, Never>()
 
+    private var supportsBackgroundLocation: Bool {
+        let backgroundModes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String]
+        return backgroundModes?.contains("location") == true
+    }
+
     override init() {
         regionEventsPublisher = regionEventSubject.eraseToAnyPublisher()
         super.init()
@@ -59,6 +64,14 @@ final class LocationService: NSObject, ObservableObject {
                 manager.startUpdatingLocation()
             } else {
                 // Background/inactive: significant-change only
+                guard manager.authorizationStatus == .authorizedAlways, supportsBackgroundLocation else {
+                    manager.allowsBackgroundLocationUpdates = false
+                    manager.stopMonitoringSignificantLocationChanges()
+                    #if DEBUG
+                    print("[LocationService] Background location updates require Always permission and location background mode.")
+                    #endif
+                    return
+                }
                 manager.allowsBackgroundLocationUpdates = true
                 manager.stopUpdatingLocation()
                 manager.startMonitoringSignificantLocationChanges()
@@ -98,8 +111,13 @@ final class LocationService: NSObject, ObservableObject {
     /// Background: battery-friendly updates
     func startSignificantChangeUpdates() {
         let status = manager.authorizationStatus
-        guard status == .authorizedAlways || status == .authorizedWhenInUse else {
-            stopSignificantChangeUpdates(); return
+        guard status == .authorizedAlways, supportsBackgroundLocation else {
+            manager.allowsBackgroundLocationUpdates = false
+            manager.stopMonitoringSignificantLocationChanges()
+            #if DEBUG
+            print("[LocationService] Cannot start significant-change updates without Always permission and location background mode.")
+            #endif
+            return
         }
         manager.allowsBackgroundLocationUpdates = true
         manager.stopUpdatingLocation()
