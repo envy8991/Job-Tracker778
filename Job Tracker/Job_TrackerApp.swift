@@ -148,6 +148,7 @@ struct JobTrackerApp: App {
                         pendingSharedJobPreview = nil
                     }
                 )
+                .environmentObject(themeManager)
             }
             // Deep links
             .onOpenURL { url in
