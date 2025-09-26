@@ -32,10 +32,10 @@ struct AppShellView: View {
     }
 
     private var splitLayout: some View {
-        NavigationSplitView(selection: sidebarSelection) {
+        NavigationSplitView {
             SidebarList(selection: sidebarSelection)
-        } detail: { selectedDestination in
-            AppShellDetailView(destination: selectedDestination ?? navigation.activeDestination)
+        } detail: {
+            AppShellDetailView(selection: sidebarSelection)
         }
         .navigationSplitViewColumnWidth(min: 260, ideal: 300)
     }
@@ -74,10 +74,15 @@ private struct SidebarList: View {
 }
 
 private struct AppShellDetailView: View {
-    let destination: AppNavigationViewModel.Destination
+    let selection: Binding<AppNavigationViewModel.Destination?>
 
     @EnvironmentObject private var jobsViewModel: JobsViewModel
     @EnvironmentObject private var usersViewModel: UsersViewModel
+    @EnvironmentObject private var navigation: AppNavigationViewModel
+
+    private var destination: AppNavigationViewModel.Destination {
+        selection.wrappedValue ?? navigation.activeDestination
+    }
 
     @ViewBuilder
     var body: some View {
