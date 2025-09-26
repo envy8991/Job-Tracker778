@@ -151,6 +151,7 @@ struct JobTrackerApp: App {
             }
             // Deep links
             .onOpenURL { url in
+                JobTrackerApp.ensureFirebaseConfigured()
                 guard let route = DeepLinkRouter.handle(url) else { return }
 
                 switch route {
