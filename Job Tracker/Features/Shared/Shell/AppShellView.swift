@@ -32,10 +32,10 @@ struct AppShellView: View {
     }
 
     private var splitLayout: some View {
-        NavigationSplitView(selection: sidebarSelection) {
+        NavigationSplitView {
             SidebarList(selection: sidebarSelection)
-        } detail: { selectedDestination in
-            AppShellDetailView(destination: selectedDestination ?? navigation.activeDestination)
+        } detail: {
+            AppShellDetailView(destination: sidebarSelection.wrappedValue ?? navigation.activeDestination)
         }
         .navigationSplitViewColumnWidth(min: 260, ideal: 300)
     }
