@@ -575,7 +575,7 @@ struct LineEditView: View {
     @State var line: FiberLine
     var onSave: (FiberLine) -> Void
     var onCancel: () -> Void
-    
+
     var body: some View {
          NavigationStack {
             Form {
@@ -597,6 +597,17 @@ struct LineEditView: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { onSave(line) } }
             }
         }
+    }
+}
+
+extension Binding {
+    init(_ source: Binding<Value?>, default defaultValue: Value) {
+        self.init(
+            get: { source.wrappedValue ?? defaultValue },
+            set: { newValue in
+                source.wrappedValue = newValue
+            }
+        )
     }
 }
 
