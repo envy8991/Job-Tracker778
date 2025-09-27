@@ -151,9 +151,9 @@ struct HelpCenterView: View {
                 action: { navigation.navigate(to: .yellowSheet) }
             ),
             HelpTopic(
-                title: "Route Mapper",
+                title: "Map",
                 icon: "map.fill",
-                summary: "Plot poles, measure footage, and export a polished route map.",
+                summary: "Plot poles, measure footage, and export a polished map.",
                 bullets: [
                     "**Step 1:** Search for an address or drop a pin to center the map, then tap to place poles in order.",
                     "**Step 2:** Long-press between poles to insert a new point, drag to refine placement, or tap a pin for details.",
@@ -164,11 +164,11 @@ struct HelpCenterView: View {
                 action: { navigation.navigate(to: .maps) }
             ),
             HelpTopic(
-                title: "Route Mapper Sessions & Markup",
+                title: "Map Sessions & Markup",
                 icon: "person.2.circle",
                 summary: "Collaborate live, draw markups, and manage shared annotations.",
                 bullets: [
-                    "**Step 1:** Open **Route Mapper** and tap **Start Session** to host or **Join** to enter a coworker’s code.",
+                    "**Step 1:** Open **Map** and tap **Start Session** to host or **Join** to enter a coworker’s code.",
                     "**Step 2:** Share the session code or invite link; the online badge updates as teammates connect.",
                     "**Step 3:** Expand the markup drawer to pick drawing tools, shapes, colors, line widths, and underground dash styles.",
                     "**Step 4:** Use undo, delete, or clear actions to manage shared markups—changes broadcast instantly to everyone.",

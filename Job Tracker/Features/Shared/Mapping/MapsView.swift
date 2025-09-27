@@ -1029,7 +1029,7 @@ struct MapsView: View {
             }
             .sheet(isPresented: $showInviteShare) {
                 if let code = sessionID {
-                    ActivityView(activityItems: ["Join my Route Mapper session with code: \(code)"])
+                    ActivityView(activityItems: ["Join my Map session with code: \(code)"])
                 }
             }
             .onAppear {
@@ -1060,7 +1060,7 @@ struct MapsView: View {
                 .allowsHitTesting(!isFullScreen)
                 .accessibilityHidden(isFullScreen)
         }
-        .navigationTitle("Route Mapper")
+        .navigationTitle("Map")
         .sheet(isPresented: $showingHelp) { RouteMapperHelp() }
         .sheet(item: $selectedPole) { pole in
             PoleInspectorView(pole: pole) { updated in
@@ -1677,7 +1677,7 @@ struct MapsView: View {
             NavigationView {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Route Mapper Guide").font(.title2).bold()
+                        Text("Map Guide").font(.title2).bold()
                         Group {
                             Text("Search: Use the search bar; tap a suggestion to zoom and drop a pole.")
                             Text("Add poles: Tap the map to drop poles in order. Long-press to insert between existing poles.")
@@ -1940,7 +1940,7 @@ struct MapsView: View {
         static func generate(poles: [Pole], mapImage: UIImage, totalDistance: Double) -> URL? {
             let pdfMeta = [
                 kCGPDFContextCreator: "Job Tracker",
-                kCGPDFContextAuthor:  "Route Mapper"
+                kCGPDFContextAuthor:  "Map"
             ] as CFDictionary
             let tmpURL = URL(fileURLWithPath: NSTemporaryDirectory())
                 .appendingPathComponent("Route_\(UUID().uuidString).pdf")

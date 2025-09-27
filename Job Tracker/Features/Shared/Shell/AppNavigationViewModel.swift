@@ -25,7 +25,7 @@ final class AppNavigationViewModel: ObservableObject {
             case .dashboard:   return "Dashboard"
             case .timesheets:  return "Timesheets"
             case .yellowSheet: return "Yellow Sheet"
-            case .maps:        return "Route Mapper"
+            case .maps:        return "Map"
             case .recentCrewJobs: return "Recent Crew Jobs"
             case .search:      return "Job Search"
             case .more:        return "More"
