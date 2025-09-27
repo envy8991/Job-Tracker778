@@ -1,5 +1,6 @@
 import SwiftUI
-import MapKit
+import CoreLocation
+import UIKit
 
 // MARK: - Data Models
 // These structs define the data for our network assets.
@@ -382,14 +383,10 @@ enum MapLayer: String, CaseIterable, Identifiable {
 struct MapsView: View {
     @StateObject private var viewModel = FiberMapViewModel()
     @State private var showControls = true
-    @State private var region: MKCoordinateRegion = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 35.9735, longitude: -88.9450),
-        span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-    )
 
     var body: some View {
         ZStack {
-            UIKitMapView(viewModel: viewModel, region: $region)
+            LeafletWebMapView(viewModel: viewModel)
                 .ignoresSafeArea()
 
             // Overlays for controls and instructions
@@ -578,7 +575,7 @@ struct LineEditView: View {
     @State var line: FiberLine
     var onSave: (FiberLine) -> Void
     var onCancel: () -> Void
-    
+
     var body: some View {
          NavigationStack {
             Form {
@@ -603,162 +600,15 @@ struct LineEditView: View {
     }
 }
 
-// MARK: - UIKit Map View Representable
-struct UIKitMapView: UIViewRepresentable {
-    @ObservedObject var viewModel: FiberMapViewModel
-    @Binding var region: MKCoordinateRegion
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    func makeUIView(context: Context) -> MKMapView {
-        let mapView = MKMapView()
-        mapView.delegate = context.coordinator
-        mapView.setRegion(region, animated: true)
-        let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
-        mapView.addGestureRecognizer(tapGesture)
-        return mapView
-    }
-
-    func updateUIView(_ uiView: MKMapView, context: Context) {
-        context.coordinator.updateAnnotations(on: uiView)
-        context.coordinator.updateOverlays(on: uiView)
-    }
-
-    class Coordinator: NSObject, MKMapViewDelegate {
-        var parent: UIKitMapView
-
-        init(_ parent: UIKitMapView) {
-            self.parent = parent
-        }
-
-        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
-            let mapView = gesture.view as! MKMapView
-            let location = gesture.location(in: mapView)
-            let coordinate = mapView.convert(location, toCoordinateFrom: mapView)
-            
-            // Check if tap was on an annotation
-            let view = mapView.hitTest(location, with: nil)
-            if view is MKMarkerAnnotationView {
-                // Let didSelect handle it
-                return
-            }
-
-            parent.viewModel.handleMapTap(coordinate: coordinate)
-        }
-
-        func updateAnnotations(on mapView: MKMapView) {
-            mapView.removeAnnotations(mapView.annotations)
-            
-            var annotations: [MKAnnotation] = []
-            if parent.viewModel.visibleLayers.contains(.poles) {
-                annotations.append(contentsOf: parent.viewModel.poles.map(PoleAnnotation.init))
-            }
-            if parent.viewModel.visibleLayers.contains(.splices) {
-                 annotations.append(contentsOf: parent.viewModel.splices.map(SpliceAnnotation.init))
-            }
-            mapView.addAnnotations(annotations)
-        }
-        
-        func updateOverlays(on mapView: MKMapView) {
-            mapView.removeOverlays(mapView.overlays)
-            if parent.viewModel.visibleLayers.contains(.lines) {
-                 let polylines = parent.viewModel.lines.compactMap { line -> MKPolyline? in
-                    guard let startPole = parent.viewModel.pole(for: line.startPoleId),
-                          let endPole = parent.viewModel.pole(for: line.endPoleId) else { return nil }
-                    
-                    let coordinates = [startPole.coordinate, endPole.coordinate]
-                    let polyline = FiberPolyline(coordinates: coordinates, count: 2)
-                    polyline.lineData = line
-                    return polyline
-                }
-                mapView.addOverlays(polylines)
-            }
-        }
-        
-        func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            if let poleAnnotation = annotation as? PoleAnnotation {
-                let identifier = "pole"
-                var view: MKMarkerAnnotationView
-                if let dequeuedView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView {
-                    dequeuedView.annotation = annotation
-                    view = dequeuedView
-                } else {
-                    view = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
-                }
-                view.markerTintColor = poleAnnotation.pole.status.uiColor
-                view.glyphImage = UIImage(systemName: "bolt.fill")
-                return view
-            } else if let spliceAnnotation = annotation as? SpliceAnnotation {
-                let identifier = "splice"
-                var view: MKMarkerAnnotationView
-                if let dequeuedView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView {
-                    dequeuedView.annotation = annotation
-                    view = dequeuedView
-                } else {
-                    view = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
-                }
-                view.markerTintColor = spliceAnnotation.splice.status.uiColor
-                view.glyphImage = UIImage(systemName: "square.stack.3d.up.fill")
-                return view
-            }
-            return nil
-        }
-        
-        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            if let polyline = overlay as? FiberPolyline, let lineData = polyline.lineData {
-                let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = lineData.status.uiColor
-                renderer.lineWidth = 3
-                return renderer
-            }
-            return MKOverlayRenderer()
-        }
-        
-        func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
-            if let annotation = view.annotation as? PoleAnnotation {
-                parent.viewModel.handlePoleTap(annotation.pole)
-            } else if let annotation = view.annotation as? SpliceAnnotation {
-                parent.viewModel.handleSpliceTap(annotation.splice)
-            }
-            mapView.deselectAnnotation(view.annotation, animated: true)
-        }
-        
-         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
-            DispatchQueue.main.async {
-                self.parent.region = mapView.region
-            }
-        }
-    }
-}
-
-// MARK: - Custom Annotation and Overlay Classes
-private class PoleAnnotation: NSObject, MKAnnotation {
-    let pole: Pole
-    var coordinate: CLLocationCoordinate2D { pole.coordinate }
-    var title: String? { pole.name }
-    init(_ pole: Pole) { self.pole = pole }
-}
-
-private class SpliceAnnotation: NSObject, MKAnnotation {
-    let splice: SpliceEnclosure
-    var coordinate: CLLocationCoordinate2D { splice.coordinate }
-    var title: String? { splice.name }
-    init(_ splice: SpliceEnclosure) { self.splice = splice }
-}
-
-private class FiberPolyline: MKPolyline {
-    var lineData: FiberLine?
-}
-
-
-// MARK: - Helper Extensions
-extension Binding {
+// MARK: - Helpers
+private extension Binding {
+    /// Provides a non-optional binding from an optional binding by supplying a default value.
     init(_ source: Binding<Value?>, default defaultValue: Value) {
         self.init(
             get: { source.wrappedValue ?? defaultValue },
-            set: { source.wrappedValue = $0 }
+            set: { newValue in
+                source.wrappedValue = newValue
+            }
         )
     }
 }

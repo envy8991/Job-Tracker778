@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fiber Optic Network Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+        }
+        .leaflet-popup-content {
+            margin: 13px 19px;
+            font-size: 14px;
+        }
+        @import url('https://rsms.me/inter/inter.css');
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="map"></div>
+    <script>
+        const FiberBridge = (function() {
+            const state = {
+                map: null,
+                layers: {
+                    poles: null,
+                    splices: null,
+                    lines: null
+                },
+                cache: {
+                    poles: new Map(),
+                    splices: new Map(),
+                    lines: new Map()
+                },
+                polePositions: new Map(),
+                isReady: false
+            };
+
+            function postMessage(event, payload) {
+                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.mapEvent) {
+                    window.webkit.messageHandlers.mapEvent.postMessage({ event, payload });
+                }
+            }
+
+            function ensureMap() {
+                if (state.map) { return; }
+                const map = L.map('map', {
+                    zoomControl: false
+                }).setView([36.3219, -88.9562], 16);
+
+                L.control.zoom({ position: 'topright' }).addTo(map);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
+
+                state.layers.poles = L.layerGroup().addTo(map);
+                state.layers.splices = L.layerGroup().addTo(map);
+                state.layers.lines = L.layerGroup().addTo(map);
+
+                map.on('click', function(event) {
+                    postMessage('mapTapped', {
+                        latitude: event.latlng.lat,
+                        longitude: event.latlng.lng
+                    });
+                });
+
+                state.map = map;
+                state.isReady = true;
+                postMessage('mapReady', null);
+            }
+
+            function clearLayer(layer) {
+                layer.clearLayers();
+            }
+
+            function createPoleMarker(pole) {
+                const icon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: '<div class="h-4 w-4 rounded-full bg-yellow-500 border-2 border-white shadow-md ring-2 ring-gray-700"></div>',
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
+                });
+                const marker = L.marker([pole.lat, pole.lng], { icon });
+                marker.bindPopup(renderPopup(pole, 'Pole'));
+                marker.on('click', function() {
+                    postMessage('poleTapped', { id: pole.id });
+                });
+                return marker;
+            }
+
+            function createSpliceMarker(splice) {
+                const colorMap = {
+                    'Good': '#22c55e',
+                    'Needs Inspection': '#3b82f6',
+                    'Damaged': '#ef4444'
+                };
+                const color = colorMap[splice.status] || 'gray';
+                const icon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class="h-4 w-4" style="background-color:${color}; border:2px solid white; box-shadow: 0 0 0 2px #4b5563;"></div>`,
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
+                });
+                const marker = L.marker([splice.lat, splice.lng], { icon });
+                marker.bindPopup(renderPopup(splice, 'Splice'));
+                marker.on('click', function() {
+                    postMessage('spliceTapped', { id: splice.id });
+                });
+                return marker;
+            }
+
+            function createLine(line) {
+                const start = state.polePositions.get(line.startPoleId);
+                const end = state.polePositions.get(line.endPoleId);
+                if (!start || !end) { return null; }
+                const statusColor = {
+                    'Active': '#16a34a',
+                    'Inactive': '#dc2626',
+                    'Planned': '#3b82f6'
+                };
+                const options = {
+                    color: statusColor[line.status] || 'gray',
+                    weight: 4,
+                    dashArray: line.status === 'Planned' ? '10, 10' : ''
+                };
+                const polyline = L.polyline([
+                    [start.lat, start.lng],
+                    [end.lat, end.lng]
+                ], options);
+                polyline.bindPopup(renderPopup(line, 'Line'));
+                polyline.on('click', function() {
+                    postMessage('lineTapped', { id: line.id });
+                });
+                return polyline;
+            }
+
+            function renderPopup(item, type) {
+                const ignoredKeys = new Set(['lat', 'lng', 'startPoleId', 'endPoleId']);
+                let html = `<div class="space-y-1"><h3 class="font-semibold text-gray-800">${item.name || type}</h3>`;
+                const isoDateRegex = /\d{4}-\d{2}-\d{2}T/;
+                Object.entries(item).forEach(([key, value]) => {
+                    if (ignoredKeys.has(key) || key === 'id' || value === null || value === undefined || key === 'name') { return; }
+                    const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                    if (key === 'imageUrl' && value) {
+                        html += `<img src="${value}" alt="${item.name || type}" class="rounded-md mt-2 max-h-40 w-full object-cover" onerror="this.style.display='none'">`;
+                    } else if (value instanceof Array) {
+                        html += `<strong>${formattedKey}:</strong> ${value.join(', ')}<br>`;
+                    } else if (typeof value === 'string' && isoDateRegex.test(value)) {
+                        const date = new Date(value);
+                        html += `<strong>${formattedKey}:</strong> ${isNaN(date.getTime()) ? value : date.toLocaleString()}<br>`;
+                    } else {
+                        html += `<strong>${formattedKey}:</strong> ${value}<br>`;
+                    }
+                });
+                html += '</div>';
+                return html;
+            }
+
+            function applySnapshot(snapshot) {
+                ensureMap();
+                state.cache.poles.clear();
+                state.cache.splices.clear();
+                state.cache.lines.clear();
+                state.polePositions.clear();
+
+                clearLayer(state.layers.poles);
+                clearLayer(state.layers.splices);
+                clearLayer(state.layers.lines);
+
+                snapshot.poles.forEach(pole => {
+                    state.polePositions.set(pole.id, { lat: pole.lat, lng: pole.lng });
+                    const marker = createPoleMarker(pole);
+                    state.cache.poles.set(pole.id, marker);
+                    marker.addTo(state.layers.poles);
+                });
+
+                snapshot.splices.forEach(splice => {
+                    const marker = createSpliceMarker(splice);
+                    state.cache.splices.set(splice.id, marker);
+                    marker.addTo(state.layers.splices);
+                });
+
+                snapshot.lines.forEach(line => {
+                    const polyline = createLine(line);
+                    if (polyline) {
+                        state.cache.lines.set(line.id, polyline);
+                        polyline.addTo(state.layers.lines);
+                    }
+                });
+
+                updateVisibleLayers(snapshot.visibleLayers || []);
+            }
+
+            function applyInteractionState(interaction) {
+                ensureMap();
+                if (!state.map) { return; }
+                const cursor = interaction.isEditMode ? 'crosshair' : 'grab';
+                state.map.getContainer().style.cursor = cursor;
+                if (interaction.center) {
+                    state.map.setView([interaction.center.latitude, interaction.center.longitude], interaction.center.zoom || state.map.getZoom());
+                }
+            }
+
+            function updateVisibleLayers(layerNames) {
+                ensureMap();
+                const set = new Set(layerNames);
+                Object.entries(state.layers).forEach(([key, layer]) => {
+                    if (!layer) { return; }
+                    if (set.has(key)) {
+                        if (!state.map.hasLayer(layer)) {
+                            layer.addTo(state.map);
+                        }
+                    } else if (state.map.hasLayer(layer)) {
+                        state.map.removeLayer(layer);
+                    }
+                });
+            }
+
+            function handleCommand(command) {
+                if (!command) { return; }
+                if (command.type === 'snapshot') {
+                    applySnapshot(command.payload);
+                } else if (command.type === 'interaction') {
+                    applyInteractionState(command.payload);
+                } else if (command.type === 'layers') {
+                    updateVisibleLayers(command.payload || []);
+                }
+            }
+
+            ensureMap();
+
+            return {
+                applySnapshot,
+                applyInteractionState,
+                updateVisibleLayers,
+                handleCommand
+            };
+        })();
+
+        window.FiberBridge = FiberBridge;
+    </script>
+</body>
+</html>
