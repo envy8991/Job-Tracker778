@@ -309,6 +309,7 @@ enum MapLayer: String, CaseIterable, Identifiable {
 // MARK: - Main SwiftUI View
 struct MapsView: View {
     @StateObject private var viewModel = FiberMapViewModel()
+    @State private var showControls = true
     @State private var region: MKCoordinateRegion = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 35.9735, longitude: -88.9450),
         span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
@@ -332,13 +333,43 @@ struct MapsView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            
-            HStack {
-                ControlPanelView(viewModel: viewModel)
-                    .padding()
+
+            VStack {
+                HStack(alignment: .top) {
+                    if showControls {
+                        ControlPanelView(viewModel: viewModel)
+                            .padding([.leading, .top])
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                    }
+                    Spacer()
+                }
+                Spacer()
+            }
+            .allowsHitTesting(showControls)
+
+            VStack {
+                HStack {
+                    Button {
+                        withAnimation(.easeInOut) {
+                            showControls.toggle()
+                        }
+                    } label: {
+                        Image(systemName: showControls ? "chevron.left" : "slider.horizontal.3")
+                            .font(.title3.weight(.semibold))
+                            .padding(12)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
+                    }
+                    .padding(.leading, showControls ? 282 : 20)
+                    .padding(.top, 20)
+                    .accessibilityLabel(showControls ? "Hide map controls" : "Show map controls")
+                    Spacer()
+                }
                 Spacer()
             }
         }
+        .animation(.easeInOut, value: showControls)
         .sheet(item: $viewModel.itemToEdit) { itemWrapper in
             let item = itemWrapper.value
             if let pole = item as? Pole {
