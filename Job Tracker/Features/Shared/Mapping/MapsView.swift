@@ -1021,6 +1021,8 @@ private struct RouteMapperMapView: UIViewRepresentable {
         private let poleIdentifier = "RouteMapperPole"
         private let spliceIdentifier = "RouteMapperSplice"
 
+        // The coordinator's parent must stay mutable so updateUIView can refresh
+        // the reference to the representable when SwiftUI recreates it.
         var parent: RouteMapperMapView
         private var lineDragStart: CLLocationCoordinate2D?
         private var isDraggingLine = false
