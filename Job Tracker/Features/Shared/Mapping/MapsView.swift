@@ -88,7 +88,11 @@ class FiberMapViewModel: ObservableObject {
     @Published var lines: [FiberLine] = []
 
     // UI State
-    @Published var isEditMode = false
+    @Published var isEditMode = false {
+        didSet {
+            handleEditModeChange(from: oldValue)
+        }
+    }
     @Published var activeTool: EditTool?
     @Published var selectedAsset: AnyHashable?
     @Published var lineStartPole: Pole?
@@ -231,7 +235,19 @@ class FiberMapViewModel: ObservableObject {
         }
         updateInstruction()
     }
-    
+
+    private func handleEditModeChange(from previousValue: Bool) {
+        guard previousValue != isEditMode else { return }
+
+        lineStartPole = nil
+
+        if isEditMode {
+            updateInstruction()
+        } else {
+            editInstruction = nil
+        }
+    }
+
     private func updateInstruction() {
         if isEditMode {
             if let tool = activeTool {
