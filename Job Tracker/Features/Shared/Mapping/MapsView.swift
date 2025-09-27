@@ -9,6 +9,7 @@ import SwiftUI
 import MapKit
 import CoreLocation
 import UIKit
+import ObjectiveC
 
 // MARK: - Shared Asset Types
 enum AssetStatus: String, CaseIterable, Identifiable {
@@ -919,13 +920,16 @@ private struct RouteMapperMapView: UIViewRepresentable {
         }
 
         func updateOverlays(on mapView: MKMapView) {
-            let currentOverlays = mapView.overlays.compactMap { $0 as? RouteFiberOverlay }
+            let currentOverlays = mapView.overlays.compactMap { overlay -> MKPolyline? in
+                guard let polyline = overlay as? MKPolyline, polyline.fiberMetadata != nil else { return nil }
+                return polyline
+            }
             if !currentOverlays.isEmpty {
                 mapView.removeOverlays(currentOverlays)
             }
 
             guard parent.viewModel.enabledLayers.contains(.fiber) else { return }
-            let overlays = parent.viewModel.fiberLines.map { RouteFiberOverlay(line: $0) }
+            let overlays = parent.viewModel.fiberLines.map { MKPolyline.fiberOverlay(from: $0) }
             if !overlays.isEmpty {
                 mapView.addOverlays(overlays)
             }
@@ -968,13 +972,16 @@ private struct RouteMapperMapView: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            guard let fiberOverlay = overlay as? RouteFiberOverlay else {
+            guard
+                let polyline = overlay as? MKPolyline,
+                let metadata = polyline.fiberMetadata
+            else {
                 return MKOverlayRenderer(overlay: overlay)
             }
 
-            let renderer = MKPolylineRenderer(polyline: fiberOverlay)
+            let renderer = MKPolylineRenderer(polyline: polyline)
             renderer.lineWidth = 4
-            renderer.strokeColor = fiberOverlay.status.annotationTint
+            renderer.strokeColor = metadata.line.status.annotationTint
             renderer.lineJoin = .round
             renderer.lineCap = .round
             return renderer
@@ -1018,17 +1025,29 @@ private final class SpliceAnnotation: NSObject, RouteAssetAnnotation {
     }
 }
 
-private final class RouteFiberOverlay: MKPolyline {
+private struct FiberOverlayMetadata {
     let line: FiberLine
-    let identifier: UUID
-    let status: AssetStatus
+}
 
-    init(line: FiberLine) {
-        self.line = line
-        self.identifier = line.id
-        self.status = line.status
+fileprivate extension MKPolyline {
+    private struct AssociatedKeys {
+        static var fiberMetadata = "fiberMetadata"
+    }
+
+    var fiberMetadata: FiberOverlayMetadata? {
+        get {
+            objc_getAssociatedObject(self, &AssociatedKeys.fiberMetadata) as? FiberOverlayMetadata
+        }
+        set {
+            objc_setAssociatedObject(self, &AssociatedKeys.fiberMetadata, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+    }
+
+    static func fiberOverlay(from line: FiberLine) -> MKPolyline {
         var coordinates = line.path
-        super.init(coordinates: &coordinates, count: coordinates.count)
+        let polyline = MKPolyline(coordinates: &coordinates, count: coordinates.count)
+        polyline.fiberMetadata = FiberOverlayMetadata(line: line)
+        return polyline
     }
 }
 
