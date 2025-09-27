@@ -250,13 +250,13 @@ struct LineDraft: Identifiable {
     var notes: String = ""
 }
 
-struct MapFocusRequest: Identifiable, Equatable {
+struct MapFocusRequest: Identifiable {
     let id = UUID()
     let coordinate: CLLocationCoordinate2D
     let span: MKCoordinateSpan
 }
 
-extension MapFocusRequest {
+extension MapFocusRequest: Equatable {
     static func == (lhs: MapFocusRequest, rhs: MapFocusRequest) -> Bool {
         lhs.coordinate.latitude == rhs.coordinate.latitude &&
         lhs.coordinate.longitude == rhs.coordinate.longitude &&
