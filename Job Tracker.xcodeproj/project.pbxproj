@@ -15,6 +15,7 @@
 		CDDA116E2D579F85007BADFF /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA116D2D579F85007BADFF /* FirebaseDatabase */; };
 		CDDA11702D579F85007BADFF /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA116F2D579F85007BADFF /* FirebaseFirestore */; };
 		CDDA11722D579F85007BADFF /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA11712D579F85007BADFF /* FirebaseStorage */; };
+		CDFE39FE2FA3624A00AEEAAB /* WebMaps in Resources */ = {isa = PBXBuildFile; fileRef = CDFE39FD2FA3624A00AEEAAB /* WebMaps */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,6 +58,7 @@
 		CD1C8C772E5BBB140001CE7E /* Job Tracker Companion Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Job Tracker Companion Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CDA531392E6CDE5400F5E950 /* Messages.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Messages.framework; path = System/Library/Frameworks/Messages.framework; sourceTree = SDKROOT; };
 		CDDA111D2D579EC0007BADFF /* Job Tracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Job Tracker.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CDFE39FD2FA3624A00AEEAAB /* WebMaps */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WebMaps; path = "Job Tracker/Resources/WebMaps"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -230,13 +232,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		CDDA111B2D579EC0007BADFF /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
+                CDDA111B2D579EC0007BADFF /* Resources */ = {
+                        isa = PBXResourcesBuildPhase;
+                        buildActionMask = 2147483647;
+                        files = (
+			CDFE39FE2FA3624A00AEEAAB /* WebMaps in Resources */,
+                        );
+                        runOnlyForDeploymentPostprocessing = 0;
+                };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
