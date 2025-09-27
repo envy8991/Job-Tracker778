@@ -1,1241 +1,662 @@
-//  MapsView.swift
-//  Job Tracker
-//
-//  Created by Quinton Thompson on 4/30/25.
-//  Updated: Rebuilt with native SwiftUI mapping controls and structured asset models.
-//
-
 import SwiftUI
 import MapKit
-import CoreLocation
-import UIKit
-import ObjectiveC
 
-// MARK: - Shared Asset Types
-enum AssetStatus: String, CaseIterable, Identifiable {
-    case planned
-    case active
-    case maintenance
-    case retired
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .planned: return "Planned"
-        case .active: return "Active"
-        case .maintenance: return "Maintenance"
-        case .retired: return "Retired"
-        }
-    }
-
-    var tint: Color {
-        switch self {
-        case .planned: return .blue
-        case .active: return .green
-        case .maintenance: return .orange
-        case .retired: return .gray
-        }
-    }
-
-    var annotationTint: UIColor {
-        switch self {
-        case .planned: return .systemBlue
-        case .active: return .systemGreen
-        case .maintenance: return .systemOrange
-        case .retired: return .systemGray
-        }
-    }
-}
+// MARK: - Data Models
+// These structs define the data for our network assets.
 
 struct Pole: Identifiable, Hashable {
     let id: UUID
     var name: String
     var coordinate: CLLocationCoordinate2D
     var status: AssetStatus
-    var capacity: Int
+    var installDate: Date?
+    var lastInspection: Date?
+    var material: String
     var notes: String
+    var imageUrl: String?
 
-    init(id: UUID = UUID(),
-         name: String = "",
-         coordinate: CLLocationCoordinate2D,
-         status: AssetStatus = .planned,
-         capacity: Int = 1,
-         notes: String = "") {
-        self.id = id
-        self.name = name
-        self.coordinate = coordinate
-        self.status = status
-        self.capacity = capacity
-        self.notes = notes
-    }
-}
-
-extension Pole {
-    static func == (lhs: Pole, rhs: Pole) -> Bool {
-        lhs.id == rhs.id
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
+    // Equatable and Hashable conformance based on ID for stable identity.
+    static func == (lhs: Pole, rhs: Pole) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 struct SpliceEnclosure: Identifiable, Hashable {
     let id: UUID
-    var label: String
+    var name: String
     var coordinate: CLLocationCoordinate2D
     var status: AssetStatus
     var capacity: Int
     var notes: String
+    var imageUrl: String?
 
-    init(id: UUID = UUID(),
-         label: String = "",
-         coordinate: CLLocationCoordinate2D,
-         status: AssetStatus = .planned,
-         capacity: Int = 12,
-         notes: String = "") {
-        self.id = id
-        self.label = label
-        self.coordinate = coordinate
-        self.status = status
-        self.capacity = capacity
-        self.notes = notes
-    }
-}
-
-extension SpliceEnclosure {
-    static func == (lhs: SpliceEnclosure, rhs: SpliceEnclosure) -> Bool {
-        lhs.id == rhs.id
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-}
-
-enum AssetReference: Hashable, Identifiable {
-    case pole(Pole.ID)
-    case splice(SpliceEnclosure.ID)
-
-    var id: String {
-        switch self {
-        case .pole(let id):
-            return "pole-\(id.uuidString)"
-        case .splice(let id):
-            return "splice-\(id.uuidString)"
-        }
-    }
+    static func == (lhs: SpliceEnclosure, rhs: SpliceEnclosure) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 struct FiberLine: Identifiable, Hashable {
     let id: UUID
-    var name: String
+    var startPoleId: Pole.ID
+    var endPoleId: Pole.ID
     var status: AssetStatus
-    var capacity: Int
-    var path: [CLLocationCoordinate2D]
-    var endpoints: [AssetReference]
+    var fiberCount: Int
+    var notes: String
 
-    init(id: UUID = UUID(),
-         name: String = "",
-         status: AssetStatus = .planned,
-         capacity: Int = 12,
-         path: [CLLocationCoordinate2D],
-         endpoints: [AssetReference] = []) {
-        self.id = id
-        self.name = name
-        self.status = status
-        self.capacity = capacity
-        self.path = path
-        self.endpoints = endpoints
-    }
+    static func == (lhs: FiberLine, rhs: FiberLine) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-extension FiberLine {
-    static func == (lhs: FiberLine, rhs: FiberLine) -> Bool {
-        lhs.id == rhs.id
-    }
+enum AssetStatus: String, CaseIterable, Identifiable, Codable {
+    case good = "Good"
+    case needsInspection = "Needs Inspection"
+    case damaged = "Damaged"
+    case active = "Active"
+    case inactive = "Inactive"
+    case planned = "Planned"
 
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
-}
+    var id: String { rawValue }
 
-// MARK: - UI Helpers
-enum SelectedAsset: Hashable, Identifiable {
-    case pole(Pole.ID)
-    case splice(SpliceEnclosure.ID)
-    case fiber(FiberLine.ID)
-
-    var id: String {
+    var color: Color {
         switch self {
-        case .pole(let id):
-            return "selected-pole-\(id.uuidString)"
-        case .splice(let id):
-            return "selected-splice-\(id.uuidString)"
-        case .fiber(let id):
-            return "selected-fiber-\(id.uuidString)"
+        case .good, .active: return .green
+        case .needsInspection, .planned: return .blue
+        case .damaged, .inactive: return .red
+        }
+    }
+    
+    var uiColor: UIColor {
+        switch self {
+        case .good, .active: return .systemGreen
+        case .needsInspection, .planned: return .systemBlue
+        case .damaged, .inactive: return .systemRed
+        }
+    }
+}
+
+// Wrapper to make AnyHashable identifiable for sheets
+struct AnyIdentifiable: Identifiable {
+    let id = UUID()
+    let value: AnyHashable
+}
+
+
+// MARK: - Map View Model
+@MainActor
+class FiberMapViewModel: ObservableObject {
+    // Data stores for our assets
+    @Published var poles: [Pole] = []
+    @Published var splices: [SpliceEnclosure] = []
+    @Published var lines: [FiberLine] = []
+
+    // UI State
+    @Published var isEditMode = false
+    @Published var activeTool: EditTool?
+    @Published var selectedAsset: AnyHashable?
+    @Published var lineStartPole: Pole?
+    @Published var editInstruction: String?
+    @Published var visibleLayers: Set<MapLayer> = [.poles, .splices, .lines]
+    
+    // Sheet presentation
+    @Published var itemToEdit: AnyIdentifiable?
+    
+    init() {
+        loadInitialData()
+    }
+    
+    // Asset lookup for drawing lines
+    func pole(for id: Pole.ID) -> Pole? {
+        poles.first { $0.id == id }
+    }
+    
+    // UI Interaction
+    func handleMapTap(coordinate: CLLocationCoordinate2D) {
+        guard isEditMode, let tool = activeTool else {
+            selectedAsset = nil
+            return
+        }
+        
+        switch tool {
+        case .addPole:
+            let newPole = Pole(id: UUID(), name: "New Pole", coordinate: coordinate, status: .good, material: "Wood", notes: "")
+            itemToEdit = AnyIdentifiable(value: newPole)
+        case .addSplice:
+            let newSplice = SpliceEnclosure(id: UUID(), name: "New Splice", coordinate: coordinate, status: .good, capacity: 12, notes: "")
+            itemToEdit = AnyIdentifiable(value: newSplice)
+        default:
+            break
+        }
+    }
+    
+    func handlePoleTap(_ pole: Pole) {
+        guard isEditMode else {
+            selectedAsset = pole
+            return
+        }
+        
+        switch activeTool {
+        case .drawLine:
+            if let startPole = lineStartPole {
+                // Finish drawing line if it's not the same pole
+                if pole.id != startPole.id {
+                     let newLine = FiberLine(id: UUID(), startPoleId: startPole.id, endPoleId: pole.id, status: .active, fiberCount: 12, notes: "")
+                     itemToEdit = AnyIdentifiable(value: newLine)
+                }
+                resetToolState()
+            } else {
+                // Start drawing line
+                lineStartPole = pole
+                updateInstruction()
+            }
+        case .delete:
+            poles.removeAll { $0.id == pole.id }
+            // Also remove lines connected to this pole
+            lines.removeAll { $0.startPoleId == pole.id || $0.endPoleId == pole.id }
+        default:
+            itemToEdit = AnyIdentifiable(value: pole)
+        }
+    }
+    
+    func handleSpliceTap(_ splice: SpliceEnclosure) {
+        guard isEditMode else {
+            selectedAsset = splice
+            return
+        }
+        
+        if activeTool == .delete {
+            splices.removeAll { $0.id == splice.id }
+        } else {
+            itemToEdit = AnyIdentifiable(value: splice)
+        }
+    }
+    
+    func handleLineTap(_ line: FiberLine) {
+         guard isEditMode else {
+            selectedAsset = line
+            return
+        }
+        if activeTool == .delete {
+            lines.removeAll { $0.id == line.id }
+        } else {
+            itemToEdit = AnyIdentifiable(value: line)
+        }
+    }
+
+    func saveItem<T: Hashable>(_ item: T) {
+         if let pole = item as? Pole {
+            if let index = poles.firstIndex(where: { $0.id == pole.id }) {
+                poles[index] = pole
+            } else {
+                poles.append(pole)
+            }
+        } else if let splice = item as? SpliceEnclosure {
+            if let index = splices.firstIndex(where: { $0.id == splice.id }) {
+                splices[index] = splice
+            } else {
+                splices.append(splice)
+            }
+        } else if let line = item as? FiberLine {
+             if let index = lines.firstIndex(where: { $0.id == line.id }) {
+                lines[index] = line
+            } else {
+                lines.append(line)
+            }
+        }
+        itemToEdit = nil
+    }
+    
+    func cancelEdit() {
+        itemToEdit = nil
+    }
+
+    func toggleLayer(_ layer: MapLayer) {
+        if visibleLayers.contains(layer) {
+            visibleLayers.remove(layer)
+        } else {
+            visibleLayers.insert(layer)
+        }
+    }
+    
+    func selectTool(_ tool: EditTool?) {
+        if activeTool == tool {
+            activeTool = nil
+        } else {
+            activeTool = tool
+        }
+        resetToolState(except: tool)
+    }
+    
+    private func resetToolState(except newTool: EditTool? = nil) {
+        lineStartPole = nil
+        if newTool != .drawLine {
+             activeTool = newTool
+        }
+        updateInstruction()
+    }
+    
+    private func updateInstruction() {
+        if isEditMode {
+            if let tool = activeTool {
+                switch tool {
+                case .addPole: editInstruction = "Tap map to add a pole."
+                case .addSplice: editInstruction = "Tap map to add a splice."
+                case .drawLine:
+                    if lineStartPole != nil {
+                        editInstruction = "Select an end pole for the line."
+                    } else {
+                        editInstruction = "Select a start pole for the line."
+                    }
+                case .delete: editInstruction = "Tap an asset to delete it."
+                }
+            } else {
+                editInstruction = "Select an editing tool."
+            }
+        } else {
+            editInstruction = nil
+        }
+    }
+
+    // Load sample data to populate the map initially
+    private func loadInitialData() {
+        let pole1 = Pole(id: UUID(), name: "P-001", coordinate: .init(latitude: 35.9735, longitude: -88.9450), status: .good, installDate: Date(), lastInspection: Date(), material: "Wood", notes: "Standard utility pole.", imageUrl: "https://placehold.co/400x300/cccccc/ffffff?text=Pole+P-001")
+        let pole2 = Pole(id: UUID(), name: "P-002", coordinate: .init(latitude: 35.9738, longitude: -88.9425), status: .needsInspection, installDate: Date(), lastInspection: Date(), material: "Wood", notes: "Leaning slightly.")
+        
+        let splice1 = SpliceEnclosure(id: UUID(), name: "SC-101", coordinate: .init(latitude: 35.97355, longitude: -88.9449), status: .good, capacity: 144, notes: "Attached to pole P-001.")
+        
+        let line1 = FiberLine(id: UUID(), startPoleId: pole1.id, endPoleId: pole2.id, status: .active, fiberCount: 48, notes: "Main trunk line.")
+        
+        self.poles = [pole1, pole2]
+        self.splices = [splice1]
+        self.lines = [line1]
+    }
+}
+
+// MARK: - Enums for UI controls
+enum EditTool: String, CaseIterable, Identifiable {
+    case addPole, addSplice, drawLine, delete
+    var id: String { rawValue }
+    
+    var icon: String {
+        switch self {
+        case .addPole: "plus.viewfinder"
+        case .addSplice: "square.stack.3d.up.fill"
+        case .drawLine: "pencil.and.ruler.fill"
+        case .delete: "trash.fill"
+        }
+    }
+    
+    var label: String {
+        switch self {
+        case .addPole: "Add Pole"
+        case .addSplice: "Add Splice"
+        case .drawLine: "Draw Line"
+        case .delete: "Delete"
         }
     }
 }
 
 enum MapLayer: String, CaseIterable, Identifiable {
-    case poles
-    case splices
-    case fiber
-
+    case poles, splices, lines
     var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .poles: return "Poles"
-        case .splices: return "Splice Enclosures"
-        case .fiber: return "Fiber"
-        }
-    }
-}
-
-enum EditTool: String, CaseIterable, Identifiable {
-    case addPole
-    case addSplice
-    case drawLine
-    case delete
-
-    var id: String { rawValue }
-
+    
     var label: String {
         switch self {
-        case .addPole: return "Add Pole"
-        case .addSplice: return "Add Splice"
-        case .drawLine: return "Draw Line"
-        case .delete: return "Delete"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .addPole: return "mappin.and.ellipse"
-        case .addSplice: return "square.stack.3d.up"
-        case .drawLine: return "pencil"
-        case .delete: return "trash"
+        case .poles: "Poles"
+        case .splices: "Splices"
+        case .lines: "Lines"
         }
     }
 }
 
-struct PoleDraft: Identifiable {
-    let id = UUID()
-    var coordinate: CLLocationCoordinate2D
-    var name: String = ""
-    var status: AssetStatus = .planned
-    var capacity: Int = 1
-    var notes: String = ""
-}
-
-struct SpliceDraft: Identifiable {
-    let id = UUID()
-    var coordinate: CLLocationCoordinate2D
-    var label: String = ""
-    var status: AssetStatus = .planned
-    var capacity: Int = 12
-    var notes: String = ""
-}
-
-struct LineDraft: Identifiable {
-    let id = UUID()
-    var points: [CLLocationCoordinate2D]
-    var name: String = ""
-    var status: AssetStatus = .planned
-    var capacity: Int = 12
-    var startEndpoint: AssetReference? = nil
-    var endEndpoint: AssetReference? = nil
-    var notes: String = ""
-}
-
-struct MapFocusRequest: Identifiable {
-    let id = UUID()
-    let coordinate: CLLocationCoordinate2D
-    let span: MKCoordinateSpan
-}
-
-extension MapFocusRequest: Equatable {
-    static func == (lhs: MapFocusRequest, rhs: MapFocusRequest) -> Bool {
-        lhs.coordinate.latitude == rhs.coordinate.latitude &&
-        lhs.coordinate.longitude == rhs.coordinate.longitude &&
-        lhs.span.latitudeDelta == rhs.span.latitudeDelta &&
-        lhs.span.longitudeDelta == rhs.span.longitudeDelta
-    }
-}
-
-private extension CLLocationCoordinate2D {
-    static let defaultCenter = CLLocationCoordinate2D(latitude: 35.9800, longitude: -88.9400)
-}
-
-// MARK: - View Model
-final class RouteMapperViewModel: ObservableObject {
-    @Published var enabledLayers: Set<MapLayer> = Set(MapLayer.allCases)
-    @Published var isEditMode = false {
-        didSet {
-            guard !isEditMode else { return }
-            activeTool = nil
-            pendingLinePoints.removeAll()
-        }
-    }
-    @Published var activeTool: EditTool? = nil {
-        didSet {
-            if activeTool != .drawLine {
-                pendingLinePoints.removeAll()
-            }
-        }
-    }
-    @Published var poles: [Pole] = []
-    @Published var splices: [SpliceEnclosure] = []
-    @Published var fiberLines: [FiberLine] = []
-    @Published var selectedAsset: SelectedAsset? {
-        didSet {
-            guard let selection = selectedAsset, selection != oldValue else { return }
-            focus(on: selection)
-        }
-    }
-    @Published var pendingLinePoints: [CLLocationCoordinate2D] = []
-    @Published var poleDraft: PoleDraft? = nil
-    @Published var spliceDraft: SpliceDraft? = nil
-    @Published var lineDraft: LineDraft? = nil
-    @Published private(set) var focusRequest: MapFocusRequest? = nil
-
-    private let focusSpan = MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005)
-
-    var shouldCaptureMapTap: Bool {
-        guard isEditMode, let tool = activeTool else { return false }
-        switch tool {
-        case .addPole, .addSplice, .drawLine, .delete:
-            return true
-        }
-    }
-
-    var toolInstruction: String? {
-        guard isEditMode else { return nil }
-        switch activeTool {
-        case nil:
-            return "Select a tool to start editing."
-        case .addPole?:
-            return "Tap anywhere on the map to drop a new pole."
-        case .addSplice?:
-            return "Tap anywhere on the map to place a splice enclosure."
-        case .drawLine?:
-            return pendingLinePoints.isEmpty ? "Tap the map to set the first point of the fiber line." : "Tap again to set the end of the fiber line."
-        case .delete?:
-            return "Tap an asset to remove it from the map."
-        }
-    }
-
-    func toggle(layer: MapLayer, isEnabled: Bool) {
-        if isEnabled {
-            enabledLayers.insert(layer)
-        } else {
-            enabledLayers.remove(layer)
-        }
-    }
-
-    func handleMapTap(at coordinate: CLLocationCoordinate2D) {
-        guard isEditMode, let tool = activeTool else { return }
-        switch tool {
-        case .addPole:
-            poleDraft = PoleDraft(coordinate: coordinate)
-        case .addSplice:
-            spliceDraft = SpliceDraft(coordinate: coordinate)
-        case .drawLine:
-            pendingLinePoints.append(coordinate)
-            presentLineDraftIfNeeded()
-        case .delete:
-            deleteNearestAsset(to: coordinate)
-        }
-    }
-
-    func beginLineDrawing(at coordinate: CLLocationCoordinate2D) {
-        guard isEditMode, activeTool == .drawLine else { return }
-        pendingLinePoints = [coordinate]
-    }
-
-    func finishLineDrawing(at coordinate: CLLocationCoordinate2D) {
-        guard isEditMode, activeTool == .drawLine else { return }
-        if pendingLinePoints.isEmpty {
-            pendingLinePoints.append(coordinate)
-        } else {
-            pendingLinePoints.append(coordinate)
-        }
-        presentLineDraftIfNeeded()
-    }
-
-    func handlePoleTap(_ pole: Pole) {
-        if isEditMode, activeTool == .delete {
-            removePole(with: pole.id)
-        } else {
-            selectedAsset = .pole(pole.id)
-        }
-    }
-
-    func handleSpliceTap(_ splice: SpliceEnclosure) {
-        if isEditMode, activeTool == .delete {
-            removeSplice(with: splice.id)
-        } else {
-            selectedAsset = .splice(splice.id)
-        }
-    }
-
-    func handleFiberTap(_ line: FiberLine) {
-        selectedAsset = .fiber(line.id)
-    }
-
-    func addPole(from draft: PoleDraft) {
-        let pole = Pole(
-            name: draft.name,
-            coordinate: draft.coordinate,
-            status: draft.status,
-            capacity: draft.capacity,
-            notes: draft.notes
-        )
-        poles.append(pole)
-        poleDraft = nil
-        selectedAsset = .pole(pole.id)
-    }
-
-    func addSplice(from draft: SpliceDraft) {
-        let splice = SpliceEnclosure(
-            label: draft.label,
-            coordinate: draft.coordinate,
-            status: draft.status,
-            capacity: draft.capacity,
-            notes: draft.notes
-        )
-        splices.append(splice)
-        spliceDraft = nil
-        selectedAsset = .splice(splice.id)
-    }
-
-    func addFiberLine(from draft: LineDraft) {
-        guard draft.points.count >= 2 else { return }
-        let endpoints = [draft.startEndpoint, draft.endEndpoint].compactMap { $0 }
-        let line = FiberLine(
-            name: draft.name,
-            status: draft.status,
-            capacity: draft.capacity,
-            path: draft.points,
-            endpoints: endpoints
-        )
-        fiberLines.append(line)
-        lineDraft = nil
-        selectedAsset = .fiber(line.id)
-    }
-
-    func cancelPoleDraft() {
-        poleDraft = nil
-    }
-
-    func cancelSpliceDraft() {
-        spliceDraft = nil
-    }
-
-    func cancelLineDraft() {
-        pendingLinePoints.removeAll()
-        lineDraft = nil
-    }
-
-    func consumeFocusRequest(_ id: MapFocusRequest.ID) {
-        if focusRequest?.id == id {
-            focusRequest = nil
-        }
-    }
-
-    func endpointOptions() -> [AssetReference] {
-        let poleRefs = poles.map { AssetReference.pole($0.id) }
-        let spliceRefs = splices.map { AssetReference.splice($0.id) }
-        return poleRefs + spliceRefs
-    }
-
-    func endpointLabel(for reference: AssetReference) -> String {
-        switch reference {
-        case .pole(let id):
-            if let name = poles.first(where: { $0.id == id })?.name,
-               !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return name
-            }
-            return "Pole"
-        case .splice(let id):
-            if let label = splices.first(where: { $0.id == id })?.label,
-               !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return label
-            }
-            return "Splice"
-        }
-    }
-
-    // MARK: - Private Helpers
-    private func presentLineDraftIfNeeded() {
-        guard pendingLinePoints.count >= 2 else { return }
-        let points = pendingLinePoints
-        pendingLinePoints.removeAll()
-        lineDraft = LineDraft(points: points)
-    }
-
-    private func deleteNearestAsset(to coordinate: CLLocationCoordinate2D) {
-        let targetPoint = MKMapPoint(coordinate)
-        let threshold: Double = 40 // meters
-
-        if let pole = poles.min(by: { MKMapPoint($0.coordinate).distance(to: targetPoint) < MKMapPoint($1.coordinate).distance(to: targetPoint) }),
-           MKMapPoint(pole.coordinate).distance(to: targetPoint) < threshold {
-            removePole(with: pole.id)
-            return
-        }
-
-        if let splice = splices.min(by: { MKMapPoint($0.coordinate).distance(to: targetPoint) < MKMapPoint($1.coordinate).distance(to: targetPoint) }),
-           MKMapPoint(splice.coordinate).distance(to: targetPoint) < threshold {
-            removeSplice(with: splice.id)
-            return
-        }
-
-        if let (index, line) = fiberLines.enumerated().min(by: { lineDistance(from: coordinate, to: $0.element.path) < lineDistance(from: coordinate, to: $1.element.path) }),
-           lineDistance(from: coordinate, to: line.path) < threshold {
-            fiberLines.remove(at: index)
-            if case .fiber(let id)? = selectedAsset, id == line.id {
-                selectedAsset = nil
-            }
-        }
-    }
-
-    private func removePole(with id: Pole.ID) {
-        poles.removeAll { $0.id == id }
-        if case .pole(let selectedID)? = selectedAsset, selectedID == id {
-            selectedAsset = nil
-        }
-    }
-
-    private func removeSplice(with id: SpliceEnclosure.ID) {
-        splices.removeAll { $0.id == id }
-        if case .splice(let selectedID)? = selectedAsset, selectedID == id {
-            selectedAsset = nil
-        }
-    }
-
-    private func lineDistance(from coordinate: CLLocationCoordinate2D, to path: [CLLocationCoordinate2D]) -> Double {
-        guard path.count >= 2 else { return .infinity }
-        var minDistance = Double.infinity
-        let targetPoint = MKMapPoint(coordinate)
-        for idx in 1..<path.count {
-            let a = MKMapPoint(path[idx - 1])
-            let b = MKMapPoint(path[idx])
-            let distance = targetPoint.distance(toLineSegmentBetween: a, and: b)
-            minDistance = min(minDistance, distance)
-        }
-        return minDistance
-    }
-
-    private func focus(on selection: SelectedAsset) {
-        switch selection {
-        case .pole(let id):
-            guard let pole = poles.first(where: { $0.id == id }) else { return }
-            focus(on: pole.coordinate)
-        case .splice(let id):
-            guard let splice = splices.first(where: { $0.id == id }) else { return }
-            focus(on: splice.coordinate)
-        case .fiber(let id):
-            guard let line = fiberLines.first(where: { $0.id == id }) else { return }
-            focus(onLine: line)
-        }
-    }
-
-    private func focus(on coordinate: CLLocationCoordinate2D) {
-        focusRequest = MapFocusRequest(coordinate: coordinate, span: focusSpan)
-    }
-
-    private func focus(onLine line: FiberLine) {
-        guard let center = midpoint(of: line.path) else { return }
-        focusRequest = MapFocusRequest(coordinate: center, span: focusSpan)
-    }
-
-    private func midpoint(of coordinates: [CLLocationCoordinate2D]) -> CLLocationCoordinate2D? {
-        guard !coordinates.isEmpty else { return nil }
-        let total = coordinates.reduce(into: (lat: 0.0, lon: 0.0)) { partialResult, value in
-            partialResult.lat += value.latitude
-            partialResult.lon += value.longitude
-        }
-        let count = Double(coordinates.count)
-        return CLLocationCoordinate2D(latitude: total.lat / count, longitude: total.lon / count)
-    }
-}
-
-// MARK: - Maps View
+// MARK: - Main SwiftUI View
 struct MapsView: View {
-    @StateObject private var viewModel = RouteMapperViewModel()
-    @State private var isSidebarCollapsed = false
-    @State private var mapRegion = MKCoordinateRegion(
-        center: .defaultCenter,
+    @StateObject private var viewModel = FiberMapViewModel()
+    @State private var region: MKCoordinateRegion = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 35.9735, longitude: -88.9450),
         span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
     )
 
     var body: some View {
-        content
-            .navigationTitle("Network Map")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Toggle(isOn: $viewModel.isEditMode) {
-                        Text("Edit Mode")
-                    }
-                    .toggleStyle(SwitchToggleStyle())
-                }
-            }
-            .sheet(item: $viewModel.poleDraft) { draft in
-                PoleFormView(draft: draft) { updated in
-                    viewModel.addPole(from: updated)
-                } onCancel: {
-                    viewModel.cancelPoleDraft()
-                }
-            }
-            .sheet(item: $viewModel.spliceDraft) { draft in
-                SpliceFormView(draft: draft) { updated in
-                    viewModel.addSplice(from: updated)
-                } onCancel: {
-                    viewModel.cancelSpliceDraft()
-                }
-            }
-            .sheet(item: $viewModel.lineDraft) { draft in
-                LineFormView(
-                    draft: draft,
-                    endpointOptions: viewModel.endpointOptions(),
-                    endpointLabelProvider: viewModel.endpointLabel(for:)
-                ) { updated in
-                    viewModel.addFiberLine(from: updated)
-                } onCancel: {
-                    viewModel.cancelLineDraft()
-                }
-            }
-            .onReceive(viewModel.$focusRequest.compactMap { $0 }) { request in
-                mapRegion = MKCoordinateRegion(center: request.coordinate, span: request.span)
-                viewModel.consumeFocusRequest(request.id)
-            }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        LegacyMapsView(
-            viewModel: viewModel,
-            isSidebarCollapsed: $isSidebarCollapsed,
-            mapRegion: $mapRegion
-        )
-    }
-}
-
-private struct LegacyMapsView: View {
-    @ObservedObject var viewModel: RouteMapperViewModel
-    @Binding var isSidebarCollapsed: Bool
-    @Binding var mapRegion: MKCoordinateRegion
-
-    var body: some View {
-        ZStack(alignment: .leading) {
-            RouteMapperMapView(viewModel: viewModel, region: $mapRegion)
+        ZStack {
+            UIKitMapView(viewModel: viewModel, region: $region)
                 .ignoresSafeArea()
-                .overlay(alignment: .bottom) {
-                    if let instruction = viewModel.toolInstruction {
-                        Text(instruction)
-                            .font(.footnote)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(.black.opacity(0.6), in: Capsule())
-                            .padding(.bottom, 24)
-                    }
-                }
-                .overlay(alignment: .topTrailing) {
-                    RouteMapperToolPicker(viewModel: viewModel)
-                        .padding(.top, 16)
-                        .padding(.trailing, 16)
-                }
 
-            RouteMapperSidebar(viewModel: viewModel)
-                .frame(maxHeight: .infinity)
-                .frame(width: isSidebarCollapsed ? 0 : 300)
-                .clipped()
-                .background {
-                    if isSidebarCollapsed {
-                        Color.clear
-                    } else {
-                        Rectangle().fill(.regularMaterial)
-                    }
-                }
-                .shadow(radius: isSidebarCollapsed ? 0 : 8)
-                .animation(.easeInOut(duration: 0.2), value: isSidebarCollapsed)
-
-            sidebarToggleButton
-                .padding(.leading, isSidebarCollapsed ? 12 : 312)
-                .padding(.top, 16)
-        }
-    }
-
-    private var sidebarToggleButton: some View {
-        Button {
-            isSidebarCollapsed.toggle()
-        } label: {
-            Image(systemName: isSidebarCollapsed ? "sidebar.leading" : "sidebar.trailing")
-                .foregroundStyle(.white)
-                .padding(10)
-                .background(.black.opacity(0.6), in: Circle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Shared UI Components
-private struct RouteMapperSidebar: View {
-    @ObservedObject var viewModel: RouteMapperViewModel
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Layers")
-                    .font(.headline)
-                ForEach(MapLayer.allCases) { layer in
-                    Toggle(layer.title, isOn: Binding(
-                        get: { viewModel.enabledLayers.contains(layer) },
-                        set: { value in
-                            viewModel.toggle(layer: layer, isEnabled: value)
-                        }
-                    ))
-                }
-
-                Divider()
-
-                if viewModel.enabledLayers.contains(.poles) {
-                    assetSection(
-                        title: "Poles",
-                        items: viewModel.poles.map { (SelectedAsset.pole($0.id), $0.name.isEmpty ? "Pole" : $0.name) }
-                    )
-                }
-
-                if viewModel.enabledLayers.contains(.splices) {
-                    assetSection(
-                        title: "Splice Enclosures",
-                        items: viewModel.splices.map { (SelectedAsset.splice($0.id), $0.label.isEmpty ? "Splice" : $0.label) }
-                    )
-                }
-
-                if viewModel.enabledLayers.contains(.fiber) && !viewModel.fiberLines.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Fiber Lines")
-                            .font(.headline)
-                        ForEach(viewModel.fiberLines) { line in
-                            Button {
-                                viewModel.handleFiberTap(line)
-                            } label: {
-                                HStack {
-                                    Text(line.name.isEmpty ? "Fiber Line" : line.name)
-                                        .foregroundStyle(.primary)
-                                    Spacer()
-                                    Text("\(line.capacity)-ct")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(8)
-                                .background(viewModel.selectedAsset == .fiber(line.id) ? Color.accentColor.opacity(0.1) : Color.clear)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+            // Overlays for controls and instructions
+            VStack {
+                Spacer()
+                if let instruction = viewModel.editInstruction {
+                    Text(instruction)
+                        .padding(12)
+                        .background(.thinMaterial)
+                        .cornerRadius(10)
+                        .shadow(radius: 5)
+                        .padding()
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .padding(20)
+            
+            HStack {
+                ControlPanelView(viewModel: viewModel)
+                    .padding()
+                Spacer()
+            }
         }
-    }
-
-    private func assetSection(title: String, items: [(SelectedAsset, String)]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            ForEach(items, id: \.0) { reference, label in
-                Button {
-                    viewModel.selectedAsset = reference
-                } label: {
-                    HStack {
-                        Text(label)
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(8)
-                    .background(viewModel.selectedAsset == reference ? Color.accentColor.opacity(0.1) : Color.clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                .buttonStyle(.plain)
+        .sheet(item: $viewModel.itemToEdit) { itemWrapper in
+            let item = itemWrapper.value
+            if let pole = item as? Pole {
+                PoleEditView(pole: pole, onSave: viewModel.saveItem, onCancel: viewModel.cancelEdit)
+            } else if let splice = item as? SpliceEnclosure {
+                SpliceEditView(splice: splice, onSave: viewModel.saveItem, onCancel: viewModel.cancelEdit)
+            } else if let line = item as? FiberLine {
+                LineEditView(line: line, onSave: viewModel.saveItem, onCancel: viewModel.cancelEdit)
             }
         }
     }
 }
 
-private struct RouteMapperToolPicker: View {
-    @ObservedObject var viewModel: RouteMapperViewModel
+// MARK: - Control Panel UI
+struct ControlPanelView: View {
+    @ObservedObject var viewModel: FiberMapViewModel
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            if viewModel.isEditMode {
-                Picker("Tool", selection: Binding(
-                    get: { viewModel.activeTool },
-                    set: { viewModel.activeTool = $0 }
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Map Controls").font(.headline).padding(.bottom, 4)
+
+            // Layer Toggles
+            Text("Layers").font(.subheadline).foregroundStyle(.secondary)
+            ForEach(MapLayer.allCases) { layer in
+                Toggle(isOn: Binding(
+                    get: { viewModel.visibleLayers.contains(layer) },
+                    set: { _ in viewModel.toggleLayer(layer) }
                 )) {
-                    Text("None").tag(EditTool?.none)
+                    Text(layer.label)
+                }
+            }
+
+            Divider().padding(.vertical, 8)
+            
+            // Edit Mode Toggle
+            Toggle(isOn: $viewModel.isEditMode.animation()) {
+                Text("Edit Mode").bold()
+            }
+            
+            // Editing Tools
+            if viewModel.isEditMode {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Tools").font(.subheadline).foregroundStyle(.secondary)
                     ForEach(EditTool.allCases) { tool in
-                        Label(tool.label, systemImage: tool.systemImage)
-                            .tag(EditTool?.some(tool))
+                        Button(action: { viewModel.selectTool(tool) }) {
+                            HStack {
+                                Image(systemName: tool.icon)
+                                Text(tool.label)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(8)
+                        .background(viewModel.activeTool == tool ? Color.accentColor.opacity(0.3) : Color.clear)
+                        .cornerRadius(8)
+                        .tint(viewModel.activeTool == tool ? .primary : .secondary)
                     }
                 }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 320)
+                .padding(.top, 4)
+                .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+        }
+        .padding()
+        .background(.regularMaterial)
+        .cornerRadius(15)
+        .shadow(radius: 5)
+        .frame(width: 250)
+    }
+}
+
+// MARK: - Editing Forms (Unchanged)
+struct PoleEditView: View {
+    @State var pole: Pole
+    var onSave: (Pole) -> Void
+    var onCancel: () -> Void
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Details") {
+                    TextField("Name", text: $pole.name)
+                    Picker("Status", selection: $pole.status) {
+                        ForEach([AssetStatus.good, .needsInspection, .damaged], id: \.self) {
+                            Text($0.rawValue).tag($0)
+                        }
+                    }
+                    TextField("Material", text: $pole.material)
+                    DatePicker("Install Date", selection: Binding($pole.installDate, default: Date()), displayedComponents: .date)
+                    DatePicker("Last Inspection", selection: Binding($pole.lastInspection, default: Date()), displayedComponents: .date)
+                }
+                Section("Notes") {
+                    TextEditor(text: $pole.notes)
+                }
+            }
+            .navigationTitle("Edit Pole")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onCancel) }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { onSave(pole) } }
             }
         }
     }
 }
 
-// MARK: - UIKit Backed Map View
-private struct RouteMapperMapView: UIViewRepresentable {
-    @ObservedObject var viewModel: RouteMapperViewModel
+struct SpliceEditView: View {
+    @State var splice: SpliceEnclosure
+    var onSave: (SpliceEnclosure) -> Void
+    var onCancel: () -> Void
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Details") {
+                    TextField("Name", text: $splice.name)
+                    Picker("Status", selection: $splice.status) {
+                         ForEach([AssetStatus.good, .needsInspection, .damaged], id: \.self) {
+                            Text($0.rawValue).tag($0)
+                        }
+                    }
+                    Stepper("Capacity: \(splice.capacity)", value: $splice.capacity, in: 0...288)
+                }
+                Section("Notes") {
+                    TextEditor(text: $splice.notes)
+                }
+            }
+            .navigationTitle("Edit Splice")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onCancel) }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { onSave(splice) } }
+            }
+        }
+    }
+}
+
+struct LineEditView: View {
+    @State var line: FiberLine
+    var onSave: (FiberLine) -> Void
+    var onCancel: () -> Void
+    
+    var body: some View {
+         NavigationStack {
+            Form {
+                Section("Details") {
+                    Picker("Status", selection: $line.status) {
+                        ForEach([AssetStatus.active, .inactive, .planned], id: \.self) {
+                            Text($0.rawValue).tag($0)
+                        }
+                    }
+                    Stepper("Fiber Count: \(line.fiberCount)", value: $line.fiberCount, in: 0...864, step: 12)
+                }
+                Section("Notes") {
+                    TextEditor(text: $line.notes)
+                }
+            }
+            .navigationTitle("Edit Line")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onCancel) }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { onSave(line) } }
+            }
+        }
+    }
+}
+
+// MARK: - UIKit Map View Representable
+struct UIKitMapView: UIViewRepresentable {
+    @ObservedObject var viewModel: FiberMapViewModel
     @Binding var region: MKCoordinateRegion
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(parent: self)
+        Coordinator(self)
     }
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
-        mapView.region = region
-        mapView.showsCompass = true
-        mapView.showsScale = false
-
+        mapView.setRegion(region, animated: true)
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
-        tapGesture.cancelsTouchesInView = false
         mapView.addGestureRecognizer(tapGesture)
-
-        let dragGesture = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress(_:)))
-        dragGesture.minimumPressDuration = 0
-        dragGesture.delegate = context.coordinator
-        mapView.addGestureRecognizer(dragGesture)
-
         return mapView
     }
 
-    func updateUIView(_ mapView: MKMapView, context: Context) {
-        context.coordinator.parent = self
-        if mapView.region.center.distance(to: region.center) > 1 || abs(mapView.region.span.latitudeDelta - region.span.latitudeDelta) > 0.0001 || abs(mapView.region.span.longitudeDelta - region.span.longitudeDelta) > 0.0001 {
-            mapView.setRegion(region, animated: true)
-        }
-
-        context.coordinator.updateAnnotations(on: mapView)
-        context.coordinator.updateOverlays(on: mapView)
+    func updateUIView(_ uiView: MKMapView, context: Context) {
+        context.coordinator.updateAnnotations(on: uiView)
+        context.coordinator.updateOverlays(on: uiView)
     }
 
-    // MARK: - Coordinator
-    final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
-        private let poleIdentifier = "RouteMapperPole"
-        private let spliceIdentifier = "RouteMapperSplice"
+    class Coordinator: NSObject, MKMapViewDelegate {
+        var parent: UIKitMapView
 
-        // The coordinator's parent must stay mutable so updateUIView can refresh
-        // the reference to the representable when SwiftUI recreates it.
-        var parent: RouteMapperMapView
-        private var lineDragStart: CLLocationCoordinate2D?
-        private var isDraggingLine = false
-
-        init(parent: RouteMapperMapView) {
+        init(_ parent: UIKitMapView) {
             self.parent = parent
         }
 
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
-            guard gesture.state == .ended,
-                  parent.viewModel.shouldCaptureMapTap,
-                  let mapView = gesture.view as? MKMapView else { return }
+            let mapView = gesture.view as! MKMapView
             let location = gesture.location(in: mapView)
             let coordinate = mapView.convert(location, toCoordinateFrom: mapView)
-            parent.viewModel.handleMapTap(at: coordinate)
-        }
-
-        @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
-            guard let mapView = gesture.view as? MKMapView else { return }
-            let location = gesture.location(in: mapView)
-            let coordinate = mapView.convert(location, toCoordinateFrom: mapView)
-
-            guard parent.viewModel.isEditMode, parent.viewModel.activeTool == .drawLine else {
-                if gesture.state == .ended {
-                    isDraggingLine = false
-                    lineDragStart = nil
-                }
+            
+            // Check if tap was on an annotation
+            let view = mapView.hitTest(location, with: nil)
+            if view is MKMarkerAnnotationView {
+                // Let didSelect handle it
                 return
             }
 
-            switch gesture.state {
-            case .began:
-                lineDragStart = coordinate
-                isDraggingLine = false
-            case .changed:
-                if !isDraggingLine, let start = lineDragStart {
-                    let startPoint = MKMapPoint(start)
-                    let currentPoint = MKMapPoint(coordinate)
-                    if startPoint.distance(to: currentPoint) > 4 {
-                        parent.viewModel.beginLineDrawing(at: start)
-                        isDraggingLine = true
-                    }
-                }
-            case .ended:
-                if isDraggingLine {
-                    parent.viewModel.finishLineDrawing(at: coordinate)
-                }
-                isDraggingLine = false
-                lineDragStart = nil
-            case .failed, .cancelled:
-                isDraggingLine = false
-                lineDragStart = nil
-            default:
-                break
-            }
-        }
-
-        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-            true
+            parent.viewModel.handleMapTap(coordinate: coordinate)
         }
 
         func updateAnnotations(on mapView: MKMapView) {
+            mapView.removeAnnotations(mapView.annotations)
+            
             var annotations: [MKAnnotation] = []
-
-            if parent.viewModel.enabledLayers.contains(.poles) {
-                annotations.append(contentsOf: parent.viewModel.poles.map { PoleAnnotation(pole: $0) })
+            if parent.viewModel.visibleLayers.contains(.poles) {
+                annotations.append(contentsOf: parent.viewModel.poles.map(PoleAnnotation.init))
             }
-            if parent.viewModel.enabledLayers.contains(.splices) {
-                annotations.append(contentsOf: parent.viewModel.splices.map { SpliceAnnotation(splice: $0) })
+            if parent.viewModel.visibleLayers.contains(.splices) {
+                 annotations.append(contentsOf: parent.viewModel.splices.map(SpliceAnnotation.init))
             }
-
-            let existing = mapView.annotations.compactMap { $0 as? RouteAssetAnnotation }
-            if !existing.isEmpty {
-                mapView.removeAnnotations(existing)
-            }
-            if !annotations.isEmpty {
-                mapView.addAnnotations(annotations)
-            }
+            mapView.addAnnotations(annotations)
         }
-
+        
         func updateOverlays(on mapView: MKMapView) {
-            let currentOverlays = mapView.overlays.compactMap { overlay -> MKPolyline? in
-                guard let polyline = overlay as? MKPolyline, polyline.fiberMetadata != nil else { return nil }
-                return polyline
-            }
-            if !currentOverlays.isEmpty {
-                mapView.removeOverlays(currentOverlays)
-            }
-
-            guard parent.viewModel.enabledLayers.contains(.fiber) else { return }
-            let overlays = parent.viewModel.fiberLines.map { MKPolyline.fiberOverlay(from: $0) }
-            if !overlays.isEmpty {
-                mapView.addOverlays(overlays)
+            mapView.removeOverlays(mapView.overlays)
+            if parent.viewModel.visibleLayers.contains(.lines) {
+                 let polylines = parent.viewModel.lines.compactMap { line -> MKPolyline? in
+                    guard let startPole = parent.viewModel.pole(for: line.startPoleId),
+                          let endPole = parent.viewModel.pole(for: line.endPoleId) else { return nil }
+                    
+                    let coordinates = [startPole.coordinate, endPole.coordinate]
+                    let polyline = FiberPolyline(coordinates: coordinates, count: 2)
+                    polyline.lineData = line
+                    return polyline
+                }
+                mapView.addOverlays(polylines)
             }
         }
-
+        
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            guard let assetAnnotation = annotation as? RouteAssetAnnotation else { return nil }
-
-            switch assetAnnotation {
-            case let poleAnnotation as PoleAnnotation:
-                let view = mapView.dequeueReusableAnnotationView(withIdentifier: poleIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: poleIdentifier)
-                view.annotation = annotation
-                view.canShowCallout = false
-                view.markerTintColor = poleAnnotation.pole.status.annotationTint
+            if let poleAnnotation = annotation as? PoleAnnotation {
+                let identifier = "pole"
+                var view: MKMarkerAnnotationView
+                if let dequeuedView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView {
+                    dequeuedView.annotation = annotation
+                    view = dequeuedView
+                } else {
+                    view = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+                }
+                view.markerTintColor = poleAnnotation.pole.status.uiColor
                 view.glyphImage = UIImage(systemName: "bolt.fill")
                 return view
-            case let spliceAnnotation as SpliceAnnotation:
-                let view = mapView.dequeueReusableAnnotationView(withIdentifier: spliceIdentifier) as? MKMarkerAnnotationView ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: spliceIdentifier)
-                view.annotation = annotation
-                view.canShowCallout = false
-                view.markerTintColor = spliceAnnotation.splice.status.annotationTint
+            } else if let spliceAnnotation = annotation as? SpliceAnnotation {
+                let identifier = "splice"
+                var view: MKMarkerAnnotationView
+                if let dequeuedView = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView {
+                    dequeuedView.annotation = annotation
+                    view = dequeuedView
+                } else {
+                    view = MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+                }
+                view.markerTintColor = spliceAnnotation.splice.status.uiColor
                 view.glyphImage = UIImage(systemName: "square.stack.3d.up.fill")
                 return view
-            default:
-                return nil
             }
+            return nil
         }
-
+        
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let polyline = overlay as? FiberPolyline, let lineData = polyline.lineData {
+                let renderer = MKPolylineRenderer(polyline: polyline)
+                renderer.strokeColor = lineData.status.uiColor
+                renderer.lineWidth = 3
+                return renderer
+            }
+            return MKOverlayRenderer()
+        }
+        
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
-            guard let assetAnnotation = view.annotation as? RouteAssetAnnotation else { return }
-            switch assetAnnotation {
-            case let poleAnnotation as PoleAnnotation:
-                parent.viewModel.handlePoleTap(poleAnnotation.pole)
-            case let spliceAnnotation as SpliceAnnotation:
-                parent.viewModel.handleSpliceTap(spliceAnnotation.splice)
-            default:
-                break
+            if let annotation = view.annotation as? PoleAnnotation {
+                parent.viewModel.handlePoleTap(annotation.pole)
+            } else if let annotation = view.annotation as? SpliceAnnotation {
+                parent.viewModel.handleSpliceTap(annotation.splice)
             }
             mapView.deselectAnnotation(view.annotation, animated: true)
         }
-
-        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            guard
-                let polyline = overlay as? MKPolyline,
-                let metadata = polyline.fiberMetadata
-            else {
-                return MKOverlayRenderer(overlay: overlay)
+        
+         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            DispatchQueue.main.async {
+                self.parent.region = mapView.region
             }
-
-            let renderer = MKPolylineRenderer(polyline: polyline)
-            renderer.lineWidth = 4
-            renderer.strokeColor = metadata.line.status.annotationTint
-            renderer.lineJoin = .round
-            renderer.lineCap = .round
-            return renderer
-        }
-
-        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
-            parent.region = mapView.region
         }
     }
 }
 
-private protocol RouteAssetAnnotation: MKAnnotation {
-    var identifier: UUID { get }
-}
-
-private final class PoleAnnotation: NSObject, RouteAssetAnnotation {
+// MARK: - Custom Annotation and Overlay Classes
+private class PoleAnnotation: NSObject, MKAnnotation {
     let pole: Pole
-    let identifier: UUID
-    @objc dynamic var coordinate: CLLocationCoordinate2D
-    var title: String? { pole.name.isEmpty ? "Pole" : pole.name }
-
-    init(pole: Pole) {
-        self.pole = pole
-        self.identifier = pole.id
-        self.coordinate = pole.coordinate
-        super.init()
-    }
+    var coordinate: CLLocationCoordinate2D { pole.coordinate }
+    var title: String? { pole.name }
+    init(_ pole: Pole) { self.pole = pole }
 }
 
-private final class SpliceAnnotation: NSObject, RouteAssetAnnotation {
+private class SpliceAnnotation: NSObject, MKAnnotation {
     let splice: SpliceEnclosure
-    let identifier: UUID
-    @objc dynamic var coordinate: CLLocationCoordinate2D
-    var title: String? { splice.label.isEmpty ? "Splice" : splice.label }
+    var coordinate: CLLocationCoordinate2D { splice.coordinate }
+    var title: String? { splice.name }
+    init(_ splice: SpliceEnclosure) { self.splice = splice }
+}
 
-    init(splice: SpliceEnclosure) {
-        self.splice = splice
-        self.identifier = splice.id
-        self.coordinate = splice.coordinate
-        super.init()
+private class FiberPolyline: MKPolyline {
+    var lineData: FiberLine?
+}
+
+
+// MARK: - Helper Extensions
+extension Binding {
+    init(_ source: Binding<Value?>, default defaultValue: Value) {
+        self.init(
+            get: { source.wrappedValue ?? defaultValue },
+            set: { source.wrappedValue = $0 }
+        )
     }
 }
 
-private struct FiberOverlayMetadata {
-    let line: FiberLine
-}
-
-fileprivate extension MKPolyline {
-    private struct AssociatedKeys {
-        static var fiberMetadata = "fiberMetadata"
-    }
-
-    var fiberMetadata: FiberOverlayMetadata? {
-        get {
-            objc_getAssociatedObject(self, &AssociatedKeys.fiberMetadata) as? FiberOverlayMetadata
-        }
-        set {
-            objc_setAssociatedObject(self, &AssociatedKeys.fiberMetadata, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-        }
-    }
-
-    static func fiberOverlay(from line: FiberLine) -> MKPolyline {
-        var coordinates = line.path
-        let polyline = MKPolyline(coordinates: &coordinates, count: coordinates.count)
-        polyline.fiberMetadata = FiberOverlayMetadata(line: line)
-        return polyline
-    }
-}
-
-// MARK: - Forms
-private struct PoleFormView: View {
-    @State private var draft: PoleDraft
-    let onSave: (PoleDraft) -> Void
-    let onCancel: () -> Void
-
-    init(draft: PoleDraft, onSave: @escaping (PoleDraft) -> Void, onCancel: @escaping () -> Void) {
-        _draft = State(initialValue: draft)
-        self.onSave = onSave
-        self.onCancel = onCancel
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Details") {
-                    TextField("Pole name", text: $draft.name)
-                    Picker("Status", selection: $draft.status) {
-                        ForEach(AssetStatus.allCases) { status in
-                            Text(status.displayName).tag(status)
-                        }
-                    }
-                    Stepper(value: $draft.capacity, in: 1...96) {
-                        Text("Capacity: \(draft.capacity)")
-                    }
-                }
-
-                Section("Notes") {
-                    TextEditor(text: $draft.notes)
-                        .frame(minHeight: 80)
-                }
-            }
-            .navigationTitle("New Pole")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        onSave(draft)
-                    }
-                }
-            }
-        }
-    }
-}
-
-private struct SpliceFormView: View {
-    @State private var draft: SpliceDraft
-    let onSave: (SpliceDraft) -> Void
-    let onCancel: () -> Void
-
-    init(draft: SpliceDraft, onSave: @escaping (SpliceDraft) -> Void, onCancel: @escaping () -> Void) {
-        _draft = State(initialValue: draft)
-        self.onSave = onSave
-        self.onCancel = onCancel
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Details") {
-                    TextField("Label", text: $draft.label)
-                    Picker("Status", selection: $draft.status) {
-                        ForEach(AssetStatus.allCases) { status in
-                            Text(status.displayName).tag(status)
-                        }
-                    }
-                    Stepper(value: $draft.capacity, in: 1...288) {
-                        Text("Capacity: \(draft.capacity)")
-                    }
-                }
-
-                Section("Notes") {
-                    TextEditor(text: $draft.notes)
-                        .frame(minHeight: 80)
-                }
-            }
-            .navigationTitle("New Splice")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        onSave(draft)
-                    }
-                }
-            }
-        }
-    }
-}
-
-private struct LineFormView: View {
-    @State private var draft: LineDraft
-    let endpointOptions: [AssetReference]
-    let endpointLabelProvider: (AssetReference) -> String
-    let onSave: (LineDraft) -> Void
-    let onCancel: () -> Void
-
-    init(draft: LineDraft,
-         endpointOptions: [AssetReference],
-         endpointLabelProvider: @escaping (AssetReference) -> String,
-         onSave: @escaping (LineDraft) -> Void,
-         onCancel: @escaping () -> Void) {
-        _draft = State(initialValue: draft)
-        self.endpointOptions = endpointOptions
-        self.endpointLabelProvider = endpointLabelProvider
-        self.onSave = onSave
-        self.onCancel = onCancel
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Details") {
-                    TextField("Fiber name", text: $draft.name)
-                    Picker("Status", selection: $draft.status) {
-                        ForEach(AssetStatus.allCases) { status in
-                            Text(status.displayName).tag(status)
-                        }
-                    }
-                    Stepper(value: $draft.capacity, in: 1...864, step: 6) {
-                        Text("Capacity: \(draft.capacity)")
-                    }
-                }
-
-                Section("Endpoints") {
-                    Picker("Start", selection: Binding(
-                        get: { draft.startEndpoint },
-                        set: { draft.startEndpoint = $0 }
-                    )) {
-                        Text("Unassigned").tag(AssetReference?.none)
-                        ForEach(endpointOptions, id: \.id) { option in
-                            Text(endpointLabelProvider(option)).tag(AssetReference?.some(option))
-                        }
-                    }
-
-                    Picker("End", selection: Binding(
-                        get: { draft.endEndpoint },
-                        set: { draft.endEndpoint = $0 }
-                    )) {
-                        Text("Unassigned").tag(AssetReference?.none)
-                        ForEach(endpointOptions, id: \.id) { option in
-                            Text(endpointLabelProvider(option)).tag(AssetReference?.some(option))
-                        }
-                    }
-                }
-
-                Section("Notes") {
-                    TextEditor(text: $draft.notes)
-                        .frame(minHeight: 80)
-                }
-            }
-            .navigationTitle("New Fiber Line")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        onSave(draft)
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Geometry helpers
-private extension MKMapPoint {
-    func distance(toLineSegmentBetween pointA: MKMapPoint, and pointB: MKMapPoint) -> Double {
-        let lineLengthSquared = pow(pointB.x - pointA.x, 2) + pow(pointB.y - pointA.y, 2)
-        guard lineLengthSquared > 0 else { return distance(to: pointA) }
-        let t = max(0, min(1, ((x - pointA.x) * (pointB.x - pointA.x) + (y - pointA.y) * (pointB.y - pointA.y)) / lineLengthSquared))
-        let projection = MKMapPoint(x: pointA.x + t * (pointB.x - pointA.x),
-                                    y: pointA.y + t * (pointB.y - pointA.y))
-        return distance(to: projection)
-    }
-}
-
-private extension CLLocationCoordinate2D {
-    func distance(to other: CLLocationCoordinate2D) -> Double {
-        let locationA = CLLocation(latitude: latitude, longitude: longitude)
-        let locationB = CLLocation(latitude: other.latitude, longitude: other.longitude)
-        return locationA.distance(from: locationB)
-    }
-}
