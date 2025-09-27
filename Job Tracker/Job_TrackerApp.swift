@@ -45,7 +45,6 @@ struct JobTrackerApp: App {
     @StateObject private var navigationViewModel = AppNavigationViewModel()
     @StateObject private var themeManager = JTThemeManager.shared
     @AppStorage("arrivalAlertsEnabledToday") private var arrivalAlertsEnabledToday = true
-    @AppStorage("hasSeenTutorial") private var hasSeenTutorial: Bool = false
     @State private var showSplash: Bool = true
     @State private var showImportSuccess: Bool = false
     @State private var importFailureMessage: String? = nil
@@ -68,40 +67,27 @@ struct JobTrackerApp: App {
         WindowGroup {
             ZStack {
                 Group {
-                    if hasSeenTutorial {
-                        ContentView()
+                    ContentView()
                         // Activate WCSession + push snapshot when main UI appears
-                            .onAppear {
-                                if !didWireWatchBridge {
-                                    PhoneWatchSyncManager.shared.configure(jobsViewModel: jobsViewModel)
-                                    didWireWatchBridge = true
-                                }
-                                // Start foreground location updates
-                                locationService.startStandardUpdates()
-                                // Ensure the watch has the latest on first appearance
-                                PhoneWatchSyncManager.shared.pushSnapshotToWatch()
+                        .onAppear {
+                            if !didWireWatchBridge {
+                                PhoneWatchSyncManager.shared.configure(jobsViewModel: jobsViewModel)
+                                didWireWatchBridge = true
                             }
-                            .onReceive(jobsViewModel.$jobs) { jobs in
-                                PhoneWatchSyncManager.shared.pushSnapshotToWatch()
-                                arrivalAlertManager.updateJobs(jobs)
-                            }
-                            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
-                                PhoneWatchSyncManager.shared.pushSnapshotToWatch()
-                                arrivalAlertManager.updateJobs(jobsViewModel.jobs)
-                            }
-                    } else {
-                        // First-run tutorial onboarding
-                        InteractiveTutorialView()
-                            .onAppear {
-                                if !didWireWatchBridge {
-                                    PhoneWatchSyncManager.shared.configure(jobsViewModel: jobsViewModel)
-                                    didWireWatchBridge = true
-                                }
-                                locationService.startStandardUpdates()
-                                PhoneWatchSyncManager.shared.pushSnapshotToWatch()
-                                arrivalAlertManager.updateJobs(jobsViewModel.jobs)
-                            }
-                    }
+                            // Start foreground location updates
+                            locationService.startStandardUpdates()
+                            // Ensure the watch has the latest on first appearance
+                            PhoneWatchSyncManager.shared.pushSnapshotToWatch()
+                            arrivalAlertManager.updateJobs(jobsViewModel.jobs)
+                        }
+                        .onReceive(jobsViewModel.$jobs) { jobs in
+                            PhoneWatchSyncManager.shared.pushSnapshotToWatch()
+                            arrivalAlertManager.updateJobs(jobs)
+                        }
+                        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                            PhoneWatchSyncManager.shared.pushSnapshotToWatch()
+                            arrivalAlertManager.updateJobs(jobsViewModel.jobs)
+                        }
                 }
                 .opacity(showSplash ? 0 : 1)
                 
@@ -128,7 +114,7 @@ struct JobTrackerApp: App {
                 .animation(.spring(response: 0.45, dampingFraction: 0.85), value: showImportSuccess)
                 .animation(.spring(response: 0.45, dampingFraction: 0.85), value: importFailureMessage)
             }
-            // Make view models available to both Tutorial and ContentView
+            // Make view models available to the main content views
             .environmentObject(authViewModel)
             .environmentObject(jobsViewModel)
             .environmentObject(usersViewModel)
