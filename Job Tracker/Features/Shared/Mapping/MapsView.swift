@@ -59,6 +59,16 @@ struct Pole: Identifiable, Hashable {
     }
 }
 
+extension Pole {
+    static func == (lhs: Pole, rhs: Pole) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+}
+
 struct SpliceEnclosure: Identifiable, Hashable {
     let id: UUID
     var label: String
@@ -79,6 +89,16 @@ struct SpliceEnclosure: Identifiable, Hashable {
         self.status = status
         self.capacity = capacity
         self.notes = notes
+    }
+}
+
+extension SpliceEnclosure {
+    static func == (lhs: SpliceEnclosure, rhs: SpliceEnclosure) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 
@@ -116,6 +136,16 @@ struct FiberLine: Identifiable, Hashable {
         self.capacity = capacity
         self.path = path
         self.endpoints = endpoints
+    }
+}
+
+extension FiberLine {
+    static func == (lhs: FiberLine, rhs: FiberLine) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 
@@ -215,6 +245,17 @@ private extension CLLocationCoordinate2D {
 
 // MARK: - Maps View
 struct MapsView: View {
+    var body: some View {
+        if #available(iOS 17.0, *) {
+            MapsViewiOS17()
+        } else {
+            LegacyMapsView()
+        }
+    }
+}
+
+@available(iOS 17.0, *)
+private struct MapsViewiOS17: View {
     @State private var cameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: .defaultCenter,
@@ -264,7 +305,13 @@ struct MapsView: View {
                         .frame(maxHeight: .infinity)
                         .frame(width: isSidebarCollapsed ? 0 : 300)
                         .clipped()
-                        .background(isSidebarCollapsed ? Color.clear : .regularMaterial)
+                        .background {
+                            if isSidebarCollapsed {
+                                Color.clear
+                            } else {
+                                Rectangle().fill(.regularMaterial)
+                            }
+                        }
                         .shadow(radius: isSidebarCollapsed ? 0 : 8)
                         .animation(.easeInOut(duration: 0.2), value: isSidebarCollapsed)
 
@@ -738,6 +785,38 @@ struct MapsView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct LegacyMapsView: View {
+    @State private var region = MKCoordinateRegion(
+        center: .defaultCenter,
+        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+    )
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 16) {
+                Map(coordinateRegion: $region)
+                    .frame(height: 320)
+                    .cornerRadius(16)
+                    .padding(.horizontal)
+
+                Text("Interactive network editing requires iOS 17 or newer.")
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+
+                Text("Update your device to the latest iOS version to unlock advanced mapping tools for poles, splice enclosures, and fiber lines.")
+                    .font(.subheadline)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+
+                Spacer()
+            }
+            .navigationTitle("Network Map")
+        }
     }
 }
 
