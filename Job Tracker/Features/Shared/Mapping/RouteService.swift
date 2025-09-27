@@ -88,30 +88,76 @@ final class RouteService: ObservableObject {
 extension Pole {
     
     func toDict() -> [String: Any] {
-        [
+        var dict: [String: Any] = [
             "id": id.uuidString,
+            "name": name,
             "lat": coordinate.latitude,
             "lon": coordinate.longitude,
-            "assignment": assignment,
-            "canAtLocation": canAtLocation,
+            "status": status.rawValue,
+            "material": material,
             "notes": notes
-            // NOTE: Photos could be stored as URLs here in the future.
         ]
+
+        if let installDate {
+            dict["installDate"] = Timestamp(date: installDate)
+        }
+
+        if let lastInspection {
+            dict["lastInspection"] = Timestamp(date: lastInspection)
+        }
+
+        if let imageUrl {
+            dict["imageUrl"] = imageUrl
+        }
+
+        return dict
     }
-    
+
     static func fromDict(_ dict: [String: Any]) -> Pole? {
         guard
             let idStr = dict["id"] as? String,
             let lat   = dict["lat"] as? CLLocationDegrees,
             let lon   = dict["lon"] as? CLLocationDegrees
         else { return nil }
-        
-        var pole = Pole(id: UUID(uuidString: idStr) ?? UUID(),
-                        coordinate: CLLocationCoordinate2D(latitude: lat,
-                                                            longitude: lon))
-        pole.assignment     = dict["assignment"]     as? String ?? ""
-        pole.canAtLocation  = dict["canAtLocation"]  as? Bool   ?? false
-        pole.notes          = dict["notes"]          as? String ?? ""
-        return pole
+
+        let id = UUID(uuidString: idStr) ?? UUID()
+        let name = dict["name"] as? String ?? "Pole"
+
+        let statusRaw = dict["status"] as? String
+        let status = statusRaw.flatMap(AssetStatus.init(rawValue:)) ?? .good
+
+        let installDate: Date?
+        if let timestamp = dict["installDate"] as? Timestamp {
+            installDate = timestamp.dateValue()
+        } else if let date = dict["installDate"] as? Date {
+            installDate = date
+        } else {
+            installDate = nil
+        }
+
+        let lastInspection: Date?
+        if let timestamp = dict["lastInspection"] as? Timestamp {
+            lastInspection = timestamp.dateValue()
+        } else if let date = dict["lastInspection"] as? Date {
+            lastInspection = date
+        } else {
+            lastInspection = nil
+        }
+
+        let material = dict["material"] as? String ?? "Unknown"
+        let notes = dict["notes"] as? String ?? ""
+        let imageUrl = dict["imageUrl"] as? String
+
+        return Pole(
+            id: id,
+            name: name,
+            coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+            status: status,
+            installDate: installDate,
+            lastInspection: lastInspection,
+            material: material,
+            notes: notes,
+            imageUrl: imageUrl
+        )
     }
 }
