@@ -256,6 +256,15 @@ struct MapFocusRequest: Identifiable, Equatable {
     let span: MKCoordinateSpan
 }
 
+extension MapFocusRequest {
+    static func == (lhs: MapFocusRequest, rhs: MapFocusRequest) -> Bool {
+        lhs.coordinate.latitude == rhs.coordinate.latitude &&
+        lhs.coordinate.longitude == rhs.coordinate.longitude &&
+        lhs.span.latitudeDelta == rhs.span.latitudeDelta &&
+        lhs.span.longitudeDelta == rhs.span.longitudeDelta
+    }
+}
+
 private extension CLLocationCoordinate2D {
     static let defaultCenter = CLLocationCoordinate2D(latitude: 35.9800, longitude: -88.9400)
 }
@@ -1012,7 +1021,7 @@ private struct RouteMapperMapView: UIViewRepresentable {
         private let poleIdentifier = "RouteMapperPole"
         private let spliceIdentifier = "RouteMapperSplice"
 
-        private var parent: RouteMapperMapView
+        var parent: RouteMapperMapView
         private var lineDragStart: CLLocationCoordinate2D?
         private var isDraggingLine = false
 
