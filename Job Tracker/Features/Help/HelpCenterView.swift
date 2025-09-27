@@ -153,26 +153,26 @@ struct HelpCenterView: View {
             HelpTopic(
                 title: "Route Mapper",
                 icon: "map.fill",
-                summary: "Plot poles, measure footage, and export a polished route map.",
+                summary: "Work in the redesigned map workspace with flexible layers and route tools.",
                 bullets: [
-                    "**Step 1:** Search for an address or drop a pin to center the map, then tap to place poles in order.",
-                    "**Step 2:** Long-press between poles to insert a new point, drag to refine placement, or tap a pin for details.",
-                    "**Step 3:** In the pole inspector, capture assignments, footage, notes, and photos for construction teams.",
-                    "**Step 4:** Use the map-style picker and distance badge to confirm the path before exporting.",
-                    "**Step 5:** Tap **Share** to generate a PDF route packet you can send or save for permits."
+                    "**Step 1:** Open **Route Mapper** to load the new canvas with search, layer toggles, and map controls pinned to the right.",
+                    "**Step 2:** Search for an address or drop the start pin, then tap the map to add route poles in sequence.",
+                    "**Step 3:** Drag any pole to fine-tune placement, or tap it to edit assignments, footage, notes, and photos in the inspector.",
+                    "**Step 4:** Toggle poles, markups, or imagery layers on and off to focus on the data you need while measuring the distance badge.",
+                    "**Step 5:** Use **Share** to export a PDF packet that captures the current layers and pole details."
                 ],
                 action: { navigation.navigate(to: .maps) }
             ),
             HelpTopic(
                 title: "Route Mapper Sessions & Markup",
                 icon: "person.2.circle",
-                summary: "Collaborate live, draw markups, and manage shared annotations.",
+                summary: "Collaborate live with shared editing tools, markup layers, and export-ready layouts.",
                 bullets: [
-                    "**Step 1:** Open **Route Mapper** and tap **Start Session** to host or **Join** to enter a coworker’s code.",
-                    "**Step 2:** Share the session code or invite link; the online badge updates as teammates connect.",
-                    "**Step 3:** Expand the markup drawer to pick drawing tools, shapes, colors, line widths, and underground dash styles.",
-                    "**Step 4:** Use undo, delete, or clear actions to manage shared markups—changes broadcast instantly to everyone.",
-                    "**Step 5:** When finished, end the session or export the PDF so the markup snapshot is saved with the route."
+                    "**Step 1:** Start or join a shared Route Mapper session so everyone edits the same workspace in real time.",
+                    "**Step 2:** Watch the participant badge to confirm collaborators are connected before you begin drawing.",
+                    "**Step 3:** Slide open the markup drawer, choose the tool and shape you need, then adjust colors, fill, and line styles.",
+                    "**Step 4:** Use the layer toggles and markup list to show, hide, or clean up drawings without disrupting pole data.",
+                    "**Step 5:** When the group is finished, export the route to capture the shared edits or close the session to lock the map."
                 ],
                 action: { navigation.navigate(to: .maps) }
             ),
