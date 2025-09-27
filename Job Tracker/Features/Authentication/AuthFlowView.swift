@@ -37,13 +37,7 @@ struct AuthFlowView: View {
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @EnvironmentObject private var themeManager: JTThemeManager
-    @AppStorage("hasSeenTutorial") private var hasSeenTutorial: Bool = false
-    @AppStorage("interactiveTutorialCurrentStage") private var tutorialStageIndex: Int = 0
-    @AppStorage("interactiveTutorialCompletedStages") private var tutorialCompletedStages: String = ""
-
     @State private var selection: Step
-    @State private var showingTutorial = false
 
     init(initialStep: Step = .signIn) {
         _selection = State(initialValue: initialStep)
@@ -91,24 +85,11 @@ struct AuthFlowView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                     .animation(reduceMotion ? nil : .spring(response: 0.44, dampingFraction: 0.88), value: selection)
 
-                    tutorialEntry
                 }
                 .padding(.horizontal, JTSpacing.lg)
                 .padding(.vertical, JTSpacing.xl)
                 .frame(maxWidth: .infinity)
             }
-        }
-        .sheet(isPresented: $showingTutorial) {
-            InteractiveTutorialView {
-                if reduceMotion {
-                    showingTutorial = false
-                } else {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showingTutorial = false
-                    }
-                }
-            }
-            .preferredColorScheme(themeManager.theme.colorScheme)
         }
     }
 
@@ -128,43 +109,6 @@ struct AuthFlowView: View {
         .frame(maxWidth: .infinity)
         .padding(.top, JTSpacing.lg)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: selection)
-    }
-
-    private var tutorialEntry: some View {
-        VStack(spacing: JTSpacing.sm) {
-            Button {
-                showingTutorial = true
-            } label: {
-                Label("Preview the onboarding tutorial", systemImage: "sparkles.tv")
-                    .font(JTTypography.body)
-                    .foregroundStyle(JTColors.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, JTSpacing.md)
-                    .padding(.horizontal, JTSpacing.lg)
-                    .jtGlassBackground(cornerRadius: JTShapes.buttonCornerRadius,
-                                       strokeColor: JTColors.glassSoftStroke,
-                                       strokeWidth: 1)
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint("Opens the interactive walkthrough in a sheet")
-
-            if hasSeenTutorial {
-                Button {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-                        hasSeenTutorial = false
-                        tutorialStageIndex = 0
-                        tutorialCompletedStages = ""
-                    }
-                } label: {
-                    Text("Reset tutorial progress for this device")
-                        .font(JTTypography.caption)
-                        .foregroundStyle(JTColors.textMuted)
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint("Next app launch will surface the tutorial again")
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private func transition(to step: Step) -> () -> Void {
