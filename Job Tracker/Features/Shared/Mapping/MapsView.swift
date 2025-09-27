@@ -14,10 +14,6 @@ struct Pole: Identifiable, Hashable {
     var material: String
     var notes: String
     var imageUrl: String?
-
-    // Equatable and Hashable conformance based on ID for stable identity.
-    static func == (lhs: Pole, rhs: Pole) -> Bool { lhs.id == rhs.id }
-    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 struct SpliceEnclosure: Identifiable, Hashable {
@@ -28,9 +24,6 @@ struct SpliceEnclosure: Identifiable, Hashable {
     var capacity: Int
     var notes: String
     var imageUrl: String?
-
-    static func == (lhs: SpliceEnclosure, rhs: SpliceEnclosure) -> Bool { lhs.id == rhs.id }
-    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 struct FiberLine: Identifiable, Hashable {
@@ -40,9 +33,6 @@ struct FiberLine: Identifiable, Hashable {
     var status: AssetStatus
     var fiberCount: Int
     var notes: String
-
-    static func == (lhs: FiberLine, rhs: FiberLine) -> Bool { lhs.id == rhs.id }
-    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 enum AssetStatus: String, CaseIterable, Identifiable, Codable {
