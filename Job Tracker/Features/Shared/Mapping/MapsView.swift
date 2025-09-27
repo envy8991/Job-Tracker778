@@ -16,6 +16,28 @@ struct Pole: Identifiable, Hashable, Codable {
     var notes: String
     var imageUrl: String?
 
+    public init(
+        id: UUID,
+        name: String,
+        coordinate: CLLocationCoordinate2D,
+        status: AssetStatus,
+        installDate: Date? = nil,
+        lastInspection: Date? = nil,
+        material: String,
+        notes: String,
+        imageUrl: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.coordinate = coordinate
+        self.status = status
+        self.installDate = installDate
+        self.lastInspection = lastInspection
+        self.material = material
+        self.notes = notes
+        self.imageUrl = imageUrl
+    }
+
     static func == (lhs: Pole, rhs: Pole) -> Bool {
         lhs.id == rhs.id &&
         lhs.name == rhs.name &&
@@ -82,6 +104,24 @@ struct SpliceEnclosure: Identifiable, Hashable, Codable {
     var notes: String
     var imageUrl: String?
 
+    init(
+        id: UUID,
+        name: String,
+        coordinate: CLLocationCoordinate2D,
+        status: AssetStatus,
+        capacity: Int,
+        notes: String,
+        imageUrl: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.coordinate = coordinate
+        self.status = status
+        self.capacity = capacity
+        self.notes = notes
+        self.imageUrl = imageUrl
+    }
+
     static func == (lhs: SpliceEnclosure, rhs: SpliceEnclosure) -> Bool {
         lhs.id == rhs.id &&
         lhs.name == rhs.name &&
@@ -138,6 +178,22 @@ struct FiberLine: Identifiable, Hashable, Codable {
     var status: AssetStatus
     var fiberCount: Int
     var notes: String
+
+    init(
+        id: UUID,
+        startPoleId: Pole.ID,
+        endPoleId: Pole.ID,
+        status: AssetStatus,
+        fiberCount: Int,
+        notes: String
+    ) {
+        self.id = id
+        self.startPoleId = startPoleId
+        self.endPoleId = endPoleId
+        self.status = status
+        self.fiberCount = fiberCount
+        self.notes = notes
+    }
 
     static func == (lhs: FiberLine, rhs: FiberLine) -> Bool {
         lhs.id == rhs.id &&
