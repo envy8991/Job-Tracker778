@@ -14,6 +14,32 @@ struct Pole: Identifiable, Hashable {
     var material: String
     var notes: String
     var imageUrl: String?
+
+    static func == (lhs: Pole, rhs: Pole) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.name == rhs.name &&
+        lhs.coordinate.latitude == rhs.coordinate.latitude &&
+        lhs.coordinate.longitude == rhs.coordinate.longitude &&
+        lhs.status == rhs.status &&
+        lhs.installDate == rhs.installDate &&
+        lhs.lastInspection == rhs.lastInspection &&
+        lhs.material == rhs.material &&
+        lhs.notes == rhs.notes &&
+        lhs.imageUrl == rhs.imageUrl
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(name)
+        hasher.combine(coordinate.latitude)
+        hasher.combine(coordinate.longitude)
+        hasher.combine(status)
+        hasher.combine(installDate)
+        hasher.combine(lastInspection)
+        hasher.combine(material)
+        hasher.combine(notes)
+        hasher.combine(imageUrl)
+    }
 }
 
 struct SpliceEnclosure: Identifiable, Hashable {
@@ -24,6 +50,28 @@ struct SpliceEnclosure: Identifiable, Hashable {
     var capacity: Int
     var notes: String
     var imageUrl: String?
+
+    static func == (lhs: SpliceEnclosure, rhs: SpliceEnclosure) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.name == rhs.name &&
+        lhs.coordinate.latitude == rhs.coordinate.latitude &&
+        lhs.coordinate.longitude == rhs.coordinate.longitude &&
+        lhs.status == rhs.status &&
+        lhs.capacity == rhs.capacity &&
+        lhs.notes == rhs.notes &&
+        lhs.imageUrl == rhs.imageUrl
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(name)
+        hasher.combine(coordinate.latitude)
+        hasher.combine(coordinate.longitude)
+        hasher.combine(status)
+        hasher.combine(capacity)
+        hasher.combine(notes)
+        hasher.combine(imageUrl)
+    }
 }
 
 struct FiberLine: Identifiable, Hashable {
@@ -33,6 +81,24 @@ struct FiberLine: Identifiable, Hashable {
     var status: AssetStatus
     var fiberCount: Int
     var notes: String
+
+    static func == (lhs: FiberLine, rhs: FiberLine) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.startPoleId == rhs.startPoleId &&
+        lhs.endPoleId == rhs.endPoleId &&
+        lhs.status == rhs.status &&
+        lhs.fiberCount == rhs.fiberCount &&
+        lhs.notes == rhs.notes
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(startPoleId)
+        hasher.combine(endPoleId)
+        hasher.combine(status)
+        hasher.combine(fiberCount)
+        hasher.combine(notes)
+    }
 }
 
 enum AssetStatus: String, CaseIterable, Identifiable, Codable {
