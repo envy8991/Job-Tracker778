@@ -376,7 +376,10 @@ private struct MapsViewiOS17: View {
         Map(position: $cameraPosition, interactionModes: .all) {
             if enabledLayers.contains(.poles) {
                 ForEach(poles) { pole in
-                    MapAnnotation(coordinate: pole.coordinate) {
+                    Annotation(
+                        pole.name.isEmpty ? "Pole" : pole.name,
+                        coordinate: pole.coordinate
+                    ) {
                         assetPin(
                             color: pole.status.tint,
                             systemName: "bolt.fill",
@@ -390,7 +393,10 @@ private struct MapsViewiOS17: View {
 
             if enabledLayers.contains(.splices) {
                 ForEach(splices) { splice in
-                    MapAnnotation(coordinate: splice.coordinate) {
+                    Annotation(
+                        splice.label.isEmpty ? "Splice" : splice.label,
+                        coordinate: splice.coordinate
+                    ) {
                         assetPin(
                             color: splice.status.tint,
                             systemName: "square.stack.3d.up.fill",
