@@ -572,11 +572,9 @@ struct MapsView: View {
     )
 
     @available(iOS 17.0, *)
-    @State private var cameraPosition = MapCameraPosition.region(
-        MKCoordinateRegion(
-            center: .defaultCenter,
-            span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-        )
+    @State private var cameraRegion17 = MKCoordinateRegion(
+        center: .defaultCenter,
+        span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
     )
 
     var body: some View {
@@ -617,7 +615,7 @@ struct MapsView: View {
             }
             .onReceive(viewModel.$focusRequest.compactMap { $0 }) { request in
                 if #available(iOS 17.0, *) {
-                    cameraPosition = .region(MKCoordinateRegion(center: request.coordinate, span: request.span))
+                    cameraRegion17 = MKCoordinateRegion(center: request.coordinate, span: request.span)
                 } else {
                     mapRegion = MKCoordinateRegion(center: request.coordinate, span: request.span)
                 }
@@ -631,7 +629,7 @@ struct MapsView: View {
             MapsViewiOS17(
                 viewModel: viewModel,
                 isSidebarCollapsed: $isSidebarCollapsed,
-                cameraPosition: $cameraPosition
+                focusRegion: $cameraRegion17
             )
         } else {
             LegacyMapsView(
@@ -647,7 +645,31 @@ struct MapsView: View {
 private struct MapsViewiOS17: View {
     @ObservedObject var viewModel: RouteMapperViewModel
     @Binding var isSidebarCollapsed: Bool
-    @Binding var cameraPosition: MapCameraPosition
+    @Binding var focusRegion: MKCoordinateRegion
+    @State private var cameraRegion: MKCoordinateRegion
+
+    init(
+        viewModel: RouteMapperViewModel,
+        isSidebarCollapsed: Binding<Bool>,
+        focusRegion: Binding<MKCoordinateRegion>
+    ) {
+        self.viewModel = viewModel
+        self._isSidebarCollapsed = isSidebarCollapsed
+        self._focusRegion = focusRegion
+        self._cameraRegion = State(initialValue: focusRegion.wrappedValue)
+    }
+
+    private var cameraPositionBinding: Binding<MapCameraPosition> {
+        Binding(
+            get: { .region(cameraRegion) },
+            set: { newValue in
+                if case let .region(region) = newValue {
+                    cameraRegion = region
+                    focusRegion = region
+                }
+            }
+        )
+    }
 
     var body: some View {
         MapReader { proxy in
@@ -690,10 +712,13 @@ private struct MapsViewiOS17: View {
             }
             .ignoresSafeArea()
         }
+        .onChange(of: focusRegion) { newValue in
+            cameraRegion = newValue
+        }
     }
 
     private func mapLayer(proxy: MapProxy) -> some View {
-        Map(position: $cameraPosition, interactionModes: .all) {
+        Map(position: cameraPositionBinding, interactionModes: .all) {
             if viewModel.enabledLayers.contains(.poles) {
                 ForEach(viewModel.poles) { pole in
                     Annotation(
