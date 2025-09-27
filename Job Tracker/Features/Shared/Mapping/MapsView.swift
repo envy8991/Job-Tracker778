@@ -5,7 +5,7 @@ import UIKit
 // MARK: - Data Models
 // These structs define the data for our network assets.
 
-struct Pole: Identifiable, Hashable {
+struct Pole: Identifiable, Hashable, Codable {
     let id: UUID
     var name: String
     var coordinate: CLLocationCoordinate2D
@@ -41,9 +41,39 @@ struct Pole: Identifiable, Hashable {
         hasher.combine(notes)
         hasher.combine(imageUrl)
     }
+    private enum CodingKeys: String, CodingKey {
+        case id, name, coordinate, status, installDate, lastInspection, material, notes, imageUrl
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        let coord = try container.decode(CodableCoordinate.self, forKey: .coordinate)
+        coordinate = coord.coordinate
+        status = try container.decode(AssetStatus.self, forKey: .status)
+        installDate = try container.decodeIfPresent(Date.self, forKey: .installDate)
+        lastInspection = try container.decodeIfPresent(Date.self, forKey: .lastInspection)
+        material = try container.decode(String.self, forKey: .material)
+        notes = try container.decode(String.self, forKey: .notes)
+        imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(CodableCoordinate(coordinate), forKey: .coordinate)
+        try container.encode(status, forKey: .status)
+        try container.encodeIfPresent(installDate, forKey: .installDate)
+        try container.encodeIfPresent(lastInspection, forKey: .lastInspection)
+        try container.encode(material, forKey: .material)
+        try container.encode(notes, forKey: .notes)
+        try container.encodeIfPresent(imageUrl, forKey: .imageUrl)
+    }
 }
 
-struct SpliceEnclosure: Identifiable, Hashable {
+struct SpliceEnclosure: Identifiable, Hashable, Codable {
     let id: UUID
     var name: String
     var coordinate: CLLocationCoordinate2D
@@ -73,9 +103,35 @@ struct SpliceEnclosure: Identifiable, Hashable {
         hasher.combine(notes)
         hasher.combine(imageUrl)
     }
+    private enum CodingKeys: String, CodingKey {
+        case id, name, coordinate, status, capacity, notes, imageUrl
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        let coord = try container.decode(CodableCoordinate.self, forKey: .coordinate)
+        coordinate = coord.coordinate
+        status = try container.decode(AssetStatus.self, forKey: .status)
+        capacity = try container.decode(Int.self, forKey: .capacity)
+        notes = try container.decode(String.self, forKey: .notes)
+        imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(CodableCoordinate(coordinate), forKey: .coordinate)
+        try container.encode(status, forKey: .status)
+        try container.encode(capacity, forKey: .capacity)
+        try container.encode(notes, forKey: .notes)
+        try container.encodeIfPresent(imageUrl, forKey: .imageUrl)
+    }
 }
 
-struct FiberLine: Identifiable, Hashable {
+struct FiberLine: Identifiable, Hashable, Codable {
     let id: UUID
     var startPoleId: Pole.ID
     var endPoleId: Pole.ID
@@ -99,6 +155,43 @@ struct FiberLine: Identifiable, Hashable {
         hasher.combine(status)
         hasher.combine(fiberCount)
         hasher.combine(notes)
+    }
+    private enum CodingKeys: String, CodingKey {
+        case id, startPoleId, endPoleId, status, fiberCount, notes
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        startPoleId = try container.decode(UUID.self, forKey: .startPoleId)
+        endPoleId = try container.decode(UUID.self, forKey: .endPoleId)
+        status = try container.decode(AssetStatus.self, forKey: .status)
+        fiberCount = try container.decode(Int.self, forKey: .fiberCount)
+        notes = try container.decode(String.self, forKey: .notes)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(startPoleId, forKey: .startPoleId)
+        try container.encode(endPoleId, forKey: .endPoleId)
+        try container.encode(status, forKey: .status)
+        try container.encode(fiberCount, forKey: .fiberCount)
+        try container.encode(notes, forKey: .notes)
+    }
+}
+
+private struct CodableCoordinate: Codable {
+    var latitude: Double
+    var longitude: Double
+
+    init(_ coordinate: CLLocationCoordinate2D) {
+        latitude = coordinate.latitude
+        longitude = coordinate.longitude
+    }
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 }
 
@@ -144,6 +237,8 @@ class FiberMapViewModel: ObservableObject {
     @Published var splices: [SpliceEnclosure] = []
     @Published var lines: [FiberLine] = []
 
+    private let storage: FiberMapStorage
+
     // UI State
     @Published var isEditMode = false {
         didSet {
@@ -159,8 +254,12 @@ class FiberMapViewModel: ObservableObject {
     // Sheet presentation
     @Published var itemToEdit: AnyIdentifiable?
     
-    init() {
-        loadInitialData()
+    init(storage: FiberMapStorage = .shared) {
+        self.storage = storage
+        if !loadFromStorage() {
+            loadInitialData()
+            persistSilently()
+        }
     }
     
     // Asset lookup for drawing lines
@@ -211,6 +310,7 @@ class FiberMapViewModel: ObservableObject {
             poles.removeAll { $0.id == pole.id }
             // Also remove lines connected to this pole
             lines.removeAll { $0.startPoleId == pole.id || $0.endPoleId == pole.id }
+            persistSilently()
         default:
             itemToEdit = AnyIdentifiable(value: pole)
         }
@@ -224,6 +324,7 @@ class FiberMapViewModel: ObservableObject {
         
         if activeTool == .delete {
             splices.removeAll { $0.id == splice.id }
+            persistSilently()
         } else {
             itemToEdit = AnyIdentifiable(value: splice)
         }
@@ -236,6 +337,7 @@ class FiberMapViewModel: ObservableObject {
         }
         if activeTool == .delete {
             lines.removeAll { $0.id == line.id }
+            persistSilently()
         } else {
             itemToEdit = AnyIdentifiable(value: line)
         }
@@ -262,6 +364,7 @@ class FiberMapViewModel: ObservableObject {
             }
         }
         itemToEdit = nil
+        persistSilently()
     }
     
     func cancelEdit() {
@@ -331,14 +434,36 @@ class FiberMapViewModel: ObservableObject {
     private func loadInitialData() {
         let pole1 = Pole(id: UUID(), name: "P-001", coordinate: .init(latitude: 35.9735, longitude: -88.9450), status: .good, installDate: Date(), lastInspection: Date(), material: "Wood", notes: "Standard utility pole.", imageUrl: "https://placehold.co/400x300/cccccc/ffffff?text=Pole+P-001")
         let pole2 = Pole(id: UUID(), name: "P-002", coordinate: .init(latitude: 35.9738, longitude: -88.9425), status: .needsInspection, installDate: Date(), lastInspection: Date(), material: "Wood", notes: "Leaning slightly.")
-        
+
         let splice1 = SpliceEnclosure(id: UUID(), name: "SC-101", coordinate: .init(latitude: 35.97355, longitude: -88.9449), status: .good, capacity: 144, notes: "Attached to pole P-001.")
-        
+
         let line1 = FiberLine(id: UUID(), startPoleId: pole1.id, endPoleId: pole2.id, status: .active, fiberCount: 48, notes: "Main trunk line.")
-        
+
         self.poles = [pole1, pole2]
         self.splices = [splice1]
         self.lines = [line1]
+    }
+
+    private func loadFromStorage() -> Bool {
+        do {
+            guard let snapshot = try storage.load() else { return false }
+            self.poles = snapshot.poles
+            self.splices = snapshot.splices
+            self.lines = snapshot.lines
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func persistSilently() {
+        do {
+            try storage.save(poles: poles, splices: splices, lines: lines)
+        } catch {
+#if DEBUG
+            print("FiberMapStorage save error:", error)
+#endif
+        }
     }
 }
 
