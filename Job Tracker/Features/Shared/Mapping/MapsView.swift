@@ -571,12 +571,6 @@ struct MapsView: View {
         span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
     )
 
-    @available(iOS 17.0, *)
-    @State private var cameraRegion17 = MKCoordinateRegion(
-        center: .defaultCenter,
-        span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-    )
-
     var body: some View {
         content
             .navigationTitle("Network Map")
@@ -614,198 +608,18 @@ struct MapsView: View {
                 }
             }
             .onReceive(viewModel.$focusRequest.compactMap { $0 }) { request in
-                if #available(iOS 17.0, *) {
-                    cameraRegion17 = MKCoordinateRegion(center: request.coordinate, span: request.span)
-                } else {
-                    mapRegion = MKCoordinateRegion(center: request.coordinate, span: request.span)
-                }
+                mapRegion = MKCoordinateRegion(center: request.coordinate, span: request.span)
                 viewModel.consumeFocusRequest(request.id)
             }
     }
 
     @ViewBuilder
     private var content: some View {
-        if #available(iOS 17.0, *) {
-            MapsViewiOS17(
-                viewModel: viewModel,
-                isSidebarCollapsed: $isSidebarCollapsed,
-                focusRegion: $cameraRegion17
-            )
-        } else {
-            LegacyMapsView(
-                viewModel: viewModel,
-                isSidebarCollapsed: $isSidebarCollapsed,
-                mapRegion: $mapRegion
-            )
-        }
-    }
-}
-
-@available(iOS 17.0, *)
-private struct MapsViewiOS17: View {
-    @ObservedObject var viewModel: RouteMapperViewModel
-    @Binding var isSidebarCollapsed: Bool
-    @Binding var focusRegion: MKCoordinateRegion
-    @State private var cameraRegion: MKCoordinateRegion
-
-    init(
-        viewModel: RouteMapperViewModel,
-        isSidebarCollapsed: Binding<Bool>,
-        focusRegion: Binding<MKCoordinateRegion>
-    ) {
-        self.viewModel = viewModel
-        self._isSidebarCollapsed = isSidebarCollapsed
-        self._focusRegion = focusRegion
-        self._cameraRegion = State(initialValue: focusRegion.wrappedValue)
-    }
-
-    private var cameraPositionBinding: Binding<MapCameraPosition> {
-        Binding(
-            get: { .region(cameraRegion) },
-            set: { newValue in
-                if case let .region(region) = newValue {
-                    cameraRegion = region
-                    focusRegion = region
-                }
-            }
+        LegacyMapsView(
+            viewModel: viewModel,
+            isSidebarCollapsed: $isSidebarCollapsed,
+            mapRegion: $mapRegion
         )
-    }
-
-    var body: some View {
-        MapReader { proxy in
-            ZStack(alignment: .leading) {
-                mapLayer(proxy: proxy)
-                    .overlay(alignment: .bottom) {
-                        if let instruction = viewModel.toolInstruction {
-                            Text(instruction)
-                                .font(.footnote)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(.black.opacity(0.6), in: Capsule())
-                                .padding(.bottom, 24)
-                        }
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        RouteMapperToolPicker(viewModel: viewModel)
-                            .padding(.top, 16)
-                            .padding(.trailing, 16)
-                    }
-
-                RouteMapperSidebar(viewModel: viewModel)
-                    .frame(maxHeight: .infinity)
-                    .frame(width: isSidebarCollapsed ? 0 : 300)
-                    .clipped()
-                    .background {
-                        if isSidebarCollapsed {
-                            Color.clear
-                        } else {
-                            Rectangle().fill(.regularMaterial)
-                        }
-                    }
-                    .shadow(radius: isSidebarCollapsed ? 0 : 8)
-                    .animation(.easeInOut(duration: 0.2), value: isSidebarCollapsed)
-
-                sidebarToggleButton
-                    .padding(.leading, isSidebarCollapsed ? 12 : 312)
-                    .padding(.top, 16)
-            }
-            .ignoresSafeArea()
-        }
-        .onChange(of: focusRegion) { newValue in
-            cameraRegion = newValue
-        }
-    }
-
-    private func mapLayer(proxy: MapProxy) -> some View {
-        Map(position: cameraPositionBinding, interactionModes: .all) {
-            if viewModel.enabledLayers.contains(.poles) {
-                ForEach(viewModel.poles) { pole in
-                    Annotation(
-                        pole.name.isEmpty ? "Pole" : pole.name,
-                        coordinate: pole.coordinate
-                    ) {
-                        assetPin(
-                            color: pole.status.tint,
-                            systemName: "bolt.fill",
-                            label: pole.name.isEmpty ? "Pole" : pole.name
-                        ) {
-                            viewModel.handlePoleTap(pole)
-                        }
-                    }
-                }
-            }
-
-            if viewModel.enabledLayers.contains(.splices) {
-                ForEach(viewModel.splices) { splice in
-                    Annotation(
-                        splice.label.isEmpty ? "Splice" : splice.label,
-                        coordinate: splice.coordinate
-                    ) {
-                        assetPin(
-                            color: splice.status.tint,
-                            systemName: "square.stack.3d.up.fill",
-                            label: splice.label.isEmpty ? "Splice" : splice.label
-                        ) {
-                            viewModel.handleSpliceTap(splice)
-                        }
-                    }
-                }
-            }
-
-            if viewModel.enabledLayers.contains(.fiber) {
-                ForEach(viewModel.fiberLines) { line in
-                    MapPolyline(coordinates: line.path)
-                        .stroke(line.status.tint, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
-                }
-            }
-        }
-        .mapStyle(.standard)
-        .overlay(alignment: .center) {
-            if viewModel.shouldCaptureMapTap {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onEnded { value in
-                                guard viewModel.shouldCaptureMapTap,
-                                      let coordinate = proxy.convert(value.location, from: .local) else { return }
-                                viewModel.handleMapTap(at: coordinate)
-                            }
-                    )
-            }
-        }
-    }
-
-    private var sidebarToggleButton: some View {
-        Button {
-            isSidebarCollapsed.toggle()
-        } label: {
-            Image(systemName: isSidebarCollapsed ? "sidebar.leading" : "sidebar.trailing")
-                .foregroundStyle(.white)
-                .padding(10)
-                .background(.black.opacity(0.6), in: Circle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func assetPin(color: Color, systemName: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: systemName)
-                    .symbolVariant(.fill)
-                    .foregroundStyle(.white)
-                    .padding(8)
-                    .background(color, in: Circle())
-                Text(label)
-                    .font(.caption2)
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(.thinMaterial, in: Capsule())
-            }
-        }
-        .buttonStyle(.plain)
     }
 }
 
