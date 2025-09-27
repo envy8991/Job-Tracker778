@@ -565,70 +565,22 @@ final class RouteMapperViewModel: ObservableObject {
 // MARK: - Maps View
 struct MapsView: View {
     @StateObject private var viewModel = RouteMapperViewModel()
+    @State private var isSidebarCollapsed = false
+    @State private var mapRegion = MKCoordinateRegion(
+        center: .defaultCenter,
+        span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+    )
 
-    var body: some View {
-        if #available(iOS 17.0, *) {
-            MapsViewiOS17(viewModel: viewModel)
-        } else {
-            LegacyMapsView(viewModel: viewModel)
-        }
-    }
-}
-
-@available(iOS 17.0, *)
-private struct MapsViewiOS17: View {
-    @ObservedObject var viewModel: RouteMapperViewModel
-
-    @State private var cameraPosition: MapCameraPosition = .region(
+    @available(iOS 17.0, *)
+    @State private var cameraPosition = MapCameraPosition.region(
         MKCoordinateRegion(
             center: .defaultCenter,
             span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
         )
     )
-    @State private var isSidebarCollapsed = false
 
     var body: some View {
-        NavigationStack {
-            MapReader { proxy in
-                ZStack(alignment: .leading) {
-                    mapLayer(proxy: proxy)
-                        .overlay(alignment: .bottom) {
-                            if let instruction = viewModel.toolInstruction {
-                                Text(instruction)
-                                    .font(.footnote)
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
-                                    .background(.black.opacity(0.6), in: Capsule())
-                                    .padding(.bottom, 24)
-                            }
-                        }
-                        .overlay(alignment: .topTrailing) {
-                            RouteMapperToolPicker(viewModel: viewModel)
-                                .padding(.top, 16)
-                                .padding(.trailing, 16)
-                        }
-
-                    RouteMapperSidebar(viewModel: viewModel)
-                        .frame(maxHeight: .infinity)
-                        .frame(width: isSidebarCollapsed ? 0 : 300)
-                        .clipped()
-                        .background {
-                            if isSidebarCollapsed {
-                                Color.clear
-                            } else {
-                                Rectangle().fill(.regularMaterial)
-                            }
-                        }
-                        .shadow(radius: isSidebarCollapsed ? 0 : 8)
-                        .animation(.easeInOut(duration: 0.2), value: isSidebarCollapsed)
-
-                    sidebarToggleButton
-                        .padding(.leading, isSidebarCollapsed ? 12 : 312)
-                        .padding(.top, 16)
-                }
-                .ignoresSafeArea()
-            }
+        content
             .navigationTitle("Network Map")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -638,35 +590,105 @@ private struct MapsViewiOS17: View {
                     .toggleStyle(SwitchToggleStyle())
                 }
             }
-        }
-        .sheet(item: $viewModel.poleDraft) { draft in
-            PoleFormView(draft: draft) { updated in
-                viewModel.addPole(from: updated)
-            } onCancel: {
-                viewModel.cancelPoleDraft()
+            .sheet(item: $viewModel.poleDraft) { draft in
+                PoleFormView(draft: draft) { updated in
+                    viewModel.addPole(from: updated)
+                } onCancel: {
+                    viewModel.cancelPoleDraft()
+                }
             }
-        }
-        .sheet(item: $viewModel.spliceDraft) { draft in
-            SpliceFormView(draft: draft) { updated in
-                viewModel.addSplice(from: updated)
-            } onCancel: {
-                viewModel.cancelSpliceDraft()
+            .sheet(item: $viewModel.spliceDraft) { draft in
+                SpliceFormView(draft: draft) { updated in
+                    viewModel.addSplice(from: updated)
+                } onCancel: {
+                    viewModel.cancelSpliceDraft()
+                }
             }
-        }
-        .sheet(item: $viewModel.lineDraft) { draft in
-            LineFormView(
-                draft: draft,
-                endpointOptions: viewModel.endpointOptions(),
-                endpointLabelProvider: viewModel.endpointLabel(for:)
-            ) { updated in
-                viewModel.addFiberLine(from: updated)
-            } onCancel: {
-                viewModel.cancelLineDraft()
+            .sheet(item: $viewModel.lineDraft) { draft in
+                LineFormView(
+                    draft: draft,
+                    endpointOptions: viewModel.endpointOptions(),
+                    endpointLabelProvider: viewModel.endpointLabel(for:)
+                ) { updated in
+                    viewModel.addFiberLine(from: updated)
+                } onCancel: {
+                    viewModel.cancelLineDraft()
+                }
             }
+            .onReceive(viewModel.$focusRequest.compactMap { $0 }) { request in
+                if #available(iOS 17.0, *) {
+                    cameraPosition = .region(MKCoordinateRegion(center: request.coordinate, span: request.span))
+                } else {
+                    mapRegion = MKCoordinateRegion(center: request.coordinate, span: request.span)
+                }
+                viewModel.consumeFocusRequest(request.id)
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if #available(iOS 17.0, *) {
+            MapsViewiOS17(
+                viewModel: viewModel,
+                isSidebarCollapsed: $isSidebarCollapsed,
+                cameraPosition: $cameraPosition
+            )
+        } else {
+            LegacyMapsView(
+                viewModel: viewModel,
+                isSidebarCollapsed: $isSidebarCollapsed,
+                mapRegion: $mapRegion
+            )
         }
-        .onReceive(viewModel.$focusRequest.compactMap { $0 }) { request in
-            cameraPosition = .region(MKCoordinateRegion(center: request.coordinate, span: request.span))
-            viewModel.consumeFocusRequest(request.id)
+    }
+}
+
+@available(iOS 17.0, *)
+private struct MapsViewiOS17: View {
+    @ObservedObject var viewModel: RouteMapperViewModel
+    @Binding var isSidebarCollapsed: Bool
+    @Binding var cameraPosition: MapCameraPosition
+
+    var body: some View {
+        MapReader { proxy in
+            ZStack(alignment: .leading) {
+                mapLayer(proxy: proxy)
+                    .overlay(alignment: .bottom) {
+                        if let instruction = viewModel.toolInstruction {
+                            Text(instruction)
+                                .font(.footnote)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(.black.opacity(0.6), in: Capsule())
+                                .padding(.bottom, 24)
+                        }
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        RouteMapperToolPicker(viewModel: viewModel)
+                            .padding(.top, 16)
+                            .padding(.trailing, 16)
+                    }
+
+                RouteMapperSidebar(viewModel: viewModel)
+                    .frame(maxHeight: .infinity)
+                    .frame(width: isSidebarCollapsed ? 0 : 300)
+                    .clipped()
+                    .background {
+                        if isSidebarCollapsed {
+                            Color.clear
+                        } else {
+                            Rectangle().fill(.regularMaterial)
+                        }
+                    }
+                    .shadow(radius: isSidebarCollapsed ? 0 : 8)
+                    .animation(.easeInOut(duration: 0.2), value: isSidebarCollapsed)
+
+                sidebarToggleButton
+                    .padding(.leading, isSidebarCollapsed ? 12 : 312)
+                    .padding(.top, 16)
+            }
+            .ignoresSafeArea()
         }
     }
 
@@ -764,87 +786,47 @@ private struct MapsViewiOS17: View {
 
 private struct LegacyMapsView: View {
     @ObservedObject var viewModel: RouteMapperViewModel
-
-    @State private var mapRegion = MKCoordinateRegion(
-        center: .defaultCenter,
-        span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
-    )
-    @State private var isSidebarCollapsed = false
+    @Binding var isSidebarCollapsed: Bool
+    @Binding var mapRegion: MKCoordinateRegion
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .leading) {
-                RouteMapperMapView(viewModel: viewModel, region: $mapRegion)
-                    .ignoresSafeArea()
-                    .overlay(alignment: .bottom) {
-                        if let instruction = viewModel.toolInstruction {
-                            Text(instruction)
-                                .font(.footnote)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(.black.opacity(0.6), in: Capsule())
-                                .padding(.bottom, 24)
-                        }
+        ZStack(alignment: .leading) {
+            RouteMapperMapView(viewModel: viewModel, region: $mapRegion)
+                .ignoresSafeArea()
+                .overlay(alignment: .bottom) {
+                    if let instruction = viewModel.toolInstruction {
+                        Text(instruction)
+                            .font(.footnote)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(.black.opacity(0.6), in: Capsule())
+                            .padding(.bottom, 24)
                     }
-                    .overlay(alignment: .topTrailing) {
-                        RouteMapperToolPicker(viewModel: viewModel)
-                            .padding(.top, 16)
-                            .padding(.trailing, 16)
-                    }
-
-                RouteMapperSidebar(viewModel: viewModel)
-                    .frame(maxHeight: .infinity)
-                    .frame(width: isSidebarCollapsed ? 0 : 300)
-                    .clipped()
-                    .background {
-                        if isSidebarCollapsed {
-                            Color.clear
-                        } else {
-                            Rectangle().fill(.regularMaterial)
-                        }
-                    }
-                    .shadow(radius: isSidebarCollapsed ? 0 : 8)
-                    .animation(.easeInOut(duration: 0.2), value: isSidebarCollapsed)
-
-                sidebarToggleButton
-                    .padding(.leading, isSidebarCollapsed ? 12 : 312)
-                    .padding(.top, 16)
-            }
-            .navigationTitle("Network Map")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Toggle(isOn: $viewModel.isEditMode) {
-                        Text("Edit Mode")
-                    }
-                    .toggleStyle(SwitchToggleStyle())
                 }
-            }
-        }
-        .sheet(item: $viewModel.poleDraft) { draft in
-            PoleFormView(draft: draft) { updated in
-                viewModel.addPole(from: updated)
-            } onCancel: {
-                viewModel.cancelPoleDraft()
-            }
-        }
-        .sheet(item: $viewModel.spliceDraft) { draft in
-            SpliceFormView(draft: draft) { updated in
-                viewModel.addSplice(from: updated)
-            } onCancel: {
-                viewModel.cancelSpliceDraft()
-            }
-        }
-        .sheet(item: $viewModel.lineDraft) { draft in
-            LineFormView(
-                draft: draft,
-                endpointOptions: viewModel.endpointOptions(),
-                endpointLabelProvider: viewModel.endpointLabel(for:)
-            ) { updated in
-                viewModel.addFiberLine(from: updated)
-            } onCancel: {
-                viewModel.cancelLineDraft()
-            }
+                .overlay(alignment: .topTrailing) {
+                    RouteMapperToolPicker(viewModel: viewModel)
+                        .padding(.top, 16)
+                        .padding(.trailing, 16)
+                }
+
+            RouteMapperSidebar(viewModel: viewModel)
+                .frame(maxHeight: .infinity)
+                .frame(width: isSidebarCollapsed ? 0 : 300)
+                .clipped()
+                .background {
+                    if isSidebarCollapsed {
+                        Color.clear
+                    } else {
+                        Rectangle().fill(.regularMaterial)
+                    }
+                }
+                .shadow(radius: isSidebarCollapsed ? 0 : 8)
+                .animation(.easeInOut(duration: 0.2), value: isSidebarCollapsed)
+
+            sidebarToggleButton
+                .padding(.leading, isSidebarCollapsed ? 12 : 312)
+                .padding(.top, 16)
         }
     }
 
@@ -1008,12 +990,6 @@ private struct RouteMapperMapView: UIViewRepresentable {
 
         context.coordinator.updateAnnotations(on: mapView)
         context.coordinator.updateOverlays(on: mapView)
-
-        if let request = viewModel.focusRequest {
-            let newRegion = MKCoordinateRegion(center: request.coordinate, span: request.span)
-            mapView.setRegion(newRegion, animated: true)
-            viewModel.consumeFocusRequest(request.id)
-        }
     }
 
     // MARK: - Coordinator
