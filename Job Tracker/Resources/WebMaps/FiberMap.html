@@ -49,6 +49,7 @@
                 },
                 polePositions: new Map(),
                 isReady: false,
+                searchMarker: null,
             };
 
             function postMessage(event, payload) {
@@ -282,6 +283,50 @@
                 });
             }
 
+            function handleCenterCommand(payload) {
+                ensureMap();
+                if (!state.map || !payload) { return; }
+
+                const latitude = payload.latitude;
+                const longitude = payload.longitude;
+                const zoom = payload.zoom ?? state.map.getZoom();
+
+                state.map.setView([latitude, longitude], zoom, { animate: true });
+
+                if (state.searchMarker) {
+                    state.map.removeLayer(state.searchMarker);
+                    state.searchMarker = null;
+                }
+
+                const highlight = L.circleMarker([latitude, longitude], {
+                    radius: 8,
+                    color: '#2563eb',
+                    weight: 2,
+                    fillColor: '#3b82f6',
+                    fillOpacity: 0.7,
+                    bubblingMouseEvents: false
+                }).addTo(state.map);
+
+                if (payload.label) {
+                    highlight.bindTooltip(payload.label, {
+                        permanent: true,
+                        direction: 'top'
+                    }).openTooltip();
+                }
+
+                state.searchMarker = highlight;
+
+                setTimeout(() => {
+                    if (state.searchMarker === highlight) {
+                        if (state.searchMarker.getTooltip()) {
+                            state.searchMarker.closeTooltip();
+                        }
+                        state.map.removeLayer(state.searchMarker);
+                        state.searchMarker = null;
+                    }
+                }, 5000);
+            }
+
             function handleCommand(command) {
                 if (!command) { return; }
                 if (command.type === 'snapshot') {
@@ -290,6 +335,8 @@
                     applyInteractionState(command.payload);
                 } else if (command.type === 'layers') {
                     updateVisibleLayers(command.payload || []);
+                } else if (command.type === 'centerMap') {
+                    handleCenterCommand(command.payload);
                 }
             }
 
@@ -300,6 +347,7 @@
                 applyInteractionState,
                 updateVisibleLayers,
                 handleCommand,
+                centerMap: handleCenterCommand,
                 clearSelection: () => setSelection(false)
             };
         })();

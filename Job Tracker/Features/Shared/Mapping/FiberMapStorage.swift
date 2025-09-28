@@ -1,10 +1,17 @@
 import Foundation
 import CoreLocation
 
+struct MapCameraState: Codable, Equatable {
+    var latitude: Double
+    var longitude: Double
+    var zoom: Double?
+}
+
 struct FiberMapSnapshot: Codable, Equatable {
     var poles: [Pole]
     var splices: [SpliceEnclosure]
     var lines: [FiberLine]
+    var mapCamera: MapCameraState?
 }
 
 final class FiberMapStorage {
@@ -54,7 +61,7 @@ final class FiberMapStorage {
         try data.write(to: fileURL, options: .atomic)
     }
 
-    func save(poles: [Pole], splices: [SpliceEnclosure], lines: [FiberLine]) throws {
-        try save(FiberMapSnapshot(poles: poles, splices: splices, lines: lines))
+    func save(poles: [Pole], splices: [SpliceEnclosure], lines: [FiberLine], mapCamera: MapCameraState) throws {
+        try save(FiberMapSnapshot(poles: poles, splices: splices, lines: lines, mapCamera: mapCamera))
     }
 }

@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreLocation
 import UIKit
+import MapKit
 
 // MARK: - Data Models
 // These structs define the data for our network assets.
@@ -284,16 +285,69 @@ struct AnyIdentifiable: Identifiable {
     let value: AnyHashable
 }
 
+struct MapSearchResult: Identifiable, Equatable {
+    let id: UUID
+    let title: String
+    let subtitle: String
+    let coordinate: CLLocationCoordinate2D
+
+    init(id: UUID = UUID(), title: String, subtitle: String, coordinate: CLLocationCoordinate2D) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.coordinate = coordinate
+    }
+
+    static func == (lhs: MapSearchResult, rhs: MapSearchResult) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.title == rhs.title &&
+        lhs.subtitle == rhs.subtitle &&
+        lhs.coordinate.latitude == rhs.coordinate.latitude &&
+        lhs.coordinate.longitude == rhs.coordinate.longitude
+    }
+}
+
+struct MapCenterCommand: Codable, Equatable {
+    let latitude: Double
+    let longitude: Double
+    let zoom: Double?
+    let label: String?
+}
+
+protocol MapSearchProviding {
+    func searchLocations(matching query: String) async throws -> [MapSearchResult]
+}
+
+struct AppleMapSearchProvider: MapSearchProviding {
+    func searchLocations(matching query: String) async throws -> [MapSearchResult] {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = query
+        let search = MKLocalSearch(request: request)
+        let response = try await search.start()
+        return response.mapItems.compactMap { item in
+            guard let coordinate = item.placemark.location?.coordinate else { return nil }
+            return MapSearchResult(
+                title: item.name ?? query,
+                subtitle: item.placemark.title ?? "",
+                coordinate: coordinate
+            )
+        }
+    }
+}
+
 
 // MARK: - Map View Model
 @MainActor
 class FiberMapViewModel: ObservableObject {
+    private static let defaultCamera = MapCameraState(latitude: 36.3219, longitude: -88.9562, zoom: 16)
+
     // Data stores for our assets
     @Published var poles: [Pole] = []
     @Published var splices: [SpliceEnclosure] = []
     @Published var lines: [FiberLine] = []
 
     private let storage: FiberMapStorage
+    private let searchProvider: MapSearchProviding
 
     // UI State
     @Published var isEditMode = false {
@@ -306,12 +360,19 @@ class FiberMapViewModel: ObservableObject {
     @Published var lineStartPole: Pole?
     @Published var editInstruction: String?
     @Published var visibleLayers: Set<MapLayer> = [.poles, .splices, .lines]
-    
+    @Published var mapCamera: MapCameraState
+    @Published private(set) var pendingCenterCommand: MapCenterCommand?
+    @Published var searchResults: [MapSearchResult] = []
+    @Published var isSearchingLocations = false
+    @Published var searchError: String?
+
     // Sheet presentation
     @Published var itemToEdit: AnyIdentifiable?
-    
-    init(storage: FiberMapStorage = .shared) {
+
+    init(storage: FiberMapStorage = .shared, searchProvider: MapSearchProviding = AppleMapSearchProvider()) {
         self.storage = storage
+        self.searchProvider = searchProvider
+        self.mapCamera = Self.defaultCamera
         if !loadFromStorage() {
             loadInitialData()
             persistSilently()
@@ -443,7 +504,43 @@ class FiberMapViewModel: ObservableObject {
         }
         resetToolState(except: tool)
     }
-    
+
+    func searchLocations(for query: String) async {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            searchResults = []
+            searchError = nil
+            return
+        }
+
+        isSearchingLocations = true
+        do {
+            let results = try await searchProvider.searchLocations(matching: trimmed)
+            searchResults = results
+            searchError = results.isEmpty ? "No matches found." : nil
+        } catch {
+            searchResults = []
+            searchError = "Unable to find that address. Please try again."
+        }
+        isSearchingLocations = false
+    }
+
+    func selectSearchResult(_ result: MapSearchResult, zoom: Double = 17) {
+        searchResults = []
+        searchError = nil
+        let camera = MapCameraState(latitude: result.coordinate.latitude, longitude: result.coordinate.longitude, zoom: zoom)
+        updateMapCamera(camera, highlight: result.title)
+    }
+
+    func clearSearchResults() {
+        searchResults = []
+        searchError = nil
+    }
+
+    func acknowledgeCenterCommand() {
+        pendingCenterCommand = nil
+    }
+
     private func resetToolState(except newTool: EditTool? = nil) {
         lineStartPole = nil
         if newTool != .drawLine {
@@ -459,6 +556,7 @@ class FiberMapViewModel: ObservableObject {
 
         if isEditMode {
             updateInstruction()
+            queueCenterCommand(label: nil)
         } else {
             editInstruction = nil
         }
@@ -506,15 +604,32 @@ class FiberMapViewModel: ObservableObject {
             self.poles = snapshot.poles
             self.splices = snapshot.splices
             self.lines = snapshot.lines
+            if let camera = snapshot.mapCamera {
+                self.mapCamera = camera
+            }
             return true
         } catch {
             return false
         }
     }
 
+    private func updateMapCamera(_ camera: MapCameraState, highlight label: String?) {
+        mapCamera = camera
+        setPendingCenterCommand(camera: camera, label: label)
+        persistSilently()
+    }
+
+    private func queueCenterCommand(label: String?) {
+        setPendingCenterCommand(camera: mapCamera, label: label)
+    }
+
+    private func setPendingCenterCommand(camera: MapCameraState, label: String?) {
+        pendingCenterCommand = MapCenterCommand(latitude: camera.latitude, longitude: camera.longitude, zoom: camera.zoom, label: label)
+    }
+
     private func persistSilently() {
         do {
-            try storage.save(poles: poles, splices: splices, lines: lines)
+            try storage.save(poles: poles, splices: splices, lines: lines, mapCamera: mapCamera)
         } catch {
 #if DEBUG
             print("FiberMapStorage save error:", error)
@@ -564,11 +679,91 @@ enum MapLayer: String, CaseIterable, Identifiable {
 struct MapsView: View {
     @StateObject private var viewModel = FiberMapViewModel()
     @State private var showControls = true
+    @State private var searchQuery = ""
 
     var body: some View {
         ZStack {
             LeafletWebMapView(viewModel: viewModel)
                 .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+
+                    TextField("Search for an address", text: $searchQuery)
+                        .textInputAutocapitalization(.never)
+                        .disableAutocorrection(true)
+                        .onSubmit { performSearch() }
+
+                    if viewModel.isSearchingLocations {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                    } else if !searchQuery.isEmpty {
+                        Button {
+                            searchQuery = ""
+                            viewModel.clearSearchResults()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityLabel("Clear search")
+                    }
+
+                    Button(action: performSearch) {
+                        Text("Search")
+                            .font(.callout.weight(.semibold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+
+                if let error = viewModel.searchError {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+
+                if !viewModel.searchResults.isEmpty {
+                    Divider()
+                        .padding(.top, 4)
+
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(viewModel.searchResults) { result in
+                                Button {
+                                    viewModel.selectSearchResult(result)
+                                    searchQuery = result.title
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(result.title)
+                                            .font(.callout.weight(.semibold))
+                                            .foregroundStyle(.primary)
+                                        if !result.subtitle.isEmpty {
+                                            Text(result.subtitle)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 8)
+                                }
+                                .buttonStyle(.plain)
+
+                                if result.id != viewModel.searchResults.last?.id {
+                                    Divider()
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 220)
+                }
+            }
+            .padding(16)
+            .background(.regularMaterial)
+            .cornerRadius(16)
+            .shadow(radius: 5)
+            .padding(.top, 20)
+            .padding(.horizontal, 20)
 
             // Overlays for controls and instructions
             VStack {
@@ -630,6 +825,11 @@ struct MapsView: View {
                 LineEditView(line: line, onSave: viewModel.saveItem, onCancel: viewModel.cancelEdit)
             }
         }
+    }
+
+    private func performSearch() {
+        let query = searchQuery
+        Task { await viewModel.searchLocations(for: query) }
     }
 }
 

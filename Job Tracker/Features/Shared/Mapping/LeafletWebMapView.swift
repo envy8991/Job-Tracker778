@@ -84,6 +84,18 @@ struct LeafletWebMapView: UIViewRepresentable {
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in self?.sendInteractionState() }
                 .store(in: &cancellables)
+
+            viewModel.$mapCamera
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in self?.sendInteractionState() }
+                .store(in: &cancellables)
+
+            viewModel.$pendingCenterCommand
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] command in
+                    self?.sendCenterCommand(command)
+                }
+                .store(in: &cancellables)
         }
 
         func sendSnapshotIfReady() {
@@ -110,6 +122,15 @@ struct LeafletWebMapView: UIViewRepresentable {
             webView.evaluateJavaScript(js, completionHandler: nil)
         }
 
+        func sendCenterCommand(_ command: MapCenterCommand?) {
+            guard isPageReady, let webView, let command else { return }
+            guard let json = encode(command) else { return }
+            let js = "FiberBridge.handleCommand({type: 'centerMap', payload: \(json)});"
+            webView.evaluateJavaScript(js) { [weak self] _, _ in
+                Task { await self?.viewModel.acknowledgeCenterCommand() }
+            }
+        }
+
         private func encode<T: Encodable>(_ value: T) -> String? {
             guard let data = try? encoder.encode(value) else { return nil }
             return String(data: data, encoding: .utf8)
@@ -132,6 +153,7 @@ struct LeafletWebMapView: UIViewRepresentable {
                 sendSnapshotIfReady()
                 sendInteractionState()
                 sendVisibleLayers()
+                sendCenterCommand(viewModel.pendingCenterCommand)
             case "mapTapped":
                 if let payload = body["payload"] as? [String: Any],
                    let lat = payload["latitude"] as? Double,
@@ -268,7 +290,11 @@ extension FiberMapViewModel {
             isEditMode: isEditMode,
             activeTool: activeTool?.rawValue,
             lineStartPoleId: lineStartPole?.id,
-            center: nil
+            center: WebInteractionState.Center(
+                latitude: mapCamera.latitude,
+                longitude: mapCamera.longitude,
+                zoom: mapCamera.zoom
+            )
         )
     }
 }
