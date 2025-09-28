@@ -147,10 +147,6 @@
                 }
 
                 map.on('click', function(event) {
-                    if (state.selectionActive) {
-                        setSelection(false);
-                        return;
-                    }
                     if (isInteractiveEvent(event)) {
                         return;
                     }
