@@ -34,8 +34,6 @@ struct LeafletWebMapView: UIViewRepresentable {
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
         context.coordinator.webView = uiView
-        context.coordinator.sendSnapshotIfReady()
-        context.coordinator.sendInteractionState()
     }
 
     // MARK: - Coordinator
