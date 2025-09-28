@@ -87,6 +87,12 @@
                 layer.clearLayers();
             }
 
+            function stopDomEvent(event) {
+                if (event?.originalEvent) {
+                    L.DomEvent.stop(event.originalEvent);
+                }
+            }
+
             function createPoleMarker(pole) {
                 const icon = L.divIcon({
                     className: 'custom-div-icon',
@@ -96,10 +102,10 @@
                 });
                 const marker = L.marker([pole.lat, pole.lng], { icon, bubblingMouseEvents: false });
                 marker.bindPopup(renderPopup(pole, 'Pole'));
+                marker.on('touchstart', stopDomEvent);
+                marker.on('pointerdown', stopDomEvent);
                 marker.on('click', function(event) {
-                    if (event?.originalEvent) {
-                        L.DomEvent.stopPropagation(event.originalEvent);
-                    }
+                    stopDomEvent(event);
                     postMessage('poleTapped', { id: pole.id });
                 });
                 return marker;
@@ -120,10 +126,10 @@
                 });
                 const marker = L.marker([splice.lat, splice.lng], { icon, bubblingMouseEvents: false });
                 marker.bindPopup(renderPopup(splice, 'Splice'));
+                marker.on('touchstart', stopDomEvent);
+                marker.on('pointerdown', stopDomEvent);
                 marker.on('click', function(event) {
-                    if (event?.originalEvent) {
-                        L.DomEvent.stopPropagation(event.originalEvent);
-                    }
+                    stopDomEvent(event);
                     postMessage('spliceTapped', { id: splice.id });
                 });
                 return marker;
@@ -149,10 +155,10 @@
                     [end.lat, end.lng]
                 ], options);
                 polyline.bindPopup(renderPopup(line, 'Line'));
+                polyline.on('touchstart', stopDomEvent);
+                polyline.on('pointerdown', stopDomEvent);
                 polyline.on('click', function(event) {
-                    if (event?.originalEvent) {
-                        L.DomEvent.stopPropagation(event.originalEvent);
-                    }
+                    stopDomEvent(event);
                     postMessage('lineTapped', { id: line.id });
                 });
                 return polyline;
