@@ -19,6 +19,7 @@
         #map {
             height: 100%;
             width: 100%;
+            position: relative;
         }
         .leaflet-popup-content-wrapper {
             border-radius: 8px;
@@ -26,6 +27,30 @@
         .leaflet-popup-content {
             margin: 13px 19px;
             font-size: 14px;
+        }
+        .fiber-close-button {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 1000;
+            background-color: rgba(17, 24, 39, 0.85);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 9999px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.3);
+            transition: background-color 0.2s ease, opacity 0.2s ease;
+        }
+        .fiber-close-button:hover,
+        .fiber-close-button:focus {
+            background-color: rgba(30, 41, 59, 0.95);
+            outline: none;
+        }
+        .fiber-close-button:active {
+            opacity: 0.9;
         }
         @import url('https://rsms.me/inter/inter.css');
     </style>
@@ -47,12 +72,24 @@
                     lines: new Map()
                 },
                 polePositions: new Map(),
-                isReady: false
+                isReady: false,
+                selectionActive: false,
+                selectionPosition: null,
+                closeButton: null
             };
 
             function postMessage(event, payload) {
                 if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.mapEvent) {
                     window.webkit.messageHandlers.mapEvent.postMessage({ event, payload });
+                }
+            }
+
+            function setSelection(active, latlng) {
+                state.selectionActive = !!active;
+                state.selectionPosition = latlng ? { lat: latlng.lat, lng: latlng.lng } : null;
+                if (state.closeButton) {
+                    state.closeButton.style.display = state.selectionActive ? 'block' : 'none';
+                    state.closeButton.setAttribute('aria-hidden', state.selectionActive ? 'false' : 'true');
                 }
             }
 
@@ -70,6 +107,25 @@
                 state.layers.poles = L.layerGroup().addTo(map);
                 state.layers.splices = L.layerGroup().addTo(map);
                 state.layers.lines = L.layerGroup().addTo(map);
+
+                const closeButton = L.DomUtil.create('button', 'fiber-close-button', map.getContainer());
+                closeButton.type = 'button';
+                closeButton.textContent = 'Close';
+                closeButton.style.display = 'none';
+                closeButton.setAttribute('aria-hidden', 'true');
+                closeButton.setAttribute('aria-label', 'Close selection');
+                L.DomEvent.disableClickPropagation(closeButton);
+                L.DomEvent.on(closeButton, 'click', function(event) {
+                    L.DomEvent.stop(event);
+                    const position = state.selectionPosition || map.getCenter();
+                    postMessage('mapTapped', {
+                        latitude: position.lat,
+                        longitude: position.lng
+                    });
+                    setSelection(false);
+                });
+                state.closeButton = closeButton;
+                setSelection(false);
 
                 function isInteractiveEvent(event) {
                     const originalTarget = event.originalEvent?.target;
@@ -91,9 +147,14 @@
                 }
 
                 map.on('click', function(event) {
+                    if (state.selectionActive) {
+                        setSelection(false);
+                        return;
+                    }
                     if (isInteractiveEvent(event)) {
                         return;
                     }
+                    setSelection(false);
                     postMessage('mapTapped', {
                         latitude: event.latlng.lat,
                         longitude: event.latlng.lng
@@ -128,6 +189,7 @@
                 marker.on('pointerdown', stopDomEvent);
                 marker.on('click', function(event) {
                     stopDomEvent(event);
+                    setSelection(true, event.latlng);
                     postMessage('poleTapped', { id: pole.id });
                 });
                 return marker;
@@ -152,6 +214,7 @@
                 marker.on('pointerdown', stopDomEvent);
                 marker.on('click', function(event) {
                     stopDomEvent(event);
+                    setSelection(true, event.latlng);
                     postMessage('spliceTapped', { id: splice.id });
                 });
                 return marker;
@@ -181,6 +244,7 @@
                 polyline.on('pointerdown', stopDomEvent);
                 polyline.on('click', function(event) {
                     stopDomEvent(event);
+                    setSelection(true, event.latlng);
                     postMessage('lineTapped', { id: line.id });
                 });
                 return polyline;
@@ -210,6 +274,7 @@
 
             function applySnapshot(snapshot) {
                 ensureMap();
+                setSelection(false);
                 state.cache.poles.clear();
                 state.cache.splices.clear();
                 state.cache.lines.clear();
@@ -285,7 +350,8 @@
                 applySnapshot,
                 applyInteractionState,
                 updateVisibleLayers,
-                handleCommand
+                handleCommand,
+                clearSelection: () => setSelection(false)
             };
         })();
 
