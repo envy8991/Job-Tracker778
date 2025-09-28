@@ -290,6 +290,8 @@
                 const latitude = payload.latitude;
                 const longitude = payload.longitude;
                 const zoom = payload.zoom ?? state.map.getZoom();
+                const kind = payload.kind || 'searchResult';
+                const isUserLocation = kind === 'userLocation';
 
                 state.map.setView([latitude, longitude], zoom, { animate: true });
 
@@ -298,14 +300,23 @@
                     state.searchMarker = null;
                 }
 
-                const highlight = L.circleMarker([latitude, longitude], {
+                const highlightOptions = isUserLocation ? {
+                    radius: 10,
+                    color: '#1d4ed8',
+                    weight: 2,
+                    fillColor: '#60a5fa',
+                    fillOpacity: 0.5,
+                    bubblingMouseEvents: false
+                } : {
                     radius: 8,
                     color: '#2563eb',
                     weight: 2,
                     fillColor: '#3b82f6',
                     fillOpacity: 0.7,
                     bubblingMouseEvents: false
-                }).addTo(state.map);
+                };
+
+                const highlight = L.circleMarker([latitude, longitude], highlightOptions).addTo(state.map);
 
                 if (payload.label) {
                     highlight.bindTooltip(payload.label, {
@@ -324,7 +335,7 @@
                         state.map.removeLayer(state.searchMarker);
                         state.searchMarker = null;
                     }
-                }, 5000);
+                }, isUserLocation ? 7000 : 5000);
             }
 
             function handleCommand(command) {

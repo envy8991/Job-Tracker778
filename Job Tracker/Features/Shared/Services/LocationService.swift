@@ -10,6 +10,13 @@ import CoreLocation
 import Combine
 import SwiftUI
 
+protocol LocationServiceProviding: AnyObject {
+    var current: CLLocation? { get }
+    var currentPublisher: AnyPublisher<CLLocation?, Never> { get }
+    func startStandardUpdates()
+    func requestAlwaysAuthorizationIfNeeded()
+}
+
 final class LocationService: NSObject, ObservableObject {
     @Published var current: CLLocation?
     let regionEventsPublisher: AnyPublisher<RegionEvent, Never>
@@ -164,6 +171,10 @@ final class LocationService: NSObject, ObservableObject {
             manager.stopMonitoring(for: region)
         }
     }
+}
+
+extension LocationService: LocationServiceProviding {
+    var currentPublisher: AnyPublisher<CLLocation?, Never> { $current.eraseToAnyPublisher() }
 }
 
 extension LocationService: CLLocationManagerDelegate {
