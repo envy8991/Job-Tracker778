@@ -72,6 +72,10 @@
                 state.layers.lines = L.layerGroup().addTo(map);
 
                 map.on('click', function(event) {
+                    const source = event.sourceTarget || event.propagatedFrom;
+                    if (source && source !== map) {
+                        return;
+                    }
                     postMessage('mapTapped', {
                         latitude: event.latlng.lat,
                         longitude: event.latlng.lng
