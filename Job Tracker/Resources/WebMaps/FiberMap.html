@@ -97,8 +97,8 @@
                 const marker = L.marker([pole.lat, pole.lng], { icon, bubblingMouseEvents: false });
                 marker.bindPopup(renderPopup(pole, 'Pole'));
                 marker.on('click', function(event) {
-                    if (event) {
-                        L.DomEvent.stopPropagation(event);
+                    if (event?.originalEvent) {
+                        L.DomEvent.stopPropagation(event.originalEvent);
                     }
                     postMessage('poleTapped', { id: pole.id });
                 });
@@ -121,8 +121,8 @@
                 const marker = L.marker([splice.lat, splice.lng], { icon, bubblingMouseEvents: false });
                 marker.bindPopup(renderPopup(splice, 'Splice'));
                 marker.on('click', function(event) {
-                    if (event) {
-                        L.DomEvent.stopPropagation(event);
+                    if (event?.originalEvent) {
+                        L.DomEvent.stopPropagation(event.originalEvent);
                     }
                     postMessage('spliceTapped', { id: splice.id });
                 });
@@ -150,8 +150,8 @@
                 ], options);
                 polyline.bindPopup(renderPopup(line, 'Line'));
                 polyline.on('click', function(event) {
-                    if (event) {
-                        L.DomEvent.stopPropagation(event);
+                    if (event?.originalEvent) {
+                        L.DomEvent.stopPropagation(event.originalEvent);
                     }
                     postMessage('lineTapped', { id: line.id });
                 });
