@@ -71,9 +71,27 @@
                 state.layers.splices = L.layerGroup().addTo(map);
                 state.layers.lines = L.layerGroup().addTo(map);
 
+                function isInteractiveEvent(event) {
+                    const originalTarget = event.originalEvent?.target;
+                    if (originalTarget?.closest('.leaflet-marker-icon, .leaflet-interactive, .leaflet-popup, .leaflet-control')) {
+                        return true;
+                    }
+
+                    const propagatedFrom = event.propagatedFrom;
+                    if (propagatedFrom && propagatedFrom !== map) {
+                        return true;
+                    }
+
+                    const sourceTarget = event.sourceTarget;
+                    if (sourceTarget && sourceTarget !== map) {
+                        return true;
+                    }
+
+                    return false;
+                }
+
                 map.on('click', function(event) {
-                    const source = event.sourceTarget || event.propagatedFrom;
-                    if (source && source !== map) {
+                    if (isInteractiveEvent(event)) {
                         return;
                     }
                     postMessage('mapTapped', {
