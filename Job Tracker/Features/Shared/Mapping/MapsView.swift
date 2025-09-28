@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import CoreLocation
 import UIKit
 import MapKit
@@ -308,10 +309,16 @@ struct MapSearchResult: Identifiable, Equatable {
 }
 
 struct MapCenterCommand: Codable, Equatable {
+    enum Kind: String, Codable {
+        case searchResult
+        case userLocation
+    }
+
     let latitude: Double
     let longitude: Double
     let zoom: Double?
     let label: String?
+    let kind: Kind?
 }
 
 protocol MapSearchProviding {
@@ -368,6 +375,9 @@ class FiberMapViewModel: ObservableObject {
 
     // Sheet presentation
     @Published var itemToEdit: AnyIdentifiable?
+
+    private var locationUpdatesCancellable: AnyCancellable?
+    private var locationServiceIdentifier: ObjectIdentifier?
 
     init(storage: FiberMapStorage = .shared, searchProvider: MapSearchProviding = AppleMapSearchProvider()) {
         self.storage = storage
@@ -541,6 +551,45 @@ class FiberMapViewModel: ObservableObject {
         pendingCenterCommand = nil
     }
 
+    func bindLocationService(_ service: LocationServiceProviding) {
+        let identifier = ObjectIdentifier(service as AnyObject)
+        guard locationServiceIdentifier != identifier else { return }
+        locationServiceIdentifier = identifier
+
+        locationUpdatesCancellable = service.currentPublisher
+            .compactMap { $0 }
+            .removeDuplicates(by: { lhs, rhs in
+                abs(lhs.coordinate.latitude - rhs.coordinate.latitude) < 0.000_001 &&
+                abs(lhs.coordinate.longitude - rhs.coordinate.longitude) < 0.000_001
+            })
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] location in
+                self?.handleDeviceLocationUpdate(location)
+            }
+    }
+
+    func locateUser(
+        using service: LocationServiceProviding,
+        authorizationStatus: CLAuthorizationStatus = CLLocationManager.authorizationStatus()
+    ) {
+        bindLocationService(service)
+
+        switch authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            if let current = service.current {
+                handleDeviceLocationUpdate(current)
+            } else {
+                service.startStandardUpdates()
+            }
+        case .notDetermined:
+            service.requestAlwaysAuthorizationIfNeeded()
+        case .denied, .restricted:
+            break
+        @unknown default:
+            break
+        }
+    }
+
     private func resetToolState(except newTool: EditTool? = nil) {
         lineStartPole = nil
         if newTool != .drawLine {
@@ -615,16 +664,34 @@ class FiberMapViewModel: ObservableObject {
 
     private func updateMapCamera(_ camera: MapCameraState, highlight label: String?) {
         mapCamera = camera
-        setPendingCenterCommand(camera: camera, label: label)
+        let kind: MapCenterCommand.Kind? = label == nil ? nil : .searchResult
+        setPendingCenterCommand(camera: camera, label: label, kind: kind)
         persistSilently()
     }
 
-    private func queueCenterCommand(label: String?) {
-        setPendingCenterCommand(camera: mapCamera, label: label)
+    private func queueCenterCommand(label: String?, kind: MapCenterCommand.Kind? = nil) {
+        setPendingCenterCommand(camera: mapCamera, label: label, kind: kind)
     }
 
-    private func setPendingCenterCommand(camera: MapCameraState, label: String?) {
-        pendingCenterCommand = MapCenterCommand(latitude: camera.latitude, longitude: camera.longitude, zoom: camera.zoom, label: label)
+    private func setPendingCenterCommand(
+        camera: MapCameraState,
+        label: String?,
+        kind: MapCenterCommand.Kind? = nil
+    ) {
+        pendingCenterCommand = MapCenterCommand(
+            latitude: camera.latitude,
+            longitude: camera.longitude,
+            zoom: camera.zoom,
+            label: label,
+            kind: kind
+        )
+    }
+
+    private func handleDeviceLocationUpdate(_ location: CLLocation) {
+        let coordinate = location.coordinate
+        let zoom = mapCamera.zoom ?? 17
+        let camera = MapCameraState(latitude: coordinate.latitude, longitude: coordinate.longitude, zoom: zoom)
+        setPendingCenterCommand(camera: camera, label: "Current Location", kind: .userLocation)
     }
 
     private func persistSilently() {
@@ -680,6 +747,7 @@ struct MapsView: View {
     @StateObject private var viewModel = FiberMapViewModel()
     @State private var showControls = true
     @State private var searchQuery = ""
+    @EnvironmentObject private var locationService: LocationService
 
     var body: some View {
         ZStack {
@@ -793,7 +861,7 @@ struct MapsView: View {
             .allowsHitTesting(showControls)
 
             VStack {
-                HStack {
+                HStack(alignment: .top, spacing: 12) {
                     Button {
                         withAnimation(.easeInOut) {
                             showControls.toggle()
@@ -806,15 +874,27 @@ struct MapsView: View {
                             .clipShape(Circle())
                             .shadow(radius: 4)
                     }
-                    .padding(.leading, showControls ? 282 : 20)
-                    .padding(.top, 20)
                     .accessibilityLabel(showControls ? "Hide map controls" : "Show map controls")
+
+                    Button(action: locateUser) {
+                        Image(systemName: "location.circle.fill")
+                            .font(.title3.weight(.semibold))
+                            .padding(12)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
+                    }
+                    .accessibilityLabel(Text(Accessibility.locateButtonLabel))
+
                     Spacer()
                 }
+                .padding(.leading, showControls ? 282 : 20)
+                .padding(.top, 20)
                 Spacer()
             }
         }
         .animation(.easeInOut, value: showControls)
+        .onAppear { viewModel.bindLocationService(locationService) }
         .sheet(item: $viewModel.itemToEdit) { itemWrapper in
             let item = itemWrapper.value
             if let pole = item as? Pole {
@@ -830,6 +910,16 @@ struct MapsView: View {
     private func performSearch() {
         let query = searchQuery
         Task { await viewModel.searchLocations(for: query) }
+    }
+
+    private func locateUser() {
+        viewModel.locateUser(using: locationService)
+    }
+}
+
+extension MapsView {
+    enum Accessibility {
+        static let locateButtonLabel = "Show my location"
     }
 }
 
