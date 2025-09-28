@@ -94,9 +94,12 @@
                     iconSize: [16, 16],
                     iconAnchor: [8, 8]
                 });
-                const marker = L.marker([pole.lat, pole.lng], { icon });
+                const marker = L.marker([pole.lat, pole.lng], { icon, bubblingMouseEvents: false });
                 marker.bindPopup(renderPopup(pole, 'Pole'));
-                marker.on('click', function() {
+                marker.on('click', function(event) {
+                    if (event) {
+                        L.DomEvent.stopPropagation(event);
+                    }
                     postMessage('poleTapped', { id: pole.id });
                 });
                 return marker;
@@ -115,9 +118,12 @@
                     iconSize: [16, 16],
                     iconAnchor: [8, 8]
                 });
-                const marker = L.marker([splice.lat, splice.lng], { icon });
+                const marker = L.marker([splice.lat, splice.lng], { icon, bubblingMouseEvents: false });
                 marker.bindPopup(renderPopup(splice, 'Splice'));
-                marker.on('click', function() {
+                marker.on('click', function(event) {
+                    if (event) {
+                        L.DomEvent.stopPropagation(event);
+                    }
                     postMessage('spliceTapped', { id: splice.id });
                 });
                 return marker;
@@ -135,14 +141,18 @@
                 const options = {
                     color: statusColor[line.status] || 'gray',
                     weight: 4,
-                    dashArray: line.status === 'Planned' ? '10, 10' : ''
+                    dashArray: line.status === 'Planned' ? '10, 10' : '',
+                    bubblingMouseEvents: false
                 };
                 const polyline = L.polyline([
                     [start.lat, start.lng],
                     [end.lat, end.lng]
                 ], options);
                 polyline.bindPopup(renderPopup(line, 'Line'));
-                polyline.on('click', function() {
+                polyline.on('click', function(event) {
+                    if (event) {
+                        L.DomEvent.stopPropagation(event);
+                    }
                     postMessage('lineTapped', { id: line.id });
                 });
                 return polyline;
