@@ -747,6 +747,7 @@ struct MapsView: View {
     @StateObject private var viewModel = FiberMapViewModel()
     @State private var showControls = true
     @State private var searchQuery = ""
+    @State private var controlPanelWidth: CGFloat = 0
     @EnvironmentObject private var locationService: LocationService
 
     var body: some View {
@@ -852,6 +853,15 @@ struct MapsView: View {
                     if showControls {
                         ControlPanelView(viewModel: viewModel)
                             .padding([.leading, .top])
+                            .background(
+                                GeometryReader { geometry in
+                                    Color.clear
+                                        .onAppear { controlPanelWidth = geometry.size.width }
+                                        .onChange(of: geometry.size) { newSize in
+                                            controlPanelWidth = newSize.width
+                                        }
+                                }
+                            )
                             .transition(.move(edge: .leading).combined(with: .opacity))
                     }
                     Spacer()
@@ -888,7 +898,12 @@ struct MapsView: View {
 
                     Spacer()
                 }
-                .padding(.leading, showControls ? 282 : 20)
+                .padding(
+                    .leading,
+                    showControls
+                        ? (controlPanelWidth > 0 ? controlPanelWidth + 32 : 32)
+                        : 20
+                )
                 .padding(.top, 20)
                 Spacer()
             }
