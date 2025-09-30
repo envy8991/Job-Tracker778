@@ -878,7 +878,7 @@ private struct ControlPanelBadgeIcon: View {
     var body: some View {
         Image(systemName: "map")
             .font(.title3.weight(.semibold))
-            .foregroundStyle(.accentColor)
+            .foregroundStyle(Color.accentColor)
             .frame(width: 38, height: 38)
             .background(
                 Circle()
