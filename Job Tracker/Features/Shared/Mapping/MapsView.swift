@@ -570,7 +570,7 @@ class FiberMapViewModel: ObservableObject {
 
     func locateUser(
         using service: LocationServiceProviding,
-        authorizationStatus: CLAuthorizationStatus = CLLocationManager.authorizationStatus()
+        authorizationStatus: CLAuthorizationStatus = CLLocationManager().authorizationStatus
     ) {
         bindLocationService(service)
 
