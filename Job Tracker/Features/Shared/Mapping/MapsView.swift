@@ -774,30 +774,15 @@ struct MapsView: View {
                 }
             }
 
-            VStack {
-                HStack(alignment: .top) {
-                    if showControls {
-                        ControlPanelView(viewModel: viewModel)
-                            .padding([.leading, .top])
-                            .background(
-                                GeometryReader { geometry in
-                                    Color.clear
-                                        .onAppear { controlPanelWidth = geometry.size.width }
-                                        .onChange(of: geometry.size) { newSize in
-                                            controlPanelWidth = newSize.width
-                                        }
-                                }
-                            )
-                            .transition(.move(edge: .leading).combined(with: .opacity))
-                    }
-                    Spacer()
-                }
-                Spacer()
-            }
-            .allowsHitTesting(showControls)
+        VStack {
+            let panelSpacing: CGFloat = 12
+            let togglePeekWidth: CGFloat = 56
+            let hiddenOffset: CGFloat = controlPanelWidth == 0
+                ? 0
+                : -(controlPanelWidth + panelSpacing) + togglePeekWidth
 
-            VStack {
-                HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: 0) {
+                HStack(alignment: .top, spacing: panelSpacing) {
                     Button {
                         withAnimation(.easeInOut) {
                             showControls.toggle()
@@ -805,34 +790,57 @@ struct MapsView: View {
                     } label: {
                         Image(systemName: showControls ? "chevron.left" : "slider.horizontal.3")
                             .font(.title3.weight(.semibold))
-                            .padding(12)
+                            .padding(.vertical, 10)
+                            .padding(.horizontal, 14)
                             .background(.regularMaterial)
-                            .clipShape(Circle())
+                            .clipShape(Capsule())
                             .shadow(radius: 4)
                     }
                     .accessibilityLabel(showControls ? "Hide map controls" : "Show map controls")
 
-                    Button(action: locateUser) {
-                        Image(systemName: "location.circle.fill")
-                            .font(.title3.weight(.semibold))
-                            .padding(12)
-                            .background(.regularMaterial)
-                            .clipShape(Circle())
-                            .shadow(radius: 4)
-                    }
-                    .accessibilityLabel(Text(Accessibility.locateButtonLabel))
-
-                    Spacer()
+                    ControlPanelView(viewModel: viewModel, idealWidth: 220)
+                        .background(
+                            GeometryReader { geometry in
+                                Color.clear
+                                    .onAppear { controlPanelWidth = geometry.size.width }
+                                    .onChange(of: geometry.size) { newSize in
+                                        controlPanelWidth = newSize.width
+                                    }
+                            }
+                        )
+                        .allowsHitTesting(showControls)
                 }
-                .padding(
-                    .leading,
-                    showControls
-                        ? (controlPanelWidth > 0 ? controlPanelWidth + 32 : 32)
-                        : 20
-                )
-                .padding(.top, 20)
                 Spacer()
             }
+            .padding(.leading, 20)
+            .padding(.top, 20)
+            .offset(x: showControls ? 0 : hiddenOffset)
+            Spacer()
+        }
+
+        VStack {
+            HStack(alignment: .top, spacing: 12) {
+                Button(action: locateUser) {
+                    Image(systemName: "location.circle.fill")
+                        .font(.title3.weight(.semibold))
+                        .padding(12)
+                        .background(.regularMaterial)
+                        .clipShape(Circle())
+                        .shadow(radius: 4)
+                }
+                .accessibilityLabel(Text(Accessibility.locateButtonLabel))
+
+                Spacer()
+            }
+            .padding(
+                .leading,
+                showControls
+                    ? max(controlPanelWidth + 96, 20)
+                    : 20
+            )
+            .padding(.top, 20)
+            Spacer()
+        }
         }
         .animation(.easeInOut, value: showControls)
         .onAppear { viewModel.bindLocationService(locationService) }
@@ -867,56 +875,75 @@ extension MapsView {
 // MARK: - Control Panel UI
 struct ControlPanelView: View {
     @ObservedObject var viewModel: FiberMapViewModel
+    let idealWidth: CGFloat?
+
+    init(viewModel: FiberMapViewModel, idealWidth: CGFloat? = nil) {
+        self._viewModel = ObservedObject(wrappedValue: viewModel)
+        self.idealWidth = idealWidth
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Map Controls").font(.headline).padding(.bottom, 4)
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Map Controls")
+                .font(.headline)
+                .padding(.bottom, 2)
 
             // Layer Toggles
-            Text("Layers").font(.subheadline).foregroundStyle(.secondary)
-            ForEach(MapLayer.allCases) { layer in
-                Toggle(isOn: Binding(
-                    get: { viewModel.visibleLayers.contains(layer) },
-                    set: { _ in viewModel.toggleLayer(layer) }
-                )) {
-                    Text(layer.label)
+            Text("Layers")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(MapLayer.allCases) { layer in
+                    Toggle(isOn: Binding(
+                        get: { viewModel.visibleLayers.contains(layer) },
+                        set: { _ in viewModel.toggleLayer(layer) }
+                    )) {
+                        Text(layer.label)
+                    }
+                    .padding(.vertical, 2)
                 }
             }
 
-            Divider().padding(.vertical, 8)
-            
+            Divider().padding(.vertical, 6)
+
             // Edit Mode Toggle
             Toggle(isOn: $viewModel.isEditMode.animation()) {
-                Text("Edit Mode").bold()
+                Text("Edit Mode")
+                    .bold()
             }
-            
+            .padding(.vertical, 2)
+
             // Editing Tools
             if viewModel.isEditMode {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Tools").font(.subheadline).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Tools")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                     ForEach(EditTool.allCases) { tool in
                         Button(action: { viewModel.selectTool(tool) }) {
-                            HStack {
+                            HStack(spacing: 8) {
                                 Image(systemName: tool.icon)
                                 Text(tool.label)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 8)
+                            .background(viewModel.activeTool == tool ? Color.accentColor.opacity(0.2) : Color.clear)
+                            .cornerRadius(10)
+                            .tint(viewModel.activeTool == tool ? .primary : .secondary)
                         }
-                        .padding(8)
-                        .background(viewModel.activeTool == tool ? Color.accentColor.opacity(0.3) : Color.clear)
-                        .cornerRadius(8)
-                        .tint(viewModel.activeTool == tool ? .primary : .secondary)
                     }
                 }
-                .padding(.top, 4)
                 .transition(.move(edge: .leading).combined(with: .opacity))
             }
         }
-        .padding()
+        .padding(.vertical, 16)
+        .padding(.horizontal, 14)
         .background(.regularMaterial)
         .cornerRadius(15)
         .shadow(radius: 5)
-        .frame(width: 250)
+        .frame(width: idealWidth)
     }
 }
 
