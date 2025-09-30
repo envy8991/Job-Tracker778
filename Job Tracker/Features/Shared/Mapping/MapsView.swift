@@ -1054,7 +1054,7 @@ private struct MapControlsCollapsedHandle: View {
             VStack(spacing: 6) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
 
                 Text("Map Controls")
                     .font(.caption2.weight(.semibold))
