@@ -747,7 +747,8 @@ struct MapsView: View {
     @StateObject private var viewModel = FiberMapViewModel()
     @State private var showControls = true
     @State private var searchQuery = ""
-    @State private var controlPanelWidth: CGFloat = 0
+    @State private var controlPanelWidth: CGFloat = 280
+    @State private var collapsedDrawerWidth: CGFloat = 72
     @EnvironmentObject private var locationService: LocationService
 
     var body: some View {
@@ -775,50 +776,41 @@ struct MapsView: View {
             }
 
         VStack {
-            let panelSpacing: CGFloat = 12
-            let togglePeekWidth: CGFloat = 56
-            let hiddenOffset: CGFloat = controlPanelWidth == 0
-                ? 0
-                : -(controlPanelWidth + panelSpacing) + togglePeekWidth
-
             HStack(alignment: .top, spacing: 0) {
-                HStack(alignment: .top, spacing: panelSpacing) {
-                    Button {
-                        withAnimation(.easeInOut) {
-                            showControls.toggle()
-                        }
-                    } label: {
-                        Image(systemName: showControls ? "chevron.left" : "slider.horizontal.3")
-                            .font(.title3.weight(.semibold))
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 14)
-                            .background(.regularMaterial)
-                            .clipShape(Capsule())
-                            .shadow(radius: 4)
-                    }
-                    .accessibilityLabel(showControls ? "Hide map controls" : "Show map controls")
-
-                    ControlPanelView(viewModel: viewModel, idealWidth: 220)
-                        .background(
-                            GeometryReader { geometry in
-                                Color.clear
-                                    .onAppear { controlPanelWidth = geometry.size.width }
-                                    .onChange(of: geometry.size) { newSize in
-                                        controlPanelWidth = newSize.width
-                                    }
+                if showControls {
+                    MapControlsExpandedDrawer(
+                        viewModel: viewModel,
+                        onCollapse: {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                showControls = false
                             }
-                        )
-                        .allowsHitTesting(showControls)
+                        },
+                        measuredWidth: $controlPanelWidth
+                    )
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+                } else {
+                    MapControlsCollapsedHandle(
+                        onExpand: {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                showControls = true
+                            }
+                        },
+                        measuredWidth: $collapsedDrawerWidth
+                    )
+                    .transition(.move(edge: .leading).combined(with: .opacity))
                 }
                 Spacer()
             }
             .padding(.leading, 20)
             .padding(.top, 20)
-            .offset(x: showControls ? 0 : hiddenOffset)
             Spacer()
         }
 
         VStack {
+            let activeDrawerWidth = showControls
+                ? max(controlPanelWidth, collapsedDrawerWidth)
+                : collapsedDrawerWidth
+
             HStack(alignment: .top, spacing: 12) {
                 Button(action: locateUser) {
                     Image(systemName: "location.circle.fill")
@@ -834,15 +826,13 @@ struct MapsView: View {
             }
             .padding(
                 .leading,
-                showControls
-                    ? max(controlPanelWidth + 96, 20)
-                    : 20
+                max(activeDrawerWidth + 32, 20)
             )
             .padding(.top, 20)
             Spacer()
         }
         }
-        .animation(.easeInOut, value: showControls)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showControls)
         .onAppear { viewModel.bindLocationService(locationService) }
         .sheet(item: $viewModel.itemToEdit) { itemWrapper in
             let item = itemWrapper.value
@@ -873,77 +863,236 @@ extension MapsView {
 }
 
 // MARK: - Control Panel UI
+private struct DrawerSectionHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(title.uppercased())
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .tracking(0.8)
+    }
+}
+
+private struct ControlPanelBadgeIcon: View {
+    var body: some View {
+        Image(systemName: "map")
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.accentColor)
+            .frame(width: 38, height: 38)
+            .background(
+                Circle()
+                    .fill(Color.accentColor.opacity(0.15))
+            )
+    }
+}
+
+private struct ControlPanelDismissButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 18, weight: .semibold))
+                .frame(width: 34, height: 34)
+                .foregroundStyle(.primary)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.primary.opacity(0.08))
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Hide map controls")
+    }
+}
+
 struct ControlPanelView: View {
     @ObservedObject var viewModel: FiberMapViewModel
-    let idealWidth: CGFloat?
 
-    init(viewModel: FiberMapViewModel, idealWidth: CGFloat? = nil) {
+    init(viewModel: FiberMapViewModel) {
         self._viewModel = ObservedObject(wrappedValue: viewModel)
-        self.idealWidth = idealWidth
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Map Controls")
-                .font(.headline)
-                .padding(.bottom, 2)
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 10) {
+                DrawerSectionHeader(title: "Layers")
 
-            // Layer Toggles
-            Text("Layers")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(MapLayer.allCases) { layer in
-                    Toggle(isOn: Binding(
-                        get: { viewModel.visibleLayers.contains(layer) },
-                        set: { _ in viewModel.toggleLayer(layer) }
-                    )) {
-                        Text(layer.label)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(MapLayer.allCases) { layer in
+                        Toggle(isOn: Binding(
+                            get: { viewModel.visibleLayers.contains(layer) },
+                            set: { _ in viewModel.toggleLayer(layer) }
+                        )) {
+                            Text(layer.label)
+                        }
+                        .toggleStyle(.switch)
+                        .tint(.accentColor)
                     }
-                    .padding(.vertical, 2)
                 }
             }
 
-            Divider().padding(.vertical, 6)
+            Divider()
 
-            // Edit Mode Toggle
             Toggle(isOn: $viewModel.isEditMode.animation()) {
                 Text("Edit Mode")
-                    .bold()
+                    .font(.callout.weight(.semibold))
             }
-            .padding(.vertical, 2)
+            .toggleStyle(.switch)
+            .tint(.accentColor)
 
-            // Editing Tools
             if viewModel.isEditMode {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Tools")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 10) {
+                    DrawerSectionHeader(title: "Tools")
+
                     ForEach(EditTool.allCases) { tool in
                         Button(action: { viewModel.selectTool(tool) }) {
-                            HStack(spacing: 8) {
+                            HStack(spacing: 10) {
                                 Image(systemName: tool.icon)
+                                    .font(.body.weight(.semibold))
                                 Text(tool.label)
+                                    .font(.callout)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 8)
-                            .background(viewModel.activeTool == tool ? Color.accentColor.opacity(0.2) : Color.clear)
-                            .cornerRadius(10)
-                            .tint(viewModel.activeTool == tool ? .primary : .secondary)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(toolBackground(for: tool))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(toolBorder(for: tool), lineWidth: viewModel.activeTool == tool ? 1 : 0)
+                            )
                         }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(toolForeground(for: tool))
                     }
                 }
                 .transition(.move(edge: .leading).combined(with: .opacity))
             }
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 14)
-        .background(.regularMaterial)
-        .cornerRadius(15)
-        .shadow(radius: 5)
-        .frame(width: idealWidth)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func toolBackground(for tool: EditTool) -> Color {
+        viewModel.activeTool == tool
+            ? Color.accentColor.opacity(0.15)
+            : Color.primary.opacity(0.05)
+    }
+
+    private func toolBorder(for tool: EditTool) -> Color {
+        viewModel.activeTool == tool
+            ? Color.accentColor.opacity(0.6)
+            : .clear
+    }
+
+    private func toolForeground(for tool: EditTool) -> Color {
+        viewModel.activeTool == tool ? .primary : .secondary
+    }
+}
+
+private struct MapControlsExpandedDrawer: View {
+    @ObservedObject var viewModel: FiberMapViewModel
+    var onCollapse: () -> Void
+    @Binding var measuredWidth: CGFloat
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(alignment: .center, spacing: 12) {
+                ControlPanelBadgeIcon()
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Map Controls")
+                        .font(.headline)
+                    Text("Layers & editing tools")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                ControlPanelDismissButton(action: onCollapse)
+            }
+
+            ControlPanelView(viewModel: viewModel)
+        }
+        .padding(18)
+        .frame(maxWidth: 300, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.primary.opacity(0.08))
+        )
+        .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 12)
+        .background(
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear { updateWidth(geometry.size.width) }
+                    .onChange(of: geometry.size) { newSize in updateWidth(newSize.width) }
+            }
+        )
+    }
+
+    private func updateWidth(_ newValue: CGFloat) {
+        guard measuredWidth != newValue else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            measuredWidth = newValue
+        }
+    }
+}
+
+private struct MapControlsCollapsedHandle: View {
+    var onExpand: () -> Void
+    @Binding var measuredWidth: CGFloat
+
+    var body: some View {
+        Button(action: onExpand) {
+            VStack(spacing: 6) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.accentColor)
+
+                Text("Map Controls")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .textCase(.uppercase)
+                    .tracking(0.8)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+            }
+            .frame(width: 72)
+            .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.primary.opacity(0.1))
+        )
+        .shadow(color: Color.black.opacity(0.12), radius: 12, x: 0, y: 8)
+        .accessibilityLabel("Show map controls")
+        .background(
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear { updateWidth(geometry.size.width) }
+                    .onChange(of: geometry.size) { newSize in updateWidth(newSize.width) }
+            }
+        )
+    }
+
+    private func updateWidth(_ newValue: CGFloat) {
+        guard measuredWidth != newValue else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            measuredWidth = newValue
+        }
     }
 }
 
