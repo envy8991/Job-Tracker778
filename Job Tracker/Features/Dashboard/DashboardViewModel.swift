@@ -199,7 +199,9 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func handleJobsListChange(_ jobs: [Job], currentLocation: CLLocation?) {
-        activeSheet = nil
+        if activeSheet != .createJob {
+            activeSheet = nil
+        }
         updateNearestJob(with: jobs, currentLocation: currentLocation)
     }
 
