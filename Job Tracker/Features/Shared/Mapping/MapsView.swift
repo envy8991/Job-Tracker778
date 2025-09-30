@@ -754,85 +754,11 @@ struct MapsView: View {
         ZStack {
             LeafletWebMapView(viewModel: viewModel)
                 .ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-
-                    TextField("Search for an address", text: $searchQuery)
-                        .textInputAutocapitalization(.never)
-                        .disableAutocorrection(true)
-                        .onSubmit { performSearch() }
-
-                    if viewModel.isSearchingLocations {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    } else if !searchQuery.isEmpty {
-                        Button {
-                            searchQuery = ""
-                            viewModel.clearSearchResults()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .accessibilityLabel("Clear search")
-                    }
-
-                    Button(action: performSearch) {
-                        Text("Search")
-                            .font(.callout.weight(.semibold))
-                    }
-                    .buttonStyle(.borderedProminent)
+                .safeAreaInset(edge: .top) {
+                    searchOverlay
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
                 }
-
-                if let error = viewModel.searchError {
-                    Text(error)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
-
-                if !viewModel.searchResults.isEmpty {
-                    Divider()
-                        .padding(.top, 4)
-
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            ForEach(viewModel.searchResults) { result in
-                                Button {
-                                    viewModel.selectSearchResult(result)
-                                    searchQuery = result.title
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(result.title)
-                                            .font(.callout.weight(.semibold))
-                                            .foregroundStyle(.primary)
-                                        if !result.subtitle.isEmpty {
-                                            Text(result.subtitle)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 8)
-                                }
-                                .buttonStyle(.plain)
-
-                                if result.id != viewModel.searchResults.last?.id {
-                                    Divider()
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxHeight: 220)
-                }
-            }
-            .padding(16)
-            .background(.regularMaterial)
-            .cornerRadius(16)
-            .shadow(radius: 5)
-            .padding(.top, 20)
-            .padding(.horizontal, 20)
 
             // Overlays for controls and instructions
             VStack {
@@ -1024,6 +950,88 @@ struct PoleEditView: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { onSave(pole) } }
             }
         }
+    }
+}
+
+private extension MapsView {
+    @ViewBuilder
+    var searchOverlay: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+
+                TextField("Search for an address", text: $searchQuery)
+                    .textInputAutocapitalization(.never)
+                    .disableAutocorrection(true)
+                    .onSubmit { performSearch() }
+
+                if viewModel.isSearchingLocations {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                } else if !searchQuery.isEmpty {
+                    Button {
+                        searchQuery = ""
+                        viewModel.clearSearchResults()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityLabel("Clear search")
+                }
+
+                Button(action: performSearch) {
+                    Text("Search")
+                        .font(.callout.weight(.semibold))
+                }
+                .buttonStyle(.borderedProminent)
+            }
+
+            if let error = viewModel.searchError {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+
+            if !viewModel.searchResults.isEmpty {
+                Divider()
+                    .padding(.top, 4)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(viewModel.searchResults) { result in
+                            Button {
+                                viewModel.selectSearchResult(result)
+                                searchQuery = result.title
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(result.title)
+                                        .font(.callout.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                    if !result.subtitle.isEmpty {
+                                        Text(result.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
+
+                            if result.id != viewModel.searchResults.last?.id {
+                                Divider()
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 220)
+            }
+        }
+        .padding(16)
+        .background(.regularMaterial)
+        .cornerRadius(16)
+        .shadow(radius: 5)
     }
 }
 
