@@ -775,62 +775,67 @@ struct MapsView: View {
                 }
             }
 
-        VStack {
-            HStack(alignment: .top, spacing: 0) {
-                if showControls {
-                    MapControlsExpandedDrawer(
-                        viewModel: viewModel,
-                        onCollapse: {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                showControls = false
-                            }
-                        },
-                        measuredWidth: $controlPanelWidth
-                    )
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-                } else {
-                    MapControlsCollapsedHandle(
-                        onExpand: {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                showControls = true
-                            }
-                        },
-                        measuredWidth: $collapsedDrawerWidth
-                    )
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-                }
+            VStack(spacing: 0) {
                 Spacer()
-            }
-            .padding(.leading, 20)
-            .padding(.top, 20)
-            Spacer()
-        }
 
-        VStack {
-            let activeDrawerWidth = showControls
-                ? max(controlPanelWidth, collapsedDrawerWidth)
-                : collapsedDrawerWidth
+                HStack(alignment: .top, spacing: 0) {
+                    if showControls {
+                        MapControlsExpandedDrawer(
+                            viewModel: viewModel,
+                            onCollapse: {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    showControls = false
+                                }
+                            },
+                            measuredWidth: $controlPanelWidth
+                        )
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                    } else {
+                        MapControlsCollapsedHandle(
+                            onExpand: {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    showControls = true
+                                }
+                            },
+                            measuredWidth: $collapsedDrawerWidth
+                        )
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                    }
 
-            HStack(alignment: .top, spacing: 12) {
-                Button(action: locateUser) {
-                    Image(systemName: "location.circle.fill")
-                        .font(.title3.weight(.semibold))
-                        .padding(12)
-                        .background(.regularMaterial)
-                        .clipShape(Circle())
-                        .shadow(radius: 4)
+                    Spacer()
                 }
-                .accessibilityLabel(Text(Accessibility.locateButtonLabel))
+                .padding(.leading, 20)
+                .padding(.bottom, 20)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+
+            VStack(spacing: 0) {
+                let activeDrawerWidth = showControls
+                    ? max(controlPanelWidth, collapsedDrawerWidth)
+                    : collapsedDrawerWidth
 
                 Spacer()
+
+                HStack(alignment: .top, spacing: 12) {
+                    Button(action: locateUser) {
+                        Image(systemName: "location.circle.fill")
+                            .font(.title3.weight(.semibold))
+                            .padding(12)
+                            .background(.regularMaterial)
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
+                    }
+                    .accessibilityLabel(Text(Accessibility.locateButtonLabel))
+
+                    Spacer()
+                }
+                .padding(
+                    .leading,
+                    max(activeDrawerWidth + 32, 20)
+                )
+                .padding(.bottom, 12)
             }
-            .padding(
-                .leading,
-                max(activeDrawerWidth + 32, 20)
-            )
-            .padding(.top, 20)
-            Spacer()
-        }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showControls)
         .onAppear { viewModel.bindLocationService(locationService) }
