@@ -50,7 +50,7 @@ final class RouteService: ObservableObject {
                 let arr  = data["poles"] as? [[String: Any]]
             else { return }
             DispatchQueue.main.async {
-                self?.poles = arr.compactMap { Pole.fromDict($0) }
+                self?.poles = arr.compactMap(Pole.init(firestoreData:))
             }
         }
         
@@ -79,85 +79,8 @@ final class RouteService: ObservableObject {
     // MARK: – Mutations
     /// Push a fresh copy of `poles` to Firestore (overwrites existing).
     func push(_ poles: [Pole]) {
-        let arr = poles.map { $0.toDict() }
+        let arr = poles.map { $0.firestoreData() }
         docRef.setData(["poles": arr], merge: true)
     }
 }
 
-// MARK: – Pole ⇄ Dictionary helpers
-extension Pole {
-    
-    func toDict() -> [String: Any] {
-        var dict: [String: Any] = [
-            "id": id.uuidString,
-            "name": name,
-            "lat": coordinate.latitude,
-            "lon": coordinate.longitude,
-            "status": status.rawValue,
-            "material": material,
-            "notes": notes
-        ]
-
-        if let installDate {
-            dict["installDate"] = Timestamp(date: installDate)
-        }
-
-        if let lastInspection {
-            dict["lastInspection"] = Timestamp(date: lastInspection)
-        }
-
-        if let imageUrl {
-            dict["imageUrl"] = imageUrl
-        }
-
-        return dict
-    }
-
-    static func fromDict(_ dict: [String: Any]) -> Pole? {
-        guard
-            let idStr = dict["id"] as? String,
-            let lat   = dict["lat"] as? CLLocationDegrees,
-            let lon   = dict["lon"] as? CLLocationDegrees
-        else { return nil }
-
-        let id = UUID(uuidString: idStr) ?? UUID()
-        let name = dict["name"] as? String ?? "Pole"
-
-        let statusRaw = dict["status"] as? String
-        let status = statusRaw.flatMap(AssetStatus.init(rawValue:)) ?? .good
-
-        let installDate: Date?
-        if let timestamp = dict["installDate"] as? Timestamp {
-            installDate = timestamp.dateValue()
-        } else if let date = dict["installDate"] as? Date {
-            installDate = date
-        } else {
-            installDate = nil
-        }
-
-        let lastInspection: Date?
-        if let timestamp = dict["lastInspection"] as? Timestamp {
-            lastInspection = timestamp.dateValue()
-        } else if let date = dict["lastInspection"] as? Date {
-            lastInspection = date
-        } else {
-            lastInspection = nil
-        }
-
-        let material = dict["material"] as? String ?? "Unknown"
-        let notes = dict["notes"] as? String ?? ""
-        let imageUrl = dict["imageUrl"] as? String
-
-        return Pole(
-            id: id,
-            name: name,
-            coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
-            status: status,
-            installDate: installDate,
-            lastInspection: lastInspection,
-            material: material,
-            notes: notes,
-            imageUrl: imageUrl
-        )
-    }
-}
