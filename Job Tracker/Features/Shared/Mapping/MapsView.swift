@@ -353,7 +353,7 @@ class FiberMapViewModel: ObservableObject {
     @Published var splices: [SpliceEnclosure] = []
     @Published var lines: [FiberLine] = []
 
-    private let storage: FiberMapStorage
+    private let dataService: FiberAssetSyncService
     private let searchProvider: MapSearchProviding
 
     // UI State
@@ -372,21 +372,28 @@ class FiberMapViewModel: ObservableObject {
     @Published var searchResults: [MapSearchResult] = []
     @Published var isSearchingLocations = false
     @Published var searchError: String?
+    @Published private(set) var isLoadingSnapshot = false
+    @Published private(set) var isSavingSnapshot = false
+    @Published var syncError: String?
 
     // Sheet presentation
     @Published var itemToEdit: AnyIdentifiable?
 
     private var locationUpdatesCancellable: AnyCancellable?
     private var locationServiceIdentifier: ObjectIdentifier?
+    private var pendingSaveTask: Task<Void, Never>?
+    private var didReceiveInitialSnapshot = false
 
-    init(storage: FiberMapStorage = .shared, searchProvider: MapSearchProviding = AppleMapSearchProvider()) {
-        self.storage = storage
+    init(dataService: FiberAssetSyncService = FirestoreFiberAssetSyncService(), searchProvider: MapSearchProviding = AppleMapSearchProvider()) {
+        self.dataService = dataService
         self.searchProvider = searchProvider
         self.mapCamera = Self.defaultCamera
-        if !loadFromStorage() {
-            loadInitialData()
-            persistSilently()
-        }
+        startListeningForRemoteChanges()
+    }
+
+    deinit {
+        dataService.stopListening()
+        pendingSaveTask?.cancel()
     }
     
     // Asset lookup for drawing lines
@@ -633,33 +640,52 @@ class FiberMapViewModel: ObservableObject {
         }
     }
 
-    // Load sample data to populate the map initially
-    private func loadInitialData() {
-        let pole1 = Pole(id: UUID(), name: "P-001", coordinate: .init(latitude: 35.9735, longitude: -88.9450), status: .good, installDate: Date(), lastInspection: Date(), material: "Wood", notes: "Standard utility pole.", imageUrl: "https://placehold.co/400x300/cccccc/ffffff?text=Pole+P-001")
-        let pole2 = Pole(id: UUID(), name: "P-002", coordinate: .init(latitude: 35.9738, longitude: -88.9425), status: .needsInspection, installDate: Date(), lastInspection: Date(), material: "Wood", notes: "Leaning slightly.")
+    private func startListeningForRemoteChanges() {
+        didReceiveInitialSnapshot = false
+        isLoadingSnapshot = true
+        syncError = nil
 
-        let splice1 = SpliceEnclosure(id: UUID(), name: "SC-101", coordinate: .init(latitude: 35.97355, longitude: -88.9449), status: .good, capacity: 144, notes: "Attached to pole P-001.")
+        dataService.beginListening { [weak self] result in
+            guard let self else { return }
 
-        let line1 = FiberLine(id: UUID(), startPoleId: pole1.id, endPoleId: pole2.id, status: .active, fiberCount: 48, notes: "Main trunk line.")
-
-        self.poles = [pole1, pole2]
-        self.splices = [splice1]
-        self.lines = [line1]
+            Task { @MainActor in
+                switch result {
+                case .success(let snapshot):
+                    self.apply(snapshot: snapshot)
+                case .failure(let error):
+                    self.handleSyncError(error)
+                }
+            }
+        }
     }
 
-    private func loadFromStorage() -> Bool {
-        do {
-            guard let snapshot = try storage.load() else { return false }
-            self.poles = snapshot.poles
-            self.splices = snapshot.splices
-            self.lines = snapshot.lines
+    private func apply(snapshot: FiberMapSnapshot?) {
+        if let snapshot {
+            poles = snapshot.poles
+            splices = snapshot.splices
+            lines = snapshot.lines
             if let camera = snapshot.mapCamera {
-                self.mapCamera = camera
+                mapCamera = camera
             }
-            return true
-        } catch {
-            return false
+            syncError = nil
+        } else if !didReceiveInitialSnapshot {
+            poles = []
+            splices = []
+            lines = []
         }
+
+        didReceiveInitialSnapshot = true
+        isLoadingSnapshot = false
+    }
+
+    private func handleSyncError(_ error: Error) {
+        isLoadingSnapshot = false
+        syncError = error.localizedDescription
+    }
+
+    func retrySync() {
+        dataService.stopListening()
+        startListeningForRemoteChanges()
     }
 
     private func updateMapCamera(_ camera: MapCameraState, highlight label: String?) {
@@ -695,12 +721,36 @@ class FiberMapViewModel: ObservableObject {
     }
 
     private func persistSilently() {
-        do {
-            try storage.save(poles: poles, splices: splices, lines: lines, mapCamera: mapCamera)
-        } catch {
-#if DEBUG
-            print("FiberMapStorage save error:", error)
-#endif
+        let snapshot = FiberMapSnapshot(poles: poles, splices: splices, lines: lines, mapCamera: mapCamera)
+        isSavingSnapshot = true
+        pendingSaveTask?.cancel()
+
+        let dataService = self.dataService
+        pendingSaveTask = Task { [weak self] in
+            do {
+                try await dataService.save(snapshot: snapshot)
+                await MainActor.run {
+                    guard let self else { return }
+                    self.syncError = nil
+                    self.isSavingSnapshot = false
+                }
+            } catch {
+                await MainActor.run {
+                    guard let self else { return }
+                    self.syncError = error.localizedDescription
+                    self.isSavingSnapshot = false
+                }
+            }
+        }
+    }
+
+    func clearSyncError() {
+        syncError = nil
+    }
+
+    func waitForPendingSync() async {
+        if let task = pendingSaveTask {
+            await task.value
         }
     }
 }
@@ -760,6 +810,11 @@ struct MapsView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
                 }
+
+            syncStatusOverlay
+                .allowsHitTesting(false)
+
+            syncErrorOverlay
 
             // Overlays for controls and instructions
             VStack {
@@ -864,6 +919,135 @@ struct MapsView: View {
 extension MapsView {
     enum Accessibility {
         static let locateButtonLabel = "Show my location"
+    }
+
+    private var syncStatusOverlay: some View {
+        VStack {
+            if viewModel.isLoadingSnapshot {
+                SyncStatusBanner(text: "Loading fiber assets…", systemImage: "arrow.triangle.2.circlepath")
+                    .transition(.opacity)
+            } else if viewModel.isSavingSnapshot {
+                SyncStatusBanner(text: "Saving changes…", systemImage: "icloud.and.arrow.up")
+                    .transition(.opacity)
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 24)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.isLoadingSnapshot)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.isSavingSnapshot)
+    }
+
+    private var syncErrorOverlay: some View {
+        VStack {
+            Spacer()
+
+            if let message = viewModel.syncError {
+                SyncErrorBanner(
+                    message: message,
+                    onDismiss: viewModel.clearSyncError,
+                    onRetry: viewModel.retrySync
+                )
+                .padding(.horizontal, 24)
+                .padding(.bottom, 32)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.syncError)
+    }
+}
+
+private struct SyncStatusBanner: View {
+    var text: String
+    var systemImage: String
+
+    var body: some View {
+        Label {
+            Text(text)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.primary)
+        } icon: {
+            Image(systemName: systemImage)
+                .font(.footnote.weight(.semibold))
+        }
+        .labelStyle(.titleAndIcon)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: Capsule())
+        .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 6)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct SyncErrorBanner: View {
+    var message: String
+    var onDismiss: () -> Void
+    var onRetry: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.white)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Sync issue")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.white)
+
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(Color.white.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 12) {
+                Button(action: onRetry) {
+                    Text("Retry")
+                        .font(.footnote.weight(.semibold))
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 16)
+                        .background(Color.white.opacity(0.22), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Retry sync")
+
+                Button(action: onDismiss) {
+                    Text("Dismiss")
+                        .font(.footnote.weight(.semibold))
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 16)
+                        .background(Color.white.opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss sync error")
+            }
+            .foregroundStyle(.white)
+        }
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(red: 0.85, green: 0.16, blue: 0.16),
+                    Color(red: 0.94, green: 0.34, blue: 0.28)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.white.opacity(0.2))
+        )
+        .shadow(color: Color.black.opacity(0.25), radius: 18, x: 0, y: 14)
+        .accessibilityElement(children: .combine)
     }
 }
 
