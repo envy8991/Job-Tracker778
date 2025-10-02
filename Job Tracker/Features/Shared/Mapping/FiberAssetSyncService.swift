@@ -42,12 +42,12 @@ final class FirestoreFiberAssetSyncService: FiberAssetSyncService {
 
     func save(snapshot: FiberMapSnapshot) async throws {
         let data = snapshot.firestoreData()
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             document.setData(data, merge: true) { error in
                 if let error {
                     continuation.resume(throwing: error)
                 } else {
-                    continuation.resume()
+                    continuation.resume(returning: ())
                 }
             }
         }
