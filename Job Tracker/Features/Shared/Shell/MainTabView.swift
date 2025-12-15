@@ -209,11 +209,15 @@ struct AdminPanelView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
     @EnvironmentObject private var usersViewModel: UsersViewModel
     @StateObject private var viewModel = AdminPanelViewModel()
+    @StateObject private var updateViewModel = AdminUpdateViewModel()
     @State private var pendingToggle: PendingToggle?
     @State private var showingBackfillConfirmation = false
+    @State private var pendingUpdateAction: PendingUpdateAction?
+    @State private var showingLogs = false
 
     var body: some View {
         List {
+            updatesSection
             rosterSection
             maintenanceSection
         }
@@ -276,6 +280,46 @@ struct AdminPanelView: View {
         } message: {
             Text("Merges legacy job creators and assignees into each job's participants array. Only run when you understand the impact.")
         }
+        .confirmationDialog(
+            pendingUpdateAction == .apply ? "Apply update?" : "Rollback to previous version?",
+            isPresented: Binding(
+                get: { pendingUpdateAction != nil },
+                set: { newValue in
+                    if !newValue { pendingUpdateAction = nil }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let action = pendingUpdateAction {
+                switch action {
+                case .apply:
+                    Button("Apply Update", role: .destructive) {
+                        updateViewModel.applyUpdate()
+                        pendingUpdateAction = nil
+                    }
+                case .rollback:
+                    Button("Rollback", role: .destructive) {
+                        updateViewModel.rollbackUpdate()
+                        pendingUpdateAction = nil
+                    }
+                }
+            }
+
+            Button("Cancel", role: .cancel) {
+                pendingUpdateAction = nil
+            }
+        } message: {
+            if pendingUpdateAction == .apply {
+                Text("Applies the downloaded build while in maintenance mode. Services may restart during the process.")
+            } else {
+                Text("Restores the last stable build. Use only if the new update is failing health checks.")
+            }
+        }
+        .sheet(isPresented: $showingLogs) {
+            NavigationStack {
+                AdminUpdateLogsView(logs: updateViewModel.logs)
+            }
+        }
         .onAppear {
             viewModel.attach(usersViewModel: usersViewModel)
             viewModel.refreshRosterSnapshot()
@@ -286,6 +330,155 @@ struct AdminPanelView: View {
                 }
             }
             authViewModel.refreshCurrentUser()
+        }
+    }
+
+    @ViewBuilder
+    private var updatesSection: some View {
+        Section("App Updates") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label("Current version", systemImage: "info.circle")
+                    Spacer()
+                    Text(updateViewModel.currentVersion)
+                        .font(.subheadline.monospaced())
+                }
+
+                if let available = updateViewModel.availableVersion {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Update available", systemImage: "arrow.down.circle")
+                            .font(.subheadline)
+                        Text("Version \(available)")
+                            .font(.subheadline.weight(.semibold))
+                        if !updateViewModel.changelog.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Changelog")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                ForEach(updateViewModel.changelog, id: \.self) { item in
+                                    HStack(alignment: .top, spacing: 6) {
+                                        Image(systemName: "checkmark.seal")
+                                            .font(.caption2)
+                                        Text(item)
+                                            .font(.footnote)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("No pending updates", systemImage: "checkmark.seal")
+                            .font(.subheadline)
+                        if let lastCheck = updateViewModel.lastCheckDate {
+                            Text("Last checked at \(lastCheck.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Package status")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(updateViewModel.verificationStatus.message)
+                        .font(.footnote)
+                        .foregroundStyle(updateViewModel.verificationStatus.isVerified ? .green : .primary)
+                }
+
+                Toggle(isOn: $updateViewModel.maintenanceModeEnabled) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Maintenance mode")
+                        Text("Required to apply or rollback updates.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let progress = updateViewModel.progress {
+                    if let fraction = progress.fractionComplete {
+                        ProgressView(value: fraction) {
+                            Text(progress.title)
+                                .font(.subheadline)
+                        } currentValueLabel: {
+                            Text(String(format: "%.0f%%", fraction * 100))
+                                .font(.caption.monospacedDigit())
+                        }
+                        Text(progress.message)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ProgressView(progress.title)
+                        Text(progress.message)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let error = updateViewModel.errorReason {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .onTapGesture { updateViewModel.resetError() }
+                }
+
+                VStack(spacing: 8) {
+                    Button {
+                        updateViewModel.checkForUpdates()
+                    } label: {
+                        Label("Check for Updates", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(updateViewModel.isBusy)
+
+                    Button {
+                        updateViewModel.downloadUpdate()
+                    } label: {
+                        Label("Download Update", systemImage: "tray.and.arrow.down")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(updateViewModel.isBusy || !updateViewModel.hasAvailableUpdate)
+
+                    Button {
+                        updateViewModel.verifyDownload()
+                    } label: {
+                        Label("Verify Package", systemImage: "checkmark.shield")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(updateViewModel.isBusy || !updateViewModel.hasDownloadedUpdate)
+
+                    Button(role: .destructive) {
+                        pendingUpdateAction = .apply
+                    } label: {
+                        Label("Apply Update", systemImage: "hammer")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(updateViewModel.isBusy || !updateViewModel.canApplyUpdate)
+
+                    Button {
+                        pendingUpdateAction = .rollback
+                    } label: {
+                        Label("Rollback", systemImage: "arrow.uturn.backward")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(updateViewModel.isBusy)
+
+                    Button {
+                        showingLogs = true
+                    } label: {
+                        Label("View Logs", systemImage: "doc.text.magnifyingglass")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+            .padding(.vertical, 4)
         }
     }
 
@@ -437,5 +630,30 @@ struct AdminPanelView: View {
         let user: AppUser
         let flag: Flag
         let newValue: Bool
+    }
+
+    private enum PendingUpdateAction {
+        case apply
+        case rollback
+    }
+}
+
+struct AdminUpdateLogsView: View {
+    let logs: [String]
+
+    var body: some View {
+        List {
+            if logs.isEmpty {
+                Text("No update activity yet.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(logs, id: \.self) { line in
+                    Text(line)
+                        .font(.caption.monospaced())
+                        .padding(.vertical, 2)
+                }
+            }
+        }
+        .navigationTitle("Update Logs")
     }
 }
