@@ -3,8 +3,6 @@ name: "Build Unsigned IPA"
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -12,7 +10,7 @@ jobs:
     runs-on: macos-latest
     env:
       PROJECT_PATH: Job Tracker.xcodeproj
-      TARGET_NAME: Job Tracker
+      SCHEME_NAME: Job Tracker
       ARCHIVE_PATH: ${{ runner.temp }}/JobTracker.xcarchive
     steps:
       - name: Checkout repository
@@ -24,11 +22,14 @@ jobs:
         with:
           xcode-version: 'latest-stable'
 
+      - name: List Schemes (Diagnostics)
+        run: xcodebuild -list -project "$PROJECT_PATH"
+
       - name: Build Archive (Unsigned)
         run: |
           xcodebuild archive \
             -project "$PROJECT_PATH" \
-            -target "$TARGET_NAME" \
+            -scheme "$SCHEME_NAME" \
             -archivePath "$ARCHIVE_PATH" \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
@@ -41,7 +42,12 @@ jobs:
       - name: Create Payload Folder
         run: |
           mkdir -p Payload
-          cp -r "$ARCHIVE_PATH/Products/Applications/"*.app Payload/
+          APP_PATH="$(find "$ARCHIVE_PATH/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app was found in archive output."
+            exit 1
+          fi
+          cp -r "$APP_PATH" Payload/
           zip -r JobTracker_Unsigned.ipa Payload
 
       - name: Upload Artifact
