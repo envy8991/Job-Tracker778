@@ -31,11 +31,11 @@ struct DashboardDailyShareSheet: View {
 }
 
 struct DashboardJobShareSheet: View {
-    let url: URL
+    let items: [Any]
     let subject: String
 
     var body: some View {
-        ActivityView(activityItems: [url], subject: subject)
+        ActivityView(activityItems: items, subject: subject)
     }
 }
 
@@ -57,5 +57,5 @@ private struct DashboardDatePickerSheetPreviewContainer: View {
 }
 
 #Preview("Job Share Sheet") {
-    DashboardJobShareSheet(url: URL(string: "https://example.com/job")!, subject: "Job link for May 1, 2025")
+    DashboardJobShareSheet(items: [URL(string: "https://example.com/job")!], subject: "Job link for May 1, 2025")
 }

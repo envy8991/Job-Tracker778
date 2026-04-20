@@ -3,6 +3,7 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject var jobsViewModel: JobsViewModel
     @EnvironmentObject var locationService: LocationService
+    @EnvironmentObject var authViewModel: AuthViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.shellChromeHeight) private var shellChromeHeight
 
@@ -105,7 +106,7 @@ struct DashboardView: View {
                         },
                         onDelete: { job in jobsViewModel.deleteJob(documentID: job.id) },
                         onShare: { job in
-                            Task { await viewModel.share(job: job) }
+                            Task { await viewModel.share(job: job, userRole: authViewModel.currentUser?.normalizedPosition) }
                         }
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -172,8 +173,8 @@ struct DashboardView: View {
                 }
             }
             .sheet(isPresented: showSystemShareBinding) {
-                if let url = viewModel.jobShareURL {
-                    DashboardJobShareSheet(url: url, subject: viewModel.shareSubject)
+                if !viewModel.jobShareItems.isEmpty {
+                    DashboardJobShareSheet(items: viewModel.jobShareItems, subject: viewModel.shareSubject)
                 }
             }
             .onAppear {
