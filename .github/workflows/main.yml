@@ -11,7 +11,7 @@ jobs:
     env:
       PROJECT_PATH: Job Tracker.xcodeproj
       SCHEME_NAME: Job Tracker
-      ARCHIVE_PATH: ${{ runner.temp }}/JobTracker.xcarchive
+      ARCHIVE_PATH: $RUNNER_TEMP/JobTracker.xcarchive
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
