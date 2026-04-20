@@ -41,7 +41,7 @@ final class DashboardViewModel: ObservableObject {
     @Published var shareItems: [Any] = []
     @Published var isPreparingDailyShare = false
     @Published var isGeneratingShareLink = false
-    @Published var jobShareURL: URL?
+    @Published var jobShareItems: [Any] = []
     @Published var showSystemShareForJob = false
     @Published var showImportToast = false
     @Published var importToastMessage = ""
@@ -226,14 +226,26 @@ final class DashboardViewModel: ObservableObject {
         presentDailyShareSheet()
     }
 
-    func share(job: Job) async {
+    func share(job: Job, userRole: String?) async {
         guard !isGeneratingShareLink else { return }
+        let normalizedRole = userRole?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalizedRole == "can" {
+            let canShareText = canRoleShareText(for: job)
+            guard !canShareText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                presentShareError(message: "Couldn't create share text for this job.")
+                return
+            }
+            jobShareItems = [canShareText]
+            showSystemShareForJob = true
+            return
+        }
+
         isGeneratingShareLink = true
         defer { isGeneratingShareLink = false }
 
         do {
             let url = try await SharedJobService.shared.publishShareLink(job: job)
-            jobShareURL = url
+            jobShareItems = [url]
             showSystemShareForJob = true
         } catch {
             presentShareError(message: "Couldn't create link: \(error.localizedDescription)")
@@ -341,6 +353,7 @@ final class DashboardViewModel: ObservableObject {
     func dismissSheets() {
         activeSheet = nil
         showSystemShareForJob = false
+        jobShareItems = []
     }
 
     // MARK: - Toasts & Sync
@@ -465,6 +478,28 @@ final class DashboardViewModel: ObservableObject {
             if suffixes.contains(cleaned) { break }
         }
         return tokens.joined(separator: " ")
+    }
+
+    private func canRoleShareText(for job: Job) -> String {
+        let line1 = houseNumberAndStreet(from: job.address).trimmingCharacters(in: .whitespacesAndNewlines)
+        let line2 = (job.assignments ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let line3 = "Can-\((job.canFootage ?? "").trimmingCharacters(in: .whitespacesAndNewlines))’F"
+        let line4 = "Nid-\((job.nidFootage ?? "").trimmingCharacters(in: .whitespacesAndNewlines))’"
+        let line5 = fiberType(from: job.materialsUsed)
+        return [line1, line2, line3, line4, line5].joined(separator: "\n")
+    }
+
+    private func fiberType(from materials: String?) -> String {
+        let trimmed = (materials ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        if let range = trimmed.range(of: "fiber:", options: [.caseInsensitive]) {
+            let fiberValue = trimmed[range.upperBound...]
+                .split(separator: ",")
+                .first
+                .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) } ?? ""
+            if !fiberValue.isEmpty { return fiberValue }
+        }
+        return trimmed
     }
 
     func openJobInMaps(_ job: Job, suggestionProviderRaw: String) {

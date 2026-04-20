@@ -13,7 +13,7 @@ struct JobSearchDetailView: View {
     @AppStorage("addressSuggestionProvider") private var suggestionProviderRaw = "apple"
 
     @State private var isGeneratingShareLink = false
-    @State private var shareURL: URL? = nil
+    @State private var shareItems: [Any] = []
     @State private var showShareSheet = false
     @State private var isAdding = false
     @State private var errorMessage: String? = nil
@@ -131,10 +131,12 @@ struct JobSearchDetailView: View {
             .padding(.bottom, JTSpacing.lg)
             .background(.ultraThinMaterial)
         }
-        .sheet(isPresented: $showShareSheet, onDismiss: { shareURL = nil }) {
-            if let url = shareURL {
+        .sheet(isPresented: $showShareSheet, onDismiss: {
+            shareItems = []
+        }) {
+            if !shareItems.isEmpty {
                 let subject = metadata.address.primary
-                ActivityView(activityItems: [url], subject: "Job link for \(subject)")
+                ActivityView(activityItems: shareItems, subject: "Job link for \(subject)")
             }
         }
         .alert(item: $alertState) { state in
@@ -246,14 +248,31 @@ struct JobSearchDetailView: View {
     private func share(job: Job) {
         guard !isGeneratingShareLink else { return }
         alertState = nil
-        shareURL = nil
+        shareItems = []
+
+        let normalizedRole = authViewModel.currentUser?.normalizedPosition
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        if normalizedRole == "can" {
+            let shareText = canRoleShareText(for: job)
+            let trimmedText = shareText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedText.isEmpty else {
+                let message = "We couldn’t create the CAN share format for this job."
+                alertState = AlertState(kind: .share, message: message)
+                return
+            }
+            shareItems = [trimmedText]
+            showShareSheet = true
+            return
+        }
+
         isGeneratingShareLink = true
 
         Task {
             do {
                 let url = try await SharedJobService.shared.publishShareLink(job: job)
                 await MainActor.run {
-                    shareURL = url
+                    shareItems = [url]
                     isGeneratingShareLink = false
                     showShareSheet = true
                 }
@@ -266,6 +285,46 @@ struct JobSearchDetailView: View {
                 }
             }
         }
+    }
+
+    private func canRoleShareText(for job: Job) -> String {
+        let line1 = houseNumberAndStreet(from: job.address).trimmingCharacters(in: .whitespacesAndNewlines)
+        let line2 = displayValue(job.assignments) ?? ""
+        let line3 = "Can-\(displayValue(job.canFootage) ?? "")’F"
+        let line4 = "Nid-\(displayValue(job.nidFootage) ?? "")’"
+        let line5 = fiberType(from: job.materialsUsed)
+        return [line1, line2, line3, line4, line5].joined(separator: "\n")
+    }
+
+    private func houseNumberAndStreet(from full: String) -> String {
+        if let comma = full.firstIndex(of: ",") {
+            return String(full[..<comma]).trimmingCharacters(in: .whitespaces)
+        }
+
+        let suffixes: Set<String> = [
+            "st", "street", "rd", "road", "ave", "avenue", "blvd", "circle", "cir", "ln", "lane",
+            "dr", "drive", "ct", "court", "pkwy", "pl", "place", "ter", "terrace"
+        ]
+        var tokens: [Substring] = []
+        for token in full.split(separator: " ") {
+            tokens.append(token)
+            let cleaned = token.trimmingCharacters(in: CharacterSet(charactersIn: ",.")).lowercased()
+            if suffixes.contains(cleaned) { break }
+        }
+        return tokens.joined(separator: " ")
+    }
+
+    private func fiberType(from materials: String?) -> String {
+        let trimmed = displayValue(materials) ?? ""
+        guard !trimmed.isEmpty else { return "" }
+        if let range = trimmed.range(of: "fiber:", options: [.caseInsensitive]) {
+            let value = trimmed[range.upperBound...]
+                .split(separator: ",")
+                .first
+                .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) } ?? ""
+            if !value.isEmpty { return value }
+        }
+        return trimmed
     }
 
     private func addToDashboard() {
