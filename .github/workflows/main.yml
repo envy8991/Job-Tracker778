@@ -3,6 +3,7 @@ name: "Build Unsigned IPA"
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch: # This lets you start the build manually from the Actions tab
 
 jobs:
   build:
@@ -14,8 +15,8 @@ jobs:
       - name: Build Archive (Unsigned)
         run: |
           xcodebuild archive \
-            -project Job-Tracker778.xcodeproj \
-            -scheme Job-Tracker778 \
+            -project "Job Tracker.xcodeproj" \
+            -scheme "Job Tracker" \
             -archivePath $RUNNER_TEMP/JobTracker.xcarchive \
             -configuration Release \
             CODE_SIGNING_ALLOWED=NO \
