@@ -3,7 +3,7 @@ name: "Build Unsigned IPA"
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: # This lets you start the build manually from the Actions tab
+  workflow_dispatch:
 
 jobs:
   build:
@@ -12,16 +12,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
       - name: Build Archive (Unsigned)
         run: |
           xcodebuild archive \
             -project "Job Tracker.xcodeproj" \
             -scheme "Job Tracker" \
             -archivePath $RUNNER_TEMP/JobTracker.xcarchive \
+            -sdk iphoneos \
             -configuration Release \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
       - name: Create Payload Folder
         run: |
@@ -32,5 +37,5 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Unsigned-IPA
+          name: JobTracker-Unsigned-IPA
           path: JobTracker_Unsigned.ipa
