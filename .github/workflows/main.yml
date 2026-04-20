@@ -8,6 +8,10 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    env:
+      PROJECT_PATH: Job Tracker.xcodeproj
+      TARGET_NAME: Job Tracker
+      DERIVED_DATA_PATH: ${{ runner.temp }}/DerivedData
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -18,13 +22,14 @@ jobs:
         with:
           xcode-version: 'latest-stable'
 
-      - name: Build Archive (Unsigned)
+      - name: Build App (Unsigned)
         run: |
-          xcodebuild archive \
-            -project "Job Tracker.xcodeproj" \
-            -scheme "Job Tracker" \
-            -archivePath $RUNNER_TEMP/JobTracker.xcarchive \
+          xcodebuild build \
+            -project "$PROJECT_PATH" \
+            -target "$TARGET_NAME" \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
             -sdk iphoneos \
+            -destination "generic/platform=iOS" \
             -configuration Release \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
@@ -34,7 +39,7 @@ jobs:
       - name: Create Payload Folder
         run: |
           mkdir -p Payload
-          cp -r $RUNNER_TEMP/JobTracker.xcarchive/Products/Applications/*.app Payload/
+          cp -r "$DERIVED_DATA_PATH/Build/Products/Release-iphoneos/"*.app Payload/
           zip -r JobTracker_Unsigned.ipa Payload
 
       - name: Upload Artifact
