@@ -7,38 +7,48 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    # Using macos-15 for a stable 2026 environment
+    runs-on: macos-15
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Resolve Package Dependencies
-        # This ensures any Swift Packages are downloaded before building
+      - name: List Project Files (Debug)
+        run: |
+          echo "Listing all project files..."
+          find . -maxdepth 2 -name "*.xcodeproj"
+          echo "Listing available schemes..."
+          xcodebuild -list
+
+      - name: Resolve Swift Packages
         run: xcodebuild -resolvePackageDependencies -project "Job Tracker.xcodeproj" -scheme "Job Tracker"
 
-      - name: Build Archive (Unsigned)
+      - name: Build App Bundle (Unsigned)
         run: |
-          xcodebuild archive \
+          xcodebuild build \
             -project "Job Tracker.xcodeproj" \
             -scheme "Job Tracker" \
             -configuration Release \
-            -archivePath ./build/JobTracker.xcarchive \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ./build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-      - name: Package IPA
+      - name: Package into IPA
         run: |
           mkdir -p Payload
-          # The asterisk * helps if the .app name is slightly different than the scheme
-          cp -r ./build/JobTracker.xcarchive/Products/Applications/*.app Payload/
+          # This find command is more robust than guessing the path
+          APP_PATH=$(find ./build -name "*.app" -type d | head -n 1)
+          echo "Found app at: $APP_PATH"
+          cp -r "$APP_PATH" Payload/
           zip -r JobTracker_Unsigned.ipa Payload
 
-      - name: Upload IPA Artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Job-Tracker-Unsigned
+          name: Job-Tracker-Unsigned-IPA
           path: JobTracker_Unsigned.ipa
