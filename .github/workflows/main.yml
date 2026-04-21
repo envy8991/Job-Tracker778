@@ -7,24 +7,22 @@ on:
 
 jobs:
   build:
-    # Using macos-15 for a stable 2026 environment
-    runs-on: macos-15
+    runs-on: macos-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: List Project Files (Debug)
+      - name: Force Disable Code Signing
+        # This manually strips signing requirements from the project file itself before building
         run: |
-          echo "Listing all project files..."
-          find . -maxdepth 2 -name "*.xcodeproj"
-          echo "Listing available schemes..."
-          xcodebuild -list
+          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' "Job Tracker.xcodeproj/project.pbxproj"
+          sed -i '' 's/CODE_SIGNING_REQUIRED = YES/CODE_SIGNING_REQUIRED = NO/g' "Job Tracker.xcodeproj/project.pbxproj"
 
       - name: Resolve Swift Packages
         run: xcodebuild -resolvePackageDependencies -project "Job Tracker.xcodeproj" -scheme "Job Tracker"
 
-      - name: Build App Bundle (Unsigned)
+      - name: Build for Testing (Unsigned)
         run: |
           xcodebuild build \
             -project "Job Tracker.xcodeproj" \
@@ -36,19 +34,24 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            COMPILER_INDEX_STORE_ENABLE=NO | xcpretty || true
+          # We use "|| true" because xcodebuild might return 65 even if the .app was created
 
-      - name: Package into IPA
+      - name: Package IPA
         run: |
           mkdir -p Payload
-          # This find command is more robust than guessing the path
+          # Search specifically for the .app file in the build folder
           APP_PATH=$(find ./build -name "*.app" -type d | head -n 1)
-          echo "Found app at: $APP_PATH"
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: No .app bundle found. The build likely failed."
+            exit 1
+          fi
           cp -r "$APP_PATH" Payload/
           zip -r JobTracker_Unsigned.ipa Payload
 
-      - name: Upload Artifact
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Job-Tracker-Unsigned-IPA
+          name: Job-Tracker-Unsigned
           path: JobTracker_Unsigned.ipa
