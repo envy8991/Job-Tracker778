@@ -13,6 +13,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Resolve Package Dependencies
+        # This ensures any Swift Packages are downloaded before building
+        run: xcodebuild -resolvePackageDependencies -project "Job Tracker.xcodeproj" -scheme "Job Tracker"
+
       - name: Build Archive (Unsigned)
         run: |
           xcodebuild archive \
@@ -22,15 +26,15 @@ jobs:
             -archivePath ./build/JobTracker.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
-            CODE_SIGNING_METHOD=manual
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            COMPILER_INDEX_STORE_ENABLE=NO
 
       - name: Package IPA
         run: |
           mkdir -p Payload
-          # Copy the .app bundle from the archive into the Payload folder
+          # The asterisk * helps if the .app name is slightly different than the scheme
           cp -r ./build/JobTracker.xcarchive/Products/Applications/*.app Payload/
-          # Zip the Payload folder and rename it to .ipa
           zip -r JobTracker_Unsigned.ipa Payload
 
       - name: Upload IPA Artifact
