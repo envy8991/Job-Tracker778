@@ -13,42 +13,47 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Force Disable Code Signing
-        # This manually strips signing requirements from the project file itself before building
-        run: |
-          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' "Job Tracker.xcodeproj/project.pbxproj"
-          sed -i '' 's/CODE_SIGNING_REQUIRED = YES/CODE_SIGNING_REQUIRED = NO/g' "Job Tracker.xcodeproj/project.pbxproj"
+      - name: Select Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Show Shared Schemes
+        run: xcodebuild -list -project "Job Tracker.xcodeproj"
 
       - name: Resolve Swift Packages
         run: xcodebuild -resolvePackageDependencies -project "Job Tracker.xcodeproj" -scheme "Job Tracker"
 
-      - name: Build for Testing (Unsigned)
+      - name: Build iOS App (Unsigned)
         run: |
+          set -eo pipefail
           xcodebuild build \
             -project "Job Tracker.xcodeproj" \
             -scheme "Job Tracker" \
             -configuration Release \
+            -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath ./build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            COMPILER_INDEX_STORE_ENABLE=NO | xcpretty || true
-          # We use "|| true" because xcodebuild might return 65 even if the .app was created
+            DEVELOPMENT_TEAM="" \
+            COMPILER_INDEX_STORE_ENABLE=NO
 
       - name: Package IPA
         run: |
-          mkdir -p Payload
-          # Search specifically for the .app file in the build folder
-          APP_PATH=$(find ./build -name "*.app" -type d | head -n 1)
-          if [ -z "$APP_PATH" ]; then
-            echo "Error: No .app bundle found. The build likely failed."
+          set -eo pipefail
+          APP_PATH="./build/Build/Products/Release-iphoneos/Job Tracker.app"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Expected app bundle not found at: $APP_PATH"
+            echo "Available app bundles:"
+            find ./build -name "*.app" -type d || true
             exit 1
           fi
-          cp -r "$APP_PATH" Payload/
-          zip -r JobTracker_Unsigned.ipa Payload
+
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          ditto -c -k --sequesterRsrc --keepParent Payload JobTracker_Unsigned.ipa
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
