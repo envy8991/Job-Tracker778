@@ -2,56 +2,90 @@ name: Build Unsigned IPA
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
-  build:
+  build_unsigned_ipa:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Force Disable Code Signing
-        # This manually strips signing requirements from the project file itself before building
-        run: |
-          sed -i '' 's/CODE_SIGNING_ALLOWED = YES/CODE_SIGNING_ALLOWED = NO/g' "Job Tracker.xcodeproj/project.pbxproj"
-          sed -i '' 's/CODE_SIGNING_REQUIRED = YES/CODE_SIGNING_REQUIRED = NO/g' "Job Tracker.xcodeproj/project.pbxproj"
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
 
-      - name: Resolve Swift Packages
-        run: xcodebuild -resolvePackageDependencies -project "Job Tracker.xcodeproj" -scheme "Job Tracker"
-
-      - name: Build for Testing (Unsigned)
+      - name: Diagnostics
         run: |
-          xcodebuild build \
+          set -euo pipefail
+          xcodebuild -version
+          xcodebuild -list -project "Job Tracker.xcodeproj"
+
+      - name: Resolve Swift packages
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies \
+            -project "Job Tracker.xcodeproj" \
+            -scheme "Job Tracker"
+
+      - name: Build app without signing
+        run: |
+          set -euo pipefail
+          xcodebuild clean build \
             -project "Job Tracker.xcodeproj" \
             -scheme "Job Tracker" \
             -configuration Release \
+            -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath ./build \
+            -derivedDataPath "$PWD/build" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="" \
+            EXPANDED_CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            COMPILER_INDEX_STORE_ENABLE=NO | xcpretty || true
-          # We use "|| true" because xcodebuild might return 65 even if the .app was created
+            DEVELOPMENT_TEAM="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            DEPLOYMENT_POSTPROCESSING=NO \
+            STRIP_INSTALLED_PRODUCT=NO \
+            COPY_PHASE_STRIP=NO \
+            RETAIN_RAW_BINARIES=YES \
+            | tee "$PWD/xcodebuild.log"
 
-      - name: Package IPA
+      - name: Show built app bundles
+        if: always()
         run: |
-          mkdir -p Payload
-          # Search specifically for the .app file in the build folder
-          APP_PATH=$(find ./build -name "*.app" -type d | head -n 1)
-          if [ -z "$APP_PATH" ]; then
-            echo "Error: No .app bundle found. The build likely failed."
+          find "$PWD/build" -name "*.app" -type d -print || true
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP_PATH="$PWD/build/Build/Products/Release-iphoneos/Job Tracker.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Expected app bundle missing: $APP_PATH"
+            find "$PWD/build" -maxdepth 5 -print || true
             exit 1
           fi
-          cp -r "$APP_PATH" Payload/
-          zip -r JobTracker_Unsigned.ipa Payload
 
-      - name: Upload IPA
+          rm -rf Payload JobTracker_Unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          ditto -c -k --sequesterRsrc --keepParent Payload JobTracker_Unsigned.ipa
+
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: Job-Tracker-Unsigned
           path: JobTracker_Unsigned.ipa
+
+      - name: Upload xcodebuild log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: xcodebuild.log
+          if-no-files-found: warn
