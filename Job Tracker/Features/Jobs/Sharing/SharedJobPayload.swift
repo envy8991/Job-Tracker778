@@ -9,7 +9,6 @@ import Foundation
 import CoreLocation
 import Firebase
 import FirebaseFirestore
-import FirebaseFirestoreSwift
 import FirebaseAuth
 
 /// What we allow to travel across users when sharing a job (minimal & privacy-safe).
@@ -197,7 +196,7 @@ final class SharedJobService {
         receiverIsCAN: Bool,
         currentUserID: String?
     ) async -> Job {
-        // Build the recipient’s Job. Keep only shared fields.
+        // Build the recipient's Job. Keep only shared fields.
         // (Adjust initializer to your actual Job model)
         var newJob = Job(
             address: payload.address,
@@ -237,7 +236,7 @@ final class SharedJobService {
         return String((0..<length).compactMap { _ in chars.randomElement() })
     }
 
-    /// Reads the current user’s normalized role (lowercased) from `/users/{uid}`.
+    /// Reads the current user's normalized role (lowercased) from `/users/{uid}`.
     private func currentUserProfile() async -> AppUser? {
         guard let uid = Auth.auth().currentUser?.uid else { return nil }
         do {
