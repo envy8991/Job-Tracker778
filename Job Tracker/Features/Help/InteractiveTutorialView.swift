@@ -221,7 +221,7 @@ final class DashboardTutorialStageModel: ObservableObject {
         }
     }
 
-    func recordShareTap() {
+    func recordShare Tap() {
         didTapShare = true
     }
 
@@ -444,7 +444,7 @@ struct InteractiveTutorialView: View {
         .overlayPreferenceValue(TutorialHighlightPreferenceKey.self) { targets in
             GeometryReader { proxy in
                 let items = targets.map { target -> TutorialHighlightItem in
-                    let rect = proxy[target.anchor, in: SwiftUI.CoordinateSpace.named(TutorialHighlightOverlay.coordinateSpaceName)].insetBy(dx: -target.padding, dy: -target.padding)
+                    let rect = proxy[target.anchor].insetBy(dx: -target.padding, dy: -target.padding)
                     return TutorialHighlightItem(
                         id: target.id,
                         frame: rect,
