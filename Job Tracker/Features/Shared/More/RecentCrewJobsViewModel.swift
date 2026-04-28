@@ -1,6 +1,5 @@
 import Foundation
 import FirebaseFirestore
-import FirebaseFirestoreSwift
 
 final class RecentCrewJobsViewModel: ObservableObject {
     enum CrewRoleFilter: String, CaseIterable, Identifiable {
