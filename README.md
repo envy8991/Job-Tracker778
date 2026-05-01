@@ -14,6 +14,7 @@ The app targets modern Apple platforms (iOS 17+ and watchOS 10+) and leans on Co
 - **Settings** – Smart routing preferences, arrival alert toggles, theme customization, and account management.
 - **Admin & Team Tools** – Admin flag management, maintenance utilities, roster sync, partner pairing, and crew chat.
 - **Assistive Workflows** – Gemini-powered splice troubleshooting, Help center tutorials, and watchOS glanceable status updates.
+- **Siri & Shortcuts** – App Intents-backed voice actions for creating jobs, updating status, listing today’s work, and launching navigation to the next job.
 
 See the [Documentation](Documentation/README.md) index for deep dives into each feature area.
 
@@ -71,6 +72,54 @@ Job Tracker778
 4. **Companion Apps**
    - **watchOS**: Select the *Job Tracker Companion Watch App* target to build the Watch app. `WatchBridge` mirrors daily jobs and leverages the same Firebase-backed models.
    - **iMessage Extension**: The *imessage cs* target adds interactive job cards to Messages. Use a Messages simulator to preview.
+
+## Siri / Shortcuts Commands
+
+Job Tracker includes App Intents (iOS 16+) so technicians can run voice commands through Siri or configure automations in the Shortcuts app.
+
+### Available actions
+
+- **Create Job**
+  - Example phrases:
+    - “Create a job in Job Tracker”
+    - “Add job with Job Tracker”
+  - Siri will ask for:
+    - Address
+    - Status
+    - Scheduled Date
+
+- **Update Job Status**
+  - Example phrases:
+    - “Mark job as Job Tracker”
+    - “Update job status in Job Tracker”
+  - Siri will ask for:
+    - Address or job number
+    - New status (`Pending`, `Needs Ariel`, `Needs Underground`, `Needs Nid`, `Needs Can`, `Done`, `Talk to Rick`, or custom)
+
+- **Get Today’s Jobs**
+  - Example phrases:
+    - “What are my jobs today in Job Tracker”
+    - “Show today’s jobs with Job Tracker”
+  - Returns a short spoken list (up to five non-pending jobs).
+
+- **Directions to Next Job**
+  - Example phrases:
+    - “Directions to my next job in Job Tracker”
+    - “Navigate to next job with Job Tracker”
+  - Opens Apple Maps to the earliest pending job for today.
+
+- **Next Job Address**
+  - Example phrases:
+    - “What is my next job address in Job Tracker”
+    - “Next job address with Job Tracker”
+  - Speaks the next pending address for today.
+
+### How to use
+
+1. Build and run the app once on device or simulator.
+2. Open **Shortcuts** → **+** → **Add Action**.
+3. Search for **Job Tracker** and pick one of the actions above.
+4. (Optional) Add it to Siri with a custom invocation phrase.
 
 ## Testing
 
