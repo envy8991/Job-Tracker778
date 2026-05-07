@@ -49,6 +49,7 @@ Job Tracker778
 ├── imessage cs/                # iMessage extension for sharing job summaries
 ├── Job TrackerTests/           # XCTest coverage for services and view models
 ├── Documentation/              # Markdown feature guides and process docs
+├── website/                    # Firebase-backed browser version for Job Tracker workflows
 └── Job Tracker.xcodeproj       # Xcode project workspace
 ```
 
