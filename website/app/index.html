@@ -16,44 +16,50 @@
         <div class="auth-copy">
           <span class="brand-mark">JT</span>
           <p class="eyebrow">Fiber field operations</p>
-          <h1>Job Tracker Web</h1>
-          <p>
-            Sign in with your Firebase-backed Job Tracker account or create a technician account
-            to manage dashboards, job search, timesheets, yellow sheets, and the More tools.
-          </p>
+          <h1 id="authHeadline">Welcome Back</h1>
+          <p id="authLead">Sign in with the credentials you use across the Job Tracker apps.</p>
         </div>
 
         <div class="auth-panel">
-          <div class="segmented" role="tablist" aria-label="Authentication mode">
-            <button class="segment active" id="loginTab" type="button" data-auth-mode="login">Login</button>
-            <button class="segment" id="signupTab" type="button" data-auth-mode="signup">Sign up</button>
+          <div class="segmented auth-segmented" role="tablist" aria-label="Authentication actions">
+            <button class="segment active" id="loginTab" type="button" data-auth-mode="login" aria-controls="loginForm" aria-selected="true">Sign In</button>
+            <button class="segment" id="signupTab" type="button" data-auth-mode="signup" aria-controls="signupForm" aria-selected="false">Sign Up</button>
+            <button class="segment" id="resetTab" type="button" data-auth-mode="reset" aria-controls="resetForm" aria-selected="false">Reset</button>
           </div>
 
-          <form id="loginForm" class="auth-form">
-            <label>Email<input id="loginEmail" type="email" autocomplete="email" required /></label>
+          <form id="loginForm" class="auth-form" novalidate>
+            <label>Email Address<input id="loginEmail" type="email" autocomplete="email" required /></label>
             <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
-            <button class="button primary" type="submit">Login</button>
-            <button class="link-button" id="resetPasswordButton" type="button">Send password reset</button>
+            <button class="button primary" type="submit">Sign In</button>
+            <button class="link-button" type="button" data-auth-mode="signup">Need an account? Create one</button>
+            <button class="link-button" type="button" data-auth-mode="reset">Forgot password?</button>
           </form>
 
-          <form id="signupForm" class="auth-form hidden">
+          <form id="signupForm" class="auth-form hidden" novalidate>
             <div class="form-grid two">
-              <label>First name<input id="signupFirstName" autocomplete="given-name" required /></label>
-              <label>Last name<input id="signupLastName" autocomplete="family-name" required /></label>
+              <label>First Name<input id="signupFirstName" autocomplete="given-name" required /></label>
+              <label>Last Name<input id="signupLastName" autocomplete="family-name" required /></label>
             </div>
-            <label>Email<input id="signupEmail" type="email" autocomplete="email" required /></label>
-            <div class="form-grid two">
-              <label>
-                Position
-                <select id="signupPosition">
-                  <option>Technician</option>
-                  <option>Supervisor</option>
-                  <option>Admin</option>
-                </select>
-              </label>
-              <label>Password<input id="signupPassword" type="password" autocomplete="new-password" minlength="6" required /></label>
-            </div>
-            <button class="button primary" type="submit">Create account</button>
+            <label>Email Address<input id="signupEmail" type="email" autocomplete="email" required /></label>
+            <label>Password<input id="signupPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
+            <label class="position-picker">
+              Crew Position
+              <select id="signupPosition">
+                <option>Aerial</option>
+                <option>Underground</option>
+                <option>Nid</option>
+                <option>Can</option>
+              </select>
+            </label>
+            <button class="button primary" type="submit">Create Account</button>
+            <button class="link-button" type="button" data-auth-mode="login">Already have an account? Sign in</button>
+          </form>
+
+          <form id="resetForm" class="auth-form hidden" novalidate>
+            <label>Email Address<input id="resetEmail" type="email" autocomplete="email" required /></label>
+            <p class="helper-text">We'll send a secure link to reset your password.</p>
+            <button class="button primary" type="submit">Email Reset Link</button>
+            <button class="link-button" type="button" data-auth-mode="login">Back to sign in</button>
           </form>
 
           <p id="authMessage" class="form-message" role="status" aria-live="polite"></p>
@@ -216,10 +222,21 @@
             <label class="search-box">Search jobs<input id="jobSearchInput" placeholder="Try: Maple, JT-1001, pending, splice, 2026-05-07" /></label>
             <div class="job-list" id="searchResults"></div>
           </section>
+
+          <section class="workspace-card">
+            <div class="section-heading">
+              <div><p class="eyebrow">Shared jobs</p><h2>Import shared job link</h2></div>
+            </div>
+            <form class="share-import-form" id="shareImportForm">
+              <label>Token or link<input id="shareTokenInput" placeholder="jobtracker://importJob?token=..." /></label>
+              <button class="button primary" type="submit">Preview import</button>
+            </form>
+            <div class="compact-list" id="shareImportPreview"></div>
+          </section>
         </section>
 
         <section class="view" id="moreView" data-view="more">
-          <div class="page-heading"><p class="eyebrow">More</p><h1>Profile, settings, and partner tools</h1><p>The required More sections are available here with local persistence.</p></div>
+          <div class="page-heading"><p class="eyebrow">More</p><h1>Profile, settings, and partner tools</h1><p>The required More sections are available here with Firebase-backed persistence.</p></div>
           <section class="more-tabs" role="tablist" aria-label="More sections">
             <button class="segment active" type="button" data-more-tab="profile">Profile</button>
             <button class="segment" type="button" data-more-tab="settings">Settings</button>
@@ -231,11 +248,12 @@
             <div class="form-grid three">
               <label>First name<input id="profileFirstName" /></label>
               <label>Last name<input id="profileLastName" /></label>
-              <label>Position<select id="profilePosition"><option>Technician</option><option>Supervisor</option><option>Admin</option></select></label>
+              <label>Position<select id="profilePosition"><option>Aerial</option><option>Underground</option><option>Nid</option><option>Can</option><option>Supervisor</option><option>Admin</option></select></label>
               <label>Email<input id="profileEmail" type="email" disabled /></label>
               <label>Phone<input id="profilePhone" placeholder="(555) 123-4567" /></label>
               <label>Home yard<input id="profileYard" placeholder="North Yard" /></label>
             </div>
+            <div class="profile-shortcuts" id="profileShortcuts" aria-label="Profile shortcuts"></div>
           </section>
 
           <section class="workspace-card more-panel" id="settingsPanel" data-more-panel="settings">
@@ -264,6 +282,34 @@
         </section>
       </main>
     </div>
+
+    <dialog class="job-detail-dialog" id="jobDetailDialog" aria-labelledby="jobDetailTitle">
+      <form class="job-detail-panel" id="jobDetailForm" method="dialog">
+        <div class="section-heading">
+          <div><p class="eyebrow">Job Detail</p><h2 id="jobDetailTitle">Edit job</h2></div>
+          <button class="button ghost" id="closeJobDetailButton" type="button">Close</button>
+        </div>
+        <input id="detailJobId" type="hidden" />
+        <div class="form-grid two">
+          <label>Job #<input id="detailJobNumber" /></label>
+          <label>Scheduled date<input id="detailDate" type="date" /></label>
+          <label>Address<input id="detailAddress" /></label>
+          <label>Status<select id="detailStatus"></select></label>
+          <label>Assignment / type<input id="detailAssignments" /></label>
+          <label>Materials used<input id="detailMaterials" /></label>
+          <label>NID footage<input id="detailNidFootage" /></label>
+          <label>CAN footage<input id="detailCanFootage" /></label>
+        </div>
+        <label>Notes<textarea id="detailNotes" rows="4"></textarea></label>
+        <label>Participants<input id="detailParticipants" placeholder="Comma-separated user IDs" /></label>
+        <div class="detail-actions">
+          <button class="button primary" id="saveJobDetailButton" type="submit">Save detail</button>
+          <button class="button secondary" id="routeJobButton" type="button">Open route</button>
+          <button class="button secondary" id="shareJobDetailButton" type="button">Share</button>
+          <button class="button danger" id="removeJobDetailButton" type="button">Remove</button>
+        </div>
+      </form>
+    </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="config.js"></script>
