@@ -52,11 +52,15 @@ a { color: inherit; }
   box-shadow: var(--shadow);
 }
 .auth-copy, .auth-panel { padding: clamp(1.5rem, 5vw, 3rem); }
-.auth-copy { background: linear-gradient(135deg, rgba(98, 213, 255, 0.18), transparent); }
+.auth-copy { display: grid; align-content: center; background: linear-gradient(135deg, rgba(98, 213, 255, 0.18), transparent); }
+.auth-panel { align-self: center; }
 .auth-copy h1, .page-heading h1, .hero h1 { margin: 0.4rem 0 1rem; letter-spacing: -0.06em; line-height: 0.95; }
 .auth-copy h1 { font-size: clamp(2.8rem, 7vw, 5rem); }
 .auth-copy p, .page-heading p, .hero p, .feature-card p, .workspace-card p, .compact-item span { color: var(--muted); line-height: 1.65; }
 .auth-form { display: grid; gap: 0.9rem; margin-top: 1.2rem; }
+.auth-segmented { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; border-radius: 1.2rem; }
+.helper-text { margin: -0.2rem 0 0; color: var(--muted); font-size: 0.9rem; }
+.position-picker select { margin-top: 0.15rem; }
 
 .app-shell {
   display: grid;
@@ -152,6 +156,7 @@ a { color: inherit; }
 .button.danger { background: rgba(255, 122, 144, 0.18); color: var(--danger); border: 1px solid rgba(255, 122, 144, 0.35); }
 .full-width { width: 100%; }
 .link-button { border: 0; background: transparent; color: var(--accent); font-weight: 800; text-align: left; }
+.link-button:hover, .link-button:focus-visible { color: var(--text); text-decoration: underline; }
 .hero-panel { display: grid; align-content: center; gap: 1.2rem; padding: 1.5rem; background: var(--card-strong); }
 .hero-panel strong { font-size: 4rem; letter-spacing: -0.07em; }
 .progress-track { height: 0.8rem; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, 0.12); }
@@ -254,4 +259,20 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   .job-item, .compact-item { grid-template-columns: 1fr; }
   .job-actions { justify-content: flex-start; }
   .more-tabs, .segmented { width: 100%; display: grid; grid-template-columns: 1fr; border-radius: 1.2rem; }
+}
+
+.share-import-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.8rem; align-items: end; }
+.profile-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+.shortcut-card { display: grid; gap: 0.35rem; padding: 1rem; border: 1px solid var(--line); border-radius: 1rem; background: rgba(255,255,255,0.05); text-align: left; color: var(--text); }
+.shortcut-card strong { font-size: 1.5rem; }
+.job-detail-dialog { width: min(94vw, 920px); border: 1px solid var(--line); border-radius: 1.5rem; padding: 0; background: transparent; color: var(--text); }
+.job-detail-dialog::backdrop { background: rgba(3, 8, 16, 0.72); backdrop-filter: blur(8px); }
+.job-detail-panel { display: grid; gap: 1rem; padding: clamp(1rem, 4vw, 1.5rem); background: var(--card-strong); box-shadow: var(--shadow); }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: flex-end; }
+.job-item h3 button { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.job-item h3 button:hover, .job-item h3 button:focus-visible { color: var(--accent); text-decoration: underline; }
+
+@media (max-width: 760px) {
+  .share-import-form, .profile-shortcuts { grid-template-columns: 1fr; }
+  .detail-actions { justify-content: flex-start; }
 }
