@@ -1,11 +1,12 @@
-const config = window.JOB_TRACKER_FIREBASE_CONFIG;
+const config = window.JOB_TRACKER_FIREBASE_CONFIG || {};
 const authBase = "https://identitytoolkit.googleapis.com/v1";
 const tokenBase = "https://securetoken.googleapis.com/v1/token";
-const firestoreBase = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents`;
+const firestoreBase = config.projectId ? `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents` : "";
 const sessionKey = "job-tracker-web-firebase-session";
 const statuses = ["Pending", "In Progress", "Needs Ariel", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick"];
 const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const shareTokenAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
 let currentUser = null;
 let authSession = readSession();
@@ -13,11 +14,26 @@ let selectedDate = workdayForToday();
 let appState = { jobs: [], users: [], timesheets: {}, yellowSheets: {}, partnerRequests: [] };
 let currentMoreTab = "profile";
 
+const authCopy = {
+  login: { headline: "Welcome Back", lead: "Sign in with the credentials you use across the Job Tracker apps." },
+  signup: { headline: "Create Your Account", lead: "Fill in your crew details below so we can personalize your dashboard." },
+  reset: { headline: "Need a Reset?", lead: "Enter the email tied to your Job Tracker account and we'll send a reset link." },
+};
+
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
 function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function randomToken(length = 24) {
+  const bytes = new Uint8Array(length);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => shareTokenAlphabet[byte % shareTokenAlphabet.length]).join("");
+  }
+  return Array.from({ length }, () => shareTokenAlphabet[Math.floor(Math.random() * shareTokenAlphabet.length)]).join("");
 }
 
 function readSession() {
@@ -88,6 +104,7 @@ function showSync(message = "All server changes synced.") {
 }
 
 async function authRequest(path, payload) {
+  if (!config.apiKey) throw new Error("Firebase config is missing. Update website/app/config.js before signing in.");
   const response = await fetch(`${authBase}/${path}?key=${config.apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -133,7 +150,7 @@ async function apiFetch(url, options = {}) {
 
 function encodeValue(value, key = "") {
   if (value === null || value === undefined) return { nullValue: null };
-  if (["date", "weekStart", "createdAt", "savedAt"].includes(key)) return { timestampValue: toTimestamp(value) };
+  if (["date", "weekStart", "createdAt", "savedAt", "expiresAt"].includes(key)) return { timestampValue: toTimestamp(value) };
   if (Array.isArray(value)) return { arrayValue: { values: value.map((item) => encodeValue(item)) } };
   if (typeof value === "boolean") return { booleanValue: value };
   if (typeof value === "number") return Number.isInteger(value) ? { integerValue: value } : { doubleValue: value };
@@ -279,18 +296,52 @@ async function enterApp() {
 }
 
 function setAuthMode(mode) {
-  $("#loginForm").classList.toggle("hidden", mode !== "login");
-  $("#signupForm").classList.toggle("hidden", mode !== "signup");
-  $("#loginTab").classList.toggle("active", mode === "login");
-  $("#signupTab").classList.toggle("active", mode === "signup");
+  const selectedMode = authCopy[mode] ? mode : "login";
+  $("#loginForm").classList.toggle("hidden", selectedMode !== "login");
+  $("#signupForm").classList.toggle("hidden", selectedMode !== "signup");
+  $("#resetForm").classList.toggle("hidden", selectedMode !== "reset");
+  $$('[data-auth-mode]').forEach((button) => {
+    const isActive = button.dataset.authMode === selectedMode && button.classList.contains("segment");
+    button.classList.toggle("active", isActive);
+    if (button.classList.contains("segment")) button.setAttribute("aria-selected", String(isActive));
+  });
+  $("#authHeadline").textContent = authCopy[selectedMode].headline;
+  $("#authLead").textContent = authCopy[selectedMode].lead;
+  if (selectedMode === "reset" && !$("#resetEmail").value) $("#resetEmail").value = $("#loginEmail").value.trim();
   setMessage("");
+}
+
+function emailError(email) {
+  if (!email) return "Email is required.";
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? "" : "Enter a valid email address.";
+}
+
+function requiredError(value, label) {
+  return value.trim() ? "" : `Please enter your ${label}.`;
+}
+
+function passwordError(password, minimum = 8) {
+  if (!password) return "Password is required.";
+  return password.length >= minimum ? "" : `Password must be at least ${minimum} characters.`;
+}
+
+function requireValid(errors) {
+  const message = errors.find(Boolean);
+  if (message) {
+    setMessage(message);
+    return false;
+  }
+  return true;
 }
 
 async function handleLogin(event) {
   event.preventDefault();
+  const email = $("#loginEmail").value.trim();
+  const password = $("#loginPassword").value;
+  if (!requireValid([emailError(email), passwordError(password, 1)])) return;
   try {
     setMessage("Signing in…");
-    await signIn($("#loginEmail").value.trim(), $("#loginPassword").value);
+    await signIn(email, password);
     setMessage("");
     await enterApp();
     showToast(`Welcome back, ${currentUser.firstName}.`);
@@ -299,21 +350,25 @@ async function handleLogin(event) {
 
 async function handleSignup(event) {
   event.preventDefault();
+  const payload = { firstName: $("#signupFirstName").value.trim(), lastName: $("#signupLastName").value.trim(), email: $("#signupEmail").value.trim(), position: $("#signupPosition").value, password: $("#signupPassword").value };
+  if (!requireValid([requiredError(payload.firstName, "first name"), requiredError(payload.lastName, "last name"), emailError(payload.email), passwordError(payload.password)])) return;
   try {
     setMessage("Creating account…");
-    await signUp({ firstName: $("#signupFirstName").value.trim(), lastName: $("#signupLastName").value.trim(), email: $("#signupEmail").value.trim(), position: $("#signupPosition").value, password: $("#signupPassword").value });
+    await signUp(payload);
     setMessage("");
     await enterApp();
     showToast("Account created and synced.");
   } catch (error) { setMessage(error.message); }
 }
 
-async function resetPassword() {
-  const email = $("#loginEmail").value.trim();
-  if (!email) { setMessage("Enter your email first, then request a reset."); return; }
+async function resetPassword(event) {
+  event?.preventDefault();
+  const email = $("#resetEmail").value.trim() || $("#loginEmail").value.trim();
+  if (!requireValid([emailError(email)])) return;
   try {
+    setMessage("Sending reset link…");
     await authRequest("accounts:sendOobCode", { requestType: "PASSWORD_RESET", email });
-    setMessage(`Password reset instructions were sent to ${email}.`);
+    setMessage(`Check ${email} for reset instructions.`);
   } catch (error) { setMessage(error.message); }
 }
 
@@ -410,9 +465,11 @@ function jobCard(job, withActions = false) {
       option.value = status; option.textContent = status; option.selected = status === job.status; select.append(option);
     });
     select.addEventListener("change", () => updateJob(job.id, { status: select.value }));
+    const share = document.createElement("button");
+    share.className = "button secondary"; share.type = "button"; share.textContent = "Share"; share.addEventListener("click", () => shareJob(job.id));
     const remove = document.createElement("button");
     remove.className = "button danger"; remove.type = "button"; remove.textContent = "Remove"; remove.addEventListener("click", () => removeJob(job.id));
-    actions.append(select, remove); item.append(actions);
+    actions.append(select, share, remove); item.append(actions);
   }
   return item;
 }
@@ -435,6 +492,31 @@ async function removeJob(id) {
   await loadAppData();
   renderAll();
   showToast("Job removed.");
+}
+
+async function shareJob(id) {
+  const job = appState.jobs.find((item) => item.id === id);
+  if (!job) return;
+  try {
+    const token = randomToken();
+    const senderName = `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() || currentUser.email || currentUser.id;
+    const senderIsCan = (currentUser.position || "").toLowerCase() === "can";
+    await setDoc("sharedJobs", token, {
+      v: 2,
+      createdAt: new Date().toISOString(),
+      expiresAt: addDays(toInputDate(new Date()), 7),
+      fromUserId: currentUser.id,
+      fromUserName: senderName,
+      address: job.address,
+      date: job.date,
+      status: job.status,
+      jobNumber: job.jobNumber || "",
+      assignment: senderIsCan ? job.assignments || "" : "",
+      senderIsCan,
+    });
+    await copyText(`jobtracker://importJob?token=${token}`, `shared-job-${job.jobNumber || token}.txt`);
+    showToast("Share link copied. It expires in 7 days.");
+  } catch (error) { showToast(error.message); }
 }
 
 async function handleJobSubmit(event) {
@@ -585,7 +667,7 @@ function hydrateUserForms() {
   $("#signedInRole").textContent = currentUser.position || "Technician";
   $("#profileFirstName").value = currentUser.firstName || "";
   $("#profileLastName").value = currentUser.lastName || "";
-  $("#profilePosition").value = currentUser.position || "Technician";
+  $("#profilePosition").value = currentUser.position || "Aerial";
   $("#profileEmail").value = currentUser.email || authSession.email || "";
   $("#profilePhone").value = currentUser.phone || "";
   $("#profileYard").value = currentUser.yard || "";
@@ -695,7 +777,7 @@ function bindEvents() {
   $$('[data-auth-mode]').forEach((button) => button.addEventListener("click", () => setAuthMode(button.dataset.authMode)));
   $("#loginForm").addEventListener("submit", handleLogin);
   $("#signupForm").addEventListener("submit", handleSignup);
-  $("#resetPasswordButton").addEventListener("click", resetPassword);
+  $("#resetForm").addEventListener("submit", resetPassword);
   $("#signOutButton").addEventListener("click", logout);
   $$('[data-route]').forEach((button) => button.addEventListener("click", (event) => { event.preventDefault(); navigate(button.dataset.route); }));
   $$('[data-focus-job-form]').forEach((button) => button.addEventListener("click", () => $("#jobNumberInput").focus()));
@@ -725,7 +807,7 @@ function initializeInputs() {
 async function bootstrap() {
   bindEvents();
   initializeInputs();
-  if (!config?.apiKey || !config?.projectId) { setMessage("Firebase config is missing. Update website/config.js before signing in."); return; }
+  if (!config?.apiKey || !config?.projectId) { setMessage("Firebase config is missing. Update website/app/config.js before signing in."); return; }
   if (!authSession?.refreshToken) return;
   try { await refreshTokenIfNeeded(); await loadCurrentUser(); await enterApp(); }
   catch (error) { clearSession(); showAuth(); setMessage(error.message); }

@@ -52,11 +52,15 @@ a { color: inherit; }
   box-shadow: var(--shadow);
 }
 .auth-copy, .auth-panel { padding: clamp(1.5rem, 5vw, 3rem); }
-.auth-copy { background: linear-gradient(135deg, rgba(98, 213, 255, 0.18), transparent); }
+.auth-copy { display: grid; align-content: center; background: linear-gradient(135deg, rgba(98, 213, 255, 0.18), transparent); }
+.auth-panel { align-self: center; }
 .auth-copy h1, .page-heading h1, .hero h1 { margin: 0.4rem 0 1rem; letter-spacing: -0.06em; line-height: 0.95; }
 .auth-copy h1 { font-size: clamp(2.8rem, 7vw, 5rem); }
 .auth-copy p, .page-heading p, .hero p, .feature-card p, .workspace-card p, .compact-item span { color: var(--muted); line-height: 1.65; }
 .auth-form { display: grid; gap: 0.9rem; margin-top: 1.2rem; }
+.auth-segmented { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; border-radius: 1.2rem; }
+.helper-text { margin: -0.2rem 0 0; color: var(--muted); font-size: 0.9rem; }
+.position-picker select { margin-top: 0.15rem; }
 
 .app-shell {
   display: grid;
@@ -152,6 +156,7 @@ a { color: inherit; }
 .button.danger { background: rgba(255, 122, 144, 0.18); color: var(--danger); border: 1px solid rgba(255, 122, 144, 0.35); }
 .full-width { width: 100%; }
 .link-button { border: 0; background: transparent; color: var(--accent); font-weight: 800; text-align: left; }
+.link-button:hover, .link-button:focus-visible { color: var(--text); text-decoration: underline; }
 .hero-panel { display: grid; align-content: center; gap: 1.2rem; padding: 1.5rem; background: var(--card-strong); }
 .hero-panel strong { font-size: 4rem; letter-spacing: -0.07em; }
 .progress-track { height: 0.8rem; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, 0.12); }
