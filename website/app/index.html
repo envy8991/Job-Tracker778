@@ -134,7 +134,7 @@
           <section class="section-grid four" aria-label="Dashboard rollups">
             <article class="feature-card"><span class="icon">📍</span><h2 id="nextJobAddress">No next job</h2><p id="nextJobHint">Add jobs to get routing hints.</p></article>
             <article class="feature-card"><span class="icon">⏱️</span><h2 id="dashboardHours">0 hrs</h2><p>Timesheet hours logged for the selected day.</p></article>
-            <article class="feature-card"><span class="icon">🟨</span><h2 id="yellowStatus">Not started</h2><p>Yellow sheet compliance status for the selected day.</p></article>
+            <article class="feature-card"><span class="icon">🟨</span><h2 id="yellowStatus">Not started</h2><p>Yellow sheet status for the selected week.</p></article>
             <article class="feature-card"><span class="icon">👥</span><h2 id="partnerStatus">No partner</h2><p>Current partner request or active crew pairing.</p></article>
           </section>
 
@@ -193,27 +193,18 @@
           <section class="workspace-card"><p class="eyebrow">History</p><h2>Past timesheets</h2><div class="compact-list" id="pastTimesheetsList"></div></section>
         </section>
 
-        <section class="view" id="yellowSheetsView" data-view="yellowSheets">
-          <div class="page-heading"><p class="eyebrow">Yellow Sheets</p><h1>Daily compliance sheet</h1><p>Capture safety checks, material usage, job notes, and technician signature for the selected date.</p></div>
-          <section class="workspace-card yellow-form">
-            <div class="form-grid three">
-              <label>Date<input id="yellowDateInput" type="date" /></label>
-              <label>Job reference<select id="yellowJobSelect"></select></label>
-              <label>Technician signature<input id="yellowSignatureInput" placeholder="Type full name" /></label>
-            </div>
-            <div class="checklist" id="yellowChecklist">
-              <label><input type="checkbox" data-yellow-check="ppe" /> PPE and safety setup complete</label>
-              <label><input type="checkbox" data-yellow-check="photos" /> Required job photos attached</label>
-              <label><input type="checkbox" data-yellow-check="materials" /> Materials and equipment documented</label>
-              <label><input type="checkbox" data-yellow-check="customer" /> Customer / site notes reviewed</label>
-            </div>
-            <div class="form-grid two">
-              <label>Material usage<textarea id="yellowMaterialsInput" rows="4" placeholder="Drops, connectors, enclosures, NIDs"></textarea></label>
-              <label>Daily notes<textarea id="yellowNotesInput" rows="4" placeholder="Safety notes, blockers, extra work"></textarea></label>
-            </div>
-            <div class="hero-actions"><button class="button primary" id="saveYellowSheetButton" type="button">Save yellow sheet</button><button class="button secondary" id="exportYellowSheetButton" type="button">Export</button></div>
-          </section>
-          <section class="workspace-card"><p class="eyebrow">History</p><h2>Past yellow sheets</h2><div class="compact-list" id="pastYellowSheetsList"></div></section>
+        <section class="view yellow-sheet-native" id="yellowSheetsView" data-view="yellowSheets">
+          <div class="yellow-week-picker" aria-label="Yellow sheet week selector">
+            <button class="week-chevron" id="yellowPreviousWeekButton" type="button" aria-label="Previous week">‹</button>
+            <button class="week-label-button" id="yellowWeekLabelButton" type="button">
+              <span id="yellowWeekLabel">Week of May 3, 2026</span>
+            </button>
+            <button class="week-chevron" id="yellowNextWeekButton" type="button" aria-label="Next week">›</button>
+          </div>
+
+          <section class="yellow-sheet-scroll" id="yellowSheetJobGroups" aria-live="polite"></section>
+
+          <button class="button primary yellow-save-button" id="saveYellowSheetButton" type="button">Save Yellow Sheet</button>
         </section>
 
         <section class="view" id="searchView" data-view="search">

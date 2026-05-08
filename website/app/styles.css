@@ -276,3 +276,105 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   .share-import-form, .profile-shortcuts { grid-template-columns: 1fr; }
   .detail-actions { justify-content: flex-start; }
 }
+
+.yellow-sheet-native {
+  gap: 1rem;
+  padding-bottom: 5.5rem;
+}
+
+.yellow-week-picker {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  position: sticky;
+  top: 1rem;
+  z-index: 2;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+}
+
+.week-chevron,
+.week-label-button {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.week-chevron {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border-radius: 0.75rem;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.week-label-button {
+  min-width: 0;
+  padding: 0.75rem 0.5rem;
+  border-radius: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.week-chevron:hover,
+.week-chevron:focus-visible,
+.week-label-button:hover,
+.week-label-button:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.yellow-sheet-scroll {
+  display: grid;
+  gap: 1rem;
+}
+
+.yellow-job-group {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.yellow-job-group h2 {
+  margin: 0;
+  padding: 0.25rem 0.4rem;
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.yellow-job-card {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0 0.25rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: rgba(51, 64, 77, 0.75);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+.yellow-job-card h3,
+.yellow-job-card p {
+  margin: 0;
+  color: var(--text);
+}
+
+.yellow-job-card h3 {
+  font-size: 1.05rem;
+}
+
+.yellow-job-card p {
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.yellow-save-button {
+  width: min(100%, 42rem);
+  justify-self: center;
+  padding: 1rem;
+  border-radius: 0.85rem;
+  font-size: 1rem;
+}

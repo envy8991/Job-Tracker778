@@ -73,6 +73,16 @@ function mondayFor(date = new Date()) {
   return toInputDate(value);
 }
 
+function sundayFor(date = new Date()) {
+  const value = new Date(date);
+  value.setDate(value.getDate() - value.getDay());
+  return toInputDate(value);
+}
+
+function weekRange(startDate, days = 7) {
+  return Array.from({ length: days }, (_, index) => addDays(startDate, index));
+}
+
 function workdayForToday() {
   const today = new Date();
   const day = today.getDay();
@@ -237,7 +247,10 @@ async function loadAppData() {
   appState.users = users;
   appState.jobs = jobs.filter((job) => canSeeJob(job));
   appState.timesheets = Object.fromEntries(timesheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.weekStart, normalizeTimesheet(sheet)]));
-  appState.yellowSheets = Object.fromEntries(yellowSheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.date || sheet.weekStart, normalizeYellowSheet(sheet)]));
+  appState.yellowSheets = Object.fromEntries(yellowSheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => {
+    const normalized = normalizeYellowSheet(sheet);
+    return [normalized.weekStart, normalized];
+  }));
   appState.partnerRequests = partnerRequests.filter((request) => request.fromUid === currentUser.id || request.toUid === currentUser.id);
   showSync();
 }
@@ -275,7 +288,19 @@ function normalizeTimesheet(sheet) {
 }
 
 function normalizeYellowSheet(sheet) {
-  return { id: sheet.id || sheet.date, userId: currentUser.id, partnerId: sheet.partnerId || "", date: sheet.date || sheet.weekStart || selectedDate, weekStart: sheet.weekStart || mondayFor(sheet.date || selectedDate), totalJobs: Number(sheet.totalJobs || 0), jobId: sheet.jobId || "", checks: sheet.checks || {}, materials: sheet.materials || "", notes: sheet.notes || "", signature: sheet.signature || "", savedAt: sheet.savedAt || null, pdfURL: sheet.pdfURL || "" };
+  const baseDate = sheet.weekStart || sheet.date || selectedDate;
+  const weekStart = sundayFor(baseDate);
+  return {
+    id: sheet.id || `${currentUser.id}_${weekStart}`,
+    userId: sheet.userId || currentUser.id,
+    partnerId: sheet.partnerId || "",
+    date: sheet.date || weekStart,
+    weekStart,
+    totalJobs: Number(sheet.totalJobs || 0),
+    jobs: Array.isArray(sheet.jobs) ? sheet.jobs : [],
+    savedAt: sheet.savedAt || null,
+    pdfURL: sheet.pdfURL || "",
+  };
 }
 
 function showApp() {
@@ -415,7 +440,7 @@ function renderDashboard() {
   const nextJob = pending[0];
   const timesheet = getTimesheet(mondayFor(selectedDate));
   const dayIndex = Math.max(0, Math.min(4, new Date(`${selectedDate}T12:00:00`).getDay() - 1));
-  const yellow = getYellowSheet(selectedDate);
+  const yellow = getYellowSheet(sundayFor(selectedDate));
   const partner = appState.partnerRequests.find((request) => request.status === "accepted");
 
   $("#dashboardGreeting").textContent = `Hi ${currentUser.firstName}, here is ${dateLabel(selectedDate)}. Updates save to Firebase and stay aligned with the native app collections.`;
@@ -428,7 +453,7 @@ function renderDashboard() {
   $("#nextJobAddress").textContent = nextJob ? nextJob.address : "No next job";
   $("#nextJobHint").textContent = nextJob ? `${nextJob.jobNumber || "No job #"} • ${nextJob.status}` : "Create or assign jobs to get routing hints.";
   $("#dashboardHours").textContent = `${sumDay(timesheet.days[dayIndex]).toFixed(1)} hrs`;
-  $("#yellowStatus").textContent = yellow.signature ? "Signed" : yellowHasContent(yellow) ? "In progress" : "Not started";
+  $("#yellowStatus").textContent = yellow.savedAt ? "Saved" : yellowHasContent(yellow) ? "Ready" : "Not started";
   $("#partnerStatus").textContent = partner ? partnerName(partner) : "No partner";
   renderJobList($("#pendingJobList"), pending, true);
   renderJobList($("#completedJobList"), done, true);
@@ -599,38 +624,85 @@ function renderPastTimesheets() {
   sheets.sort((a, b) => b.weekStart.localeCompare(a.weekStart)).forEach((sheet) => { const item = document.createElement("article"); item.className = "compact-item"; item.innerHTML = `<div><h3>Week of ${dateLabel(sheet.weekStart)}</h3><span>${Number(sheet.totalHours || 0).toFixed(2)} hours • Supervisor: ${sheet.supervisor || "Not set"}</span></div>`; list.append(item); });
 }
 
-function getYellowSheet(date) {
-  if (!appState.yellowSheets[date]) appState.yellowSheets[date] = normalizeYellowSheet({ id: `${currentUser.id}_${date}`, userId: currentUser.id, date });
-  return appState.yellowSheets[date];
+function getYellowSheet(weekStart) {
+  if (!appState.yellowSheets[weekStart]) appState.yellowSheets[weekStart] = normalizeYellowSheet({ id: `${currentUser.id}_${weekStart}`, userId: currentUser.id, weekStart });
+  return appState.yellowSheets[weekStart];
 }
 
-function yellowHasContent(sheet) { return Object.values(sheet.checks || {}).some(Boolean) || sheet.materials || sheet.notes || sheet.signature; }
+function yellowHasContent(sheet) { return Boolean(sheet.savedAt || sheet.totalJobs || sheet.jobs?.length || sheet.pdfURL); }
+
+function yellowSheetWeekJobs(weekStart = sundayFor(selectedDate)) {
+  const days = new Set(weekRange(weekStart));
+  return appState.jobs
+    .filter((job) => days.has(job.date) && String(job.status || "").toLowerCase() !== "pending")
+    .sort((a, b) => (a.jobNumber || "No Job Number").localeCompare(b.jobNumber || "No Job Number") || a.address.localeCompare(b.address));
+}
+
+function yellowJobSnapshot(job) {
+  return {
+    id: job.id,
+    address: job.address || "",
+    jobNumber: job.jobNumber || "",
+    status: job.status || "",
+    nidFootage: job.nidFootage || "",
+    canFootage: job.canFootage || "",
+    materialsUsed: job.materialsUsed || "",
+  };
+}
 
 function renderYellowSheet() {
-  const date = $("#yellowDateInput").value || selectedDate;
-  const sheet = getYellowSheet(date);
-  $("#yellowDateInput").value = date;
-  const select = $("#yellowJobSelect");
-  select.innerHTML = `<option value="">General day sheet</option>`;
-  appState.jobs.filter((job) => job.date === date).forEach((job) => { const option = document.createElement("option"); option.value = job.id; option.textContent = `${job.jobNumber || "No job #"} · ${job.address}`; option.selected = job.id === sheet.jobId; select.append(option); });
-  $$('[data-yellow-check]').forEach((input) => { input.checked = Boolean(sheet.checks?.[input.dataset.yellowCheck]); });
-  $("#yellowMaterialsInput").value = sheet.materials;
-  $("#yellowNotesInput").value = sheet.notes;
-  $("#yellowSignatureInput").value = sheet.signature;
+  const weekStart = sundayFor(selectedDate);
+  const jobs = yellowSheetWeekJobs(weekStart);
+  const groups = jobs.reduce((map, job) => {
+    const jobNumber = job.jobNumber || "No Job Number";
+    map.set(jobNumber, [...(map.get(jobNumber) || []), job]);
+    return map;
+  }, new Map());
+  const container = $("#yellowSheetJobGroups");
+  $("#yellowWeekLabel").textContent = `Week of ${dateLabel(weekStart, { month: "long", day: "numeric", year: "numeric" })}`;
+  container.innerHTML = "";
+
+  if (jobs.length === 0) {
+    container.innerHTML = `<p class="empty-state">No completed or in-progress jobs for this week.</p>`;
+    renderPastYellowSheets();
+    return;
+  }
+
+  groups.forEach((groupJobs, jobNumber) => {
+    const section = document.createElement("section");
+    section.className = "yellow-job-group";
+    const heading = document.createElement("h2");
+    heading.textContent = `Job Number: ${jobNumber}`;
+    section.append(heading);
+    groupJobs.forEach((job) => section.append(yellowJobCard(job)));
+    container.append(section);
+  });
+
   renderPastYellowSheets();
 }
 
+function yellowJobCard(job) {
+  const card = document.createElement("article");
+  card.className = "yellow-job-card";
+  const footage = [job.nidFootage ? `NID Footage: ${job.nidFootage}` : "", job.canFootage ? `CAN Footage: ${job.canFootage}` : ""].filter(Boolean);
+  card.innerHTML = `
+    <h3>${escapeHtml(job.address || "No address")}</h3>
+    <p>Job Number: ${escapeHtml(job.jobNumber || "N/A")}</p>
+    <p>Status: ${escapeHtml(job.status || "N/A")}</p>
+    <p>${escapeHtml(footage.length ? footage.join(" • ") : "Footages: N/A")}</p>
+    ${job.materialsUsed ? `<p>Materials: ${escapeHtml(job.materialsUsed)}</p>` : ""}
+  `;
+  return card;
+}
+
 function captureYellowSheet() {
-  const date = $("#yellowDateInput").value;
-  const sheet = getYellowSheet(date);
-  sheet.jobId = $("#yellowJobSelect").value;
-  sheet.materials = $("#yellowMaterialsInput").value.trim();
-  sheet.notes = $("#yellowNotesInput").value.trim();
-  sheet.signature = $("#yellowSignatureInput").value.trim();
-  sheet.weekStart = mondayFor(date);
-  sheet.totalJobs = appState.jobs.filter((job) => job.date === date).length;
-  sheet.checks = {};
-  $$('[data-yellow-check]').forEach((input) => { sheet.checks[input.dataset.yellowCheck] = input.checked; });
+  const weekStart = sundayFor(selectedDate);
+  const jobs = yellowSheetWeekJobs(weekStart).map(yellowJobSnapshot);
+  const sheet = getYellowSheet(weekStart);
+  sheet.date = weekStart;
+  sheet.weekStart = weekStart;
+  sheet.totalJobs = jobs.length;
+  sheet.jobs = jobs;
   return sheet;
 }
 
@@ -644,18 +716,20 @@ async function handleSaveYellowSheet() {
 }
 
 function renderPastYellowSheets() {
-  const sheets = Object.values(appState.yellowSheets).filter((sheet) => sheet.savedAt);
   const list = $("#pastYellowSheetsList");
+  if (!list) return;
+  const sheets = Object.values(appState.yellowSheets).filter((sheet) => sheet.savedAt);
   list.innerHTML = "";
   if (sheets.length === 0) { list.innerHTML = `<p class="empty-state">Saved yellow sheets will appear here.</p>`; return; }
-  sheets.sort((a, b) => b.date.localeCompare(a.date)).forEach((sheet) => { const checks = Object.values(sheet.checks || {}).filter(Boolean).length; const item = document.createElement("article"); item.className = "compact-item"; item.innerHTML = `<div><h3>${dateLabel(sheet.date)}</h3><span>${checks}/4 checks complete • Signature: ${sheet.signature || "Missing"}</span></div>`; list.append(item); });
+  sheets.sort((a, b) => b.weekStart.localeCompare(a.weekStart)).forEach((sheet) => { const item = document.createElement("article"); item.className = "compact-item"; item.innerHTML = `<div><h3>Week of ${dateLabel(sheet.weekStart, { month: "short", day: "numeric", year: "numeric" })}</h3><span>${sheet.totalJobs || sheet.jobs?.length || 0} jobs saved${sheet.pdfURL ? " • PDF ready" : ""}</span></div>`; list.append(item); });
 }
 
+function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]); }
 function downloadText(filename, text) { const blob = new Blob([text], { type: "text/plain" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); URL.revokeObjectURL(link.href); }
 async function copyText(text, fallbackName) { try { await navigator.clipboard.writeText(text); showToast("Summary copied to clipboard."); } catch { downloadText(fallbackName, text); showToast("Clipboard unavailable, downloaded a text summary instead."); } }
 function dailySummaryText() { const lines = [`Job Tracker Daily Summary`, `Date: ${dateLabel(selectedDate)}`, `Technician: ${currentUser.firstName} ${currentUser.lastName}`, ""]; selectedJobs().forEach((job) => lines.push(`${job.jobNumber || "No job #"} • ${job.status} • ${job.address} • ${job.notes || "No note"}`)); if (selectedJobs().length === 0) lines.push("No jobs scheduled."); return lines.join("\n"); }
 function timesheetText() { const sheet = captureTimesheet(); return [`Job Tracker Timesheet`, `Week: ${sheet.weekStart}`, `Technician: ${sheet.name1}`, `Supervisor: ${sheet.supervisor || "Not set"}`, `Partner: ${sheet.name2 || "None"}`, "", ...sheet.days.map((day) => `${day.name}: ${sumDay(day).toFixed(2)} hrs - ${day.notes || "No notes"}`), `Total: ${sheet.totalHours} hrs`].join("\n"); }
-function yellowSheetText() { const sheet = captureYellowSheet(); const checks = Object.entries(sheet.checks).map(([key, value]) => `${key}: ${value ? "yes" : "no"}`).join("\n"); return [`Job Tracker Yellow Sheet`, `Date: ${sheet.date}`, `Technician: ${currentUser.firstName} ${currentUser.lastName}`, `Signature: ${sheet.signature || "Missing"}`, "", checks, "", `Materials: ${sheet.materials || "None"}`, `Notes: ${sheet.notes || "None"}`].join("\n"); }
+
 
 function renderSearch() {
   const query = $("#jobSearchInput").value.trim().toLowerCase();
@@ -788,9 +862,10 @@ function bindEvents() {
   $("#timesheetWeekInput").addEventListener("change", renderTimesheet);
   $("#saveTimesheetButton").addEventListener("click", () => handleSaveTimesheet().catch((error) => showToast(error.message)));
   $("#exportTimesheetButton").addEventListener("click", () => downloadText(`timesheet-${$("#timesheetWeekInput").value}.txt`, timesheetText()));
-  $("#yellowDateInput").addEventListener("change", renderYellowSheet);
+  $("#yellowPreviousWeekButton").addEventListener("click", () => { selectedDate = addDays(sundayFor(selectedDate), -7); renderYellowSheet(); });
+  $("#yellowWeekLabelButton").addEventListener("click", () => { selectedDate = sundayFor(new Date()); renderYellowSheet(); });
+  $("#yellowNextWeekButton").addEventListener("click", () => { selectedDate = addDays(sundayFor(selectedDate), 7); renderYellowSheet(); });
   $("#saveYellowSheetButton").addEventListener("click", () => handleSaveYellowSheet().catch((error) => showToast(error.message)));
-  $("#exportYellowSheetButton").addEventListener("click", () => downloadText(`yellow-sheet-${$("#yellowDateInput").value}.txt`, yellowSheetText()));
   $("#jobSearchInput").addEventListener("input", renderSearch);
   $$('[data-more-tab]').forEach((button) => button.addEventListener("click", () => setMoreTab(button.dataset.moreTab)));
   $("#saveProfileButton").addEventListener("click", () => saveProfile().catch((error) => showToast(error.message)));
@@ -801,7 +876,6 @@ function bindEvents() {
 function initializeInputs() {
   $("#scheduledDateInput").value = selectedDate;
   $("#timesheetWeekInput").value = mondayFor(selectedDate);
-  $("#yellowDateInput").value = selectedDate;
 }
 
 async function bootstrap() {

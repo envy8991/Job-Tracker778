@@ -7,7 +7,7 @@ This folder contains the Firebase-backed browser version of Job Tracker. It is i
 - **Authentication** – Firebase email/password login, signup, password reset email, persisted session refresh, and sign-out.
 - **Dashboard** – Monday-Friday selector, daily job rollups, completion progress, Firebase sync status, next-job hint, daily summary copy/download, quick job creation, status updates, and job removal.
 - **Timesheets** – weekly timesheet editor with supervisor/partner fields, Gibson/Cable South/Other hour totals, Firestore-backed history, and text export.
-- **Yellow Sheets** – daily compliance checklist with job reference, materials, notes, technician signature, Firestore-backed history, and text export.
+- **Yellow Sheets** – native-style weekly yellow sheet with a Sunday week selector, grouped job-number sections, job detail cards, and Firestore-backed saves.
 - **Job Search** – global searchable job index across job number, address, status, type/assignment, date, notes, and materials with inline status updates.
 - **More** – functional Profile, Settings, and Find a Partner sections with Firestore-backed profile/settings and native-compatible partner request records.
 
@@ -28,7 +28,7 @@ The web app reads and writes these existing app collections:
 - `users/{uid}` for profile, role, and web settings.
 - `jobs/{jobId}` using the native `Job` fields, including `date`, `status`, `createdBy`, `assignedTo`, and `participants`.
 - `timesheets/{uid_weekStart}` using the native rollup fields plus web row details for editing.
-- `yellowSheets/{uid_date}` using the native weekly fields plus daily checklist details for editing.
+- `yellowSheets/{uid_weekStart}` using native weekly yellow sheet fields plus saved job-card snapshots for web review.
 - `partnerRequests/{requestId}` and `partnerships/{pairId}` using native-compatible partner request fields.
 
 ## Deployment notes
