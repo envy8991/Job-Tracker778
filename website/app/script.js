@@ -380,10 +380,6 @@ function logout() {
   showToast("Signed out.");
 }
 
-function renderDate() {
-  $("#sidebarDate").textContent = dateLabel(toInputDate(new Date()), { weekday: "long", month: "short", day: "numeric" });
-}
-
 function selectedJobs() {
   return appState.jobs.filter((job) => job.date === selectedDate);
 }
@@ -419,7 +415,6 @@ function renderDashboard() {
   const partner = appState.partnerRequests.find((request) => request.status === "accepted");
 
   $("#dashboardGreeting").textContent = `Hi ${currentUser.firstName}, here is ${dateLabel(selectedDate)}. Updates save to Firebase and stay aligned with the native app collections.`;
-  $("#sidebarSummary").textContent = `${jobs.length} jobs on selected day`;
   $("#totalCount").textContent = jobs.length;
   $("#pendingCount").textContent = pending.length;
   $("#doneCount").textContent = done.length;
@@ -664,7 +659,6 @@ function renderSearch() {
 }
 
 function hydrateUserForms() {
-  $("#signedInRole").textContent = currentUser.position || "Technician";
   $("#profileFirstName").value = currentUser.firstName || "";
   $("#profileLastName").value = currentUser.lastName || "";
   $("#profilePosition").value = currentUser.position || "Aerial";
@@ -764,7 +758,6 @@ function navigate(route) {
 
 function renderAll() {
   if (!currentUser) return;
-  renderDate();
   renderWeekdayPicker();
   renderDashboard();
   renderTimesheet();

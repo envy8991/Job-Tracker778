@@ -68,32 +68,6 @@
     </div>
 
     <div id="appShell" class="app-shell hidden">
-      <aside class="sidebar" aria-label="Primary">
-        <a class="brand" href="#dashboard" data-route="dashboard" aria-label="Job Tracker dashboard">
-          <span class="brand-mark">JT</span>
-          <span>
-            <strong>Job Tracker</strong>
-            <small id="signedInRole">Web workspace</small>
-          </span>
-        </a>
-
-        <nav class="nav-links" aria-label="Workspace sections">
-          <button class="nav-link active" type="button" data-route="dashboard">Dashboard</button>
-          <button class="nav-link" type="button" data-route="timesheets">Timesheets</button>
-          <button class="nav-link" type="button" data-route="yellowSheets">Yellow Sheets</button>
-          <button class="nav-link" type="button" data-route="search">Job Search</button>
-          <button class="nav-link" type="button" data-route="more">More</button>
-        </nav>
-
-        <div class="sidebar-card">
-          <small>Today</small>
-          <strong id="sidebarDate">Loading...</strong>
-          <span id="sidebarSummary">0 jobs scheduled</span>
-        </div>
-
-        <button class="button ghost full-width" id="signOutButton" type="button">Sign out</button>
-      </aside>
-
       <main class="content">
         <section class="view active" id="dashboardView" data-view="dashboard">
           <header class="hero">
@@ -244,7 +218,13 @@
           </section>
 
           <section class="workspace-card more-panel active" id="profilePanel" data-more-panel="profile">
-            <div class="section-heading"><div><p class="eyebrow">Profile</p><h2>Account details</h2></div><button class="button secondary" id="saveProfileButton" type="button">Save profile</button></div>
+            <div class="section-heading">
+              <div><p class="eyebrow">Profile</p><h2>Account details</h2></div>
+              <div class="detail-actions">
+                <button class="button secondary" id="saveProfileButton" type="button">Save profile</button>
+                <button class="button ghost" id="signOutButton" type="button">Sign out</button>
+              </div>
+            </div>
             <div class="form-grid three">
               <label>First name<input id="profileFirstName" /></label>
               <label>Last name<input id="profileLastName" /></label>
@@ -281,6 +261,29 @@
           </section>
         </section>
       </main>
+
+      <nav class="bottom-tab-bar" aria-label="Primary">
+        <button class="tab-button active" type="button" data-route="dashboard" aria-label="Dashboard" data-symbol="rectangle.grid.2x2">
+          <span class="tab-symbol" aria-hidden="true">▦</span>
+          <span class="tab-label">Dashboard</span>
+        </button>
+        <button class="tab-button" type="button" data-route="timesheets" aria-label="Timesheets" data-symbol="clock">
+          <span class="tab-symbol" aria-hidden="true">◷</span>
+          <span class="tab-label">Timesheets</span>
+        </button>
+        <button class="tab-button" type="button" data-route="yellowSheets" aria-label="Yellow Sheet" data-symbol="doc.text">
+          <span class="tab-symbol" aria-hidden="true">▤</span>
+          <span class="tab-label">Yellow Sheet</span>
+        </button>
+        <button class="tab-button" type="button" data-route="search" aria-label="Job Search" data-symbol="magnifyingglass">
+          <span class="tab-symbol" aria-hidden="true">⌕</span>
+          <span class="tab-label">Job Search</span>
+        </button>
+        <button class="tab-button" type="button" data-route="more" aria-label="More" data-symbol="ellipsis.circle">
+          <span class="tab-symbol" aria-hidden="true">⋯</span>
+          <span class="tab-label">More</span>
+        </button>
+      </nav>
     </div>
 
     <dialog class="job-detail-dialog" id="jobDetailDialog" aria-labelledby="jobDetailTitle">
