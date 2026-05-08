@@ -751,10 +751,225 @@ function dailySummaryText() { const lines = [`Job Tracker Daily Summary`, `Date:
 function timesheetText() { const sheet = captureTimesheet(); return [`Job Tracker Timesheet`, `Week: ${sheet.weekStart}`, `Technician: ${sheet.name1}`, `Supervisor: ${sheet.supervisor || "Not set"}`, `Partner: ${sheet.name2 || "None"}`, "", ...sheet.days.map((day) => `${day.name}: ${sumDay(day).toFixed(2)} hrs - ${day.notes || "No notes"}`), `Total: ${sheet.totalHours} hrs`].join("\n"); }
 function yellowSheetText() { const sheet = captureYellowSheet(); const checks = Object.entries(sheet.checks).map(([key, value]) => `${key}: ${value ? "yes" : "no"}`).join("\n"); return [`Job Tracker Yellow Sheet`, `Date: ${sheet.date}`, `Technician: ${currentUser.firstName} ${currentUser.lastName}`, `Signature: ${sheet.signature || "Missing"}`, "", checks, "", `Materials: ${sheet.materials || "None"}`, `Notes: ${sheet.notes || "None"}`].join("\n"); }
 
+function displayUserName(user) {
+  if (!user) return "";
+  return `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email || user.id || "";
+}
+
+function userById(uid) {
+  return appState.users.find((user) => user.id === uid);
+}
+
+function searchTokens(query) {
+  return query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+function compactDateLabel(value) {
+  if (!value) return "No date";
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value);
+  if (Number.isNaN(date.valueOf())) return value;
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(date);
+}
+
+function splitSearchAddress(address = "") {
+  const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
+  return { primary: parts[0] || address || "No address", secondary: parts.slice(1).join(", ") };
+}
+
+function creatorLine(job) {
+  const creator = userById(job.createdBy);
+  if (creator) {
+    const role = (creator.position || creator.normalizedPosition || "").trim();
+    return role ? `Added by ${displayUserName(creator)} · ${role}` : `Added by ${displayUserName(creator)}`;
+  }
+  const crew = userById(job.assignedTo);
+  return crew ? `Crew: ${displayUserName(crew)}` : "Crew not assigned";
+}
+
+function searchSnippet(job, tokens) {
+  const candidates = [
+    ["Notes", job.notes],
+    ["Materials", job.materialsUsed],
+    ["Assignments", job.assignments],
+    ["NID Footage", job.nidFootage],
+    ["CAN Footage", job.canFootage],
+  ];
+  for (const [title, rawValue] of candidates) {
+    const value = String(rawValue || "").trim();
+    if (!value) continue;
+    if (!tokens.length || tokens.some((token) => value.toLowerCase().includes(token))) return { title, value };
+  }
+  return null;
+}
+
+function searchHaystack(job) {
+  const creator = userById(job.createdBy);
+  const creatorName = displayUserName(creator);
+  return [
+    job.address,
+    job.jobNumber,
+    job.status,
+    job.notes,
+    job.assignments,
+    job.materialsUsed,
+    job.nidFootage,
+    job.canFootage,
+    compactDateLabel(job.date),
+    job.date,
+    creatorName,
+    creator?.position,
+    creator?.normalizedPosition,
+  ].filter(Boolean).join(" ").toLowerCase();
+}
+
+function compareSearchJobs(a, b) {
+  const dateOrder = String(b.date || "").localeCompare(String(a.date || ""));
+  if (dateOrder !== 0) return dateOrder;
+  return String(a.address || "").localeCompare(String(b.address || ""), undefined, { sensitivity: "base" });
+}
+
+function buildQuickFilters() {
+  const countBy = (valueFor) => {
+    const counts = new Map();
+    appState.jobs.forEach((job) => {
+      const value = String(valueFor(job) || "").trim();
+      if (!value) return;
+      const key = value.toLowerCase();
+      const existing = counts.get(key) || { display: value, count: 0 };
+      existing.count += 1;
+      counts.set(key, existing);
+    });
+    return [...counts.values()].sort((a, b) => b.count - a.count || a.display.localeCompare(b.display, undefined, { sensitivity: "base" }));
+  };
+  const statuses = countBy((job) => job.status).slice(0, 4).map((item) => ({ ...item, kind: "status" }));
+  const creators = countBy((job) => displayUserName(userById(job.createdBy))).slice(0, 4).map((item) => ({ ...item, kind: "creator" }));
+  return [...statuses, ...creators].slice(0, 8);
+}
+
+function renderQuickFilters() {
+  const container = $("#searchQuickFilters");
+  if (!container) return;
+  const filters = buildQuickFilters();
+  container.innerHTML = "";
+  if (!filters.length) return;
+  const heading = document.createElement("p");
+  heading.className = "quick-filter-title";
+  heading.textContent = "Quick filters";
+  const row = document.createElement("div");
+  row.className = "quick-filter-row";
+  filters.forEach((filter) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "quick-filter-pill";
+    const label = document.createElement("span");
+    label.textContent = `${filter.kind === "creator" ? "👥" : "🏷️"} ${filter.display}`;
+    const count = document.createElement("small");
+    count.textContent = `${filter.count} job${filter.count === 1 ? "" : "s"}`;
+    button.append(label, count);
+    button.addEventListener("click", () => {
+      $("#jobSearchInput").value = filter.display;
+      renderSearch();
+    });
+    row.append(button);
+  });
+  container.append(heading, row);
+}
+
+function renderSearchResultCard(job, tokens) {
+  const item = document.createElement("article");
+  item.className = "job-item search-result-card";
+  const { primary, secondary } = splitSearchAddress(job.address);
+  const snippet = searchSnippet(job, tokens);
+
+  const header = document.createElement("div");
+  header.className = "search-result-header";
+
+  const addressBlock = document.createElement("div");
+  addressBlock.className = "search-result-address";
+  const title = document.createElement("h3");
+  title.textContent = primary;
+  addressBlock.append(title);
+  if (secondary) {
+    const line = document.createElement("p");
+    line.textContent = secondary;
+    addressBlock.append(line);
+  }
+
+  const jobNumber = document.createElement("span");
+  jobNumber.className = "badge job-number-badge";
+  jobNumber.textContent = job.jobNumber ? `#${job.jobNumber}` : "No job #";
+  header.append(addressBlock, jobNumber);
+
+  const meta = document.createElement("div");
+  meta.className = "job-meta search-result-meta";
+  const status = document.createElement("span");
+  status.className = `badge ${statusClass(job.status)}`.trim();
+  status.textContent = job.status || "No status";
+  const date = document.createElement("span");
+  date.textContent = compactDateLabel(job.date);
+  const creator = document.createElement("span");
+  creator.className = "search-result-creator";
+  creator.textContent = creatorLine(job);
+  meta.append(status, date, creator);
+
+  item.append(header, meta);
+  if (snippet) {
+    const snippetBlock = document.createElement("div");
+    snippetBlock.className = "search-result-snippet";
+    const snippetTitle = document.createElement("span");
+    snippetTitle.textContent = snippet.title.toUpperCase();
+    const snippetValue = document.createElement("p");
+    snippetValue.textContent = snippet.value;
+    snippetBlock.append(snippetTitle, snippetValue);
+    item.append(snippetBlock);
+  }
+  if ([job.createdBy, job.assignedTo].includes(currentUser.id) || (job.participants || []).includes(currentUser.id)) {
+    const owned = document.createElement("span");
+    owned.className = "search-owned-label";
+    owned.textContent = "✓ In your job list";
+    item.append(owned);
+  }
+  return item;
+}
+
 function renderSearch() {
-  const query = $("#jobSearchInput").value.trim().toLowerCase();
-  const filtered = query ? appState.jobs.filter((job) => [job.jobNumber, job.address, job.type, job.status, job.notes, job.date, job.assignments, job.materialsUsed].join(" ").toLowerCase().includes(query)) : appState.jobs;
-  renderJobList($("#searchResults"), filtered, true);
+  const input = $("#jobSearchInput");
+  const results = $("#searchResults");
+  const query = input.value.trim();
+  const tokens = searchTokens(query);
+  const sortedJobs = [...appState.jobs].sort(compareSearchJobs);
+  const matches = tokens.length ? sortedJobs.filter((job) => {
+    const haystack = searchHaystack(job);
+    return tokens.every((token) => haystack.includes(token));
+  }) : sortedJobs.slice(0, 12);
+
+  renderQuickFilters();
+  results.innerHTML = "";
+
+  if (!tokens.length) {
+    const idle = document.createElement("article");
+    idle.className = "search-idle-card";
+    idle.innerHTML = `<div class="search-idle-icon">⌕</div><h3>Search the entire company</h3><p>Type part of an address, job number, status, or teammate to explore every job in Job Tracker.</p>`;
+    results.append(idle);
+    if (!matches.length) return;
+    const heading = document.createElement("div");
+    heading.className = "search-list-heading";
+    heading.innerHTML = `<h3>Recent activity</h3><p>Jump back into the latest jobs from across your team.</p>`;
+    results.append(heading);
+  } else if (!matches.length) {
+    const empty = document.createElement("article");
+    empty.className = "empty-state search-empty-state";
+    empty.innerHTML = `<strong>No jobs found for “${query.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[char]))}”</strong><span>Try fewer keywords or search by street, city, job number, status, or teammate name.</span>`;
+    results.append(empty);
+    return;
+  } else {
+    const heading = document.createElement("div");
+    heading.className = "search-list-heading";
+    heading.innerHTML = `<h3>Results</h3><p>${matches.length} match${matches.length === 1 ? "" : "es"}</p>`;
+    results.append(heading);
+  }
+
+  matches.forEach((job) => results.append(renderSearchResultCard(job, tokens)));
 }
 
 function hydrateUserForms() {

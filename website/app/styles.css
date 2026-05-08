@@ -214,6 +214,56 @@ textarea { resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(98, 213, 255, 0.12); }
 .search-box input { font-size: 1.2rem; padding: 1rem; }
 
+.search-workspace { display: grid; gap: 1rem; }
+.quick-filters { display: grid; gap: 0.55rem; }
+.quick-filter-title, .search-list-heading p, .search-result-address p, .search-result-snippet p { margin: 0; }
+.quick-filter-title { color: var(--muted); font-size: 0.9rem; font-weight: 800; }
+.quick-filter-row { display: flex; gap: 0.65rem; overflow-x: auto; padding: 0.1rem 0 0.25rem; }
+.quick-filter-pill {
+  display: grid;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+  min-width: 8.5rem;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+}
+.quick-filter-pill span { font-size: 0.82rem; font-weight: 850; }
+.quick-filter-pill small { color: var(--muted); font-weight: 750; }
+.job-list.search-results { gap: 1rem; margin-top: 0; }
+.search-idle-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.7rem;
+  padding: 2rem 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 1.4rem;
+  background: rgba(255, 255, 255, 0.05);
+  text-align: center;
+}
+.search-idle-icon { color: var(--muted); font-size: 2.5rem; font-weight: 900; }
+.search-idle-card h3, .search-list-heading h3 { margin: 0; }
+.search-idle-card p, .search-list-heading p { color: var(--muted); line-height: 1.55; }
+.search-list-heading { display: grid; gap: 0.2rem; margin-top: 0.35rem; }
+.job-item.search-result-card { display: grid; grid-template-columns: 1fr; align-items: stretch; gap: 0.85rem; }
+.search-result-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+.search-result-address { display: grid; gap: 0.25rem; min-width: 0; }
+.search-result-address h3 { line-height: 1.25; }
+.search-result-address p { color: var(--muted); font-size: 0.9rem; }
+.job-number-badge { white-space: nowrap; }
+.search-result-meta { margin-top: 0; align-items: center; }
+.search-result-creator { color: var(--muted); }
+.search-result-snippet { display: grid; gap: 0.25rem; }
+.search-result-snippet span { color: var(--muted); font-size: 0.75rem; font-weight: 900; letter-spacing: 0.08em; }
+.search-result-snippet p { color: var(--text); line-height: 1.45; }
+.search-owned-label { color: var(--success); font-size: 0.85rem; font-weight: 850; }
+.search-empty-state { display: grid; gap: 0.35rem; }
+.search-empty-state span { color: var(--muted); }
+
 .job-list, .compact-list { display: grid; gap: 0.75rem; margin-top: 1rem; }
 .job-item, .compact-item {
   display: grid;
