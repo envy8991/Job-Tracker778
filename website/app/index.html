@@ -177,7 +177,7 @@
           <section class="workspace-card">
             <div class="timesheet-toolbar">
               <label>Week start<input id="timesheetWeekInput" type="date" /></label>
-              <label>Supervisor<input id="timesheetSupervisorInput" placeholder="Supervisor name" /></label>
+              <label>SUPERVISOR<input id="timesheetSupervisorInput" placeholder="Supervisor name" /></label>
               <label>Partner<input id="timesheetPartnerInput" placeholder="Partner name" /></label>
               <button class="button primary" id="saveTimesheetButton" type="button">Save timesheet</button>
               <button class="button secondary" id="exportTimesheetButton" type="button">Export</button>
@@ -236,49 +236,121 @@
         </section>
 
         <section class="view" id="moreView" data-view="more">
-          <div class="page-heading"><p class="eyebrow">More</p><h1>Profile, settings, and partner tools</h1><p>The required More sections are available here with Firebase-backed persistence.</p></div>
-          <section class="more-tabs" role="tablist" aria-label="More sections">
-            <button class="segment active" type="button" data-more-tab="profile">Profile</button>
-            <button class="segment" type="button" data-more-tab="settings">Settings</button>
-            <button class="segment" type="button" data-more-tab="partner">Find a partner</button>
-          </section>
+          <div class="page-heading" id="moreMenuHeading"><p class="eyebrow">More</p><h1>More</h1><p>Open the same account, team, job, resource, assist, role, and support destinations available in the native app.</p></div>
 
-          <section class="workspace-card more-panel active" id="profilePanel" data-more-panel="profile">
-            <div class="section-heading"><div><p class="eyebrow">Profile</p><h2>Account details</h2></div><button class="button secondary" id="saveProfileButton" type="button">Save profile</button></div>
-            <div class="form-grid three">
-              <label>First name<input id="profileFirstName" /></label>
-              <label>Last name<input id="profileLastName" /></label>
-              <label>Position<select id="profilePosition"><option>Aerial</option><option>Underground</option><option>Nid</option><option>Can</option><option>Supervisor</option><option>Admin</option></select></label>
-              <label>Email<input id="profileEmail" type="email" disabled /></label>
-              <label>Phone<input id="profilePhone" placeholder="(555) 123-4567" /></label>
-              <label>Home yard<input id="profileYard" placeholder="North Yard" /></label>
+          <section class="more-menu" id="moreMenu" aria-label="More destinations">
+            <div class="more-menu-section">
+              <h2>ACCOUNT</h2>
+              <button class="more-menu-row" type="button" data-more-destination="profile"><span class="more-row-icon">👤</span><span>Profile</span><span class="more-row-chevron" aria-hidden="true">›</span></button>
+              <button class="more-menu-row" type="button" data-more-destination="settings"><span class="more-row-icon">⚙️</span><span>Settings</span><span class="more-row-chevron" aria-hidden="true">›</span></button>
             </div>
-            <div class="profile-shortcuts" id="profileShortcuts" aria-label="Profile shortcuts"></div>
-          </section>
 
-          <section class="workspace-card more-panel" id="settingsPanel" data-more-panel="settings">
-            <div class="section-heading"><div><p class="eyebrow">Settings</p><h2>Routing, alerts, and appearance</h2></div><button class="button secondary" id="saveSettingsButton" type="button">Save settings</button></div>
-            <div class="settings-grid">
-              <label class="toggle-row"><span><strong>Smart routing</strong><small>Prioritize the next closest open job.</small></span><input id="smartRoutingInput" type="checkbox" /></label>
-              <label class="toggle-row"><span><strong>Arrival alerts</strong><small>Remind me when I arrive at a job.</small></span><input id="arrivalAlertsInput" type="checkbox" /></label>
-              <label>Optimize by<select id="routingOptimizeInput"><option>Distance</option><option>Schedule</option><option>Status priority</option></select></label>
-              <label>Address suggestions<select id="addressProviderInput"><option>Apple Maps</option><option>Google Places</option><option>Manual entry</option></select></label>
-              <label>Theme<select id="themeInput"><option>Dark</option><option>High contrast</option><option>Ocean</option></select></label>
+            <div class="more-menu-section">
+              <h2>TEAM</h2>
+              <button class="more-menu-row" type="button" data-more-destination="partner"><span class="more-row-icon">👥</span><span>Find a Partner</span><span class="more-row-chevron" aria-hidden="true">›</span></button>
+            </div>
+
+            <div class="more-menu-section">
+              <h2>JOBS</h2>
+              <button class="more-menu-row" type="button" data-more-destination="recentCrewJobs"><span class="more-row-icon">🕘</span><span>Recent Crew Jobs</span><span class="more-row-chevron" aria-hidden="true">›</span></button>
+            </div>
+
+            <div class="more-menu-section">
+              <h2>RESOURCES</h2>
+              <button class="more-menu-row" type="button" data-more-destination="maps"><span class="more-row-icon">🗺️</span><span>Route Mapper</span><span class="more-row-chevron" aria-hidden="true">›</span></button>
+            </div>
+
+            <div class="more-menu-section">
+              <h2>SPLICE ASSIST</h2>
+              <button class="more-menu-row" type="button" data-more-destination="spliceAssist"><span class="more-row-icon">✨</span><span>Splice Assist</span><span class="more-row-chevron" aria-hidden="true">›</span></button>
+            </div>
+
+            <div class="more-menu-section" data-more-role-section="supervisor" hidden>
+              <h2>SUPERVISOR</h2>
+              <button class="more-menu-row" type="button" data-more-destination="supervisor"><span class="more-row-icon">🪪</span><span>Supervisor</span><span class="more-row-chevron" aria-hidden="true">›</span></button>
+            </div>
+
+            <div class="more-menu-section" data-more-role-section="admin" hidden>
+              <h2>ADMIN</h2>
+              <button class="more-menu-row" type="button" data-more-destination="admin"><span class="more-row-icon">🛠️</span><span>Admin</span><span class="more-row-chevron" aria-hidden="true">›</span></button>
+            </div>
+
+            <div class="more-menu-section">
+              <h2>SUPPORT</h2>
+              <button class="more-menu-row" type="button" data-more-destination="helpCenter"><span class="more-row-icon">❔</span><span>Help Center</span><span class="more-row-chevron" aria-hidden="true">›</span></button>
             </div>
           </section>
 
-          <section class="workspace-card more-panel" id="partnerPanel" data-more-panel="partner">
-            <div class="section-heading"><div><p class="eyebrow">Find a partner</p><h2>Crew pairing requests</h2></div></div>
-            <form class="partner-form" id="partnerForm">
-              <label>Partner<select id="partnerUserInput" required></select></label>
-              <label>Needed for<select id="partnerNeedInput"><option>Aerial work</option><option>Underground pull</option><option>Splice assist</option><option>Late callback</option></select></label>
-              <label>Location<input id="partnerLocationInput" placeholder="Cabinet, address, or yard" required /></label>
-              <label>When<input id="partnerWhenInput" type="time" required /></label>
-              <label>Note<input id="partnerNoteInput" placeholder="What help is needed?" /></label>
-              <button class="button primary" type="submit">Send request</button>
-            </form>
-            <div class="compact-list" id="partnerRequestsList"></div>
-          </section>
+          <div class="more-detail-shell" id="moreDetailShell" hidden>
+            <button class="more-back-button" id="moreBackButton" type="button" aria-label="Back to More menu">‹ More</button>
+
+            <section class="workspace-card more-panel" id="profilePanel" data-more-panel="profile">
+              <div class="section-heading"><div><p class="eyebrow">Profile</p><h2>Account details</h2></div><button class="button secondary" id="saveProfileButton" type="button">Save profile</button></div>
+              <div class="form-grid three">
+                <label>First name<input id="profileFirstName" /></label>
+                <label>Last name<input id="profileLastName" /></label>
+                <label>Position<select id="profilePosition"><option>Aerial</option><option>Underground</option><option>Nid</option><option>Can</option><option>Supervisor</option><option>Admin</option></select></label>
+                <label>Email<input id="profileEmail" type="email" disabled /></label>
+                <label>Phone<input id="profilePhone" placeholder="(555) 123-4567" /></label>
+                <label>Home yard<input id="profileYard" placeholder="North Yard" /></label>
+              </div>
+              <div class="profile-shortcuts" id="profileShortcuts" aria-label="Profile shortcuts"></div>
+            </section>
+
+            <section class="workspace-card more-panel" id="settingsPanel" data-more-panel="settings">
+              <div class="section-heading"><div><p class="eyebrow">Settings</p><h2>Routing, alerts, and appearance</h2></div><button class="button secondary" id="saveSettingsButton" type="button">Save settings</button></div>
+              <div class="settings-grid">
+                <label class="toggle-row"><span><strong>Smart routing</strong><small>Prioritize the next closest open job.</small></span><input id="smartRoutingInput" type="checkbox" /></label>
+                <label class="toggle-row"><span><strong>Arrival alerts</strong><small>Remind me when I arrive at a job.</small></span><input id="arrivalAlertsInput" type="checkbox" /></label>
+                <label>Optimize by<select id="routingOptimizeInput"><option>Distance</option><option>Schedule</option><option>Status priority</option></select></label>
+                <label>Address suggestions<select id="addressProviderInput"><option>Apple Maps</option><option>Google Places</option><option>Manual entry</option></select></label>
+                <label>Theme<select id="themeInput"><option>Dark</option><option>High contrast</option><option>Ocean</option></select></label>
+              </div>
+            </section>
+
+            <section class="workspace-card more-panel" id="partnerPanel" data-more-panel="partner">
+              <div class="section-heading"><div><p class="eyebrow">Find a partner</p><h2>Crew pairing requests</h2></div></div>
+              <form class="partner-form" id="partnerForm">
+                <label>Partner<select id="partnerUserInput" required></select></label>
+                <label>Needed for<select id="partnerNeedInput"><option>Aerial work</option><option>Underground pull</option><option>Splice assist</option><option>Late callback</option></select></label>
+                <label>Location<input id="partnerLocationInput" placeholder="Cabinet, address, or yard" required /></label>
+                <label>When<input id="partnerWhenInput" type="time" required /></label>
+                <label>Note<input id="partnerNoteInput" placeholder="What help is needed?" /></label>
+                <button class="button primary" type="submit">Send request</button>
+              </form>
+              <div class="compact-list" id="partnerRequestsList"></div>
+            </section>
+
+            <section class="workspace-card more-panel more-placeholder" data-more-panel="recentCrewJobs">
+              <div class="section-heading"><div><p class="eyebrow">Recent Crew Jobs</p><h2>Recent Crew Jobs</h2></div></div>
+              <p>This native destination is not implemented in the web workspace yet.</p>
+            </section>
+
+            <section class="workspace-card more-panel more-placeholder" data-more-panel="maps">
+              <div class="section-heading"><div><p class="eyebrow">Route Mapper</p><h2>Route Mapper</h2></div></div>
+              <p>This native destination is not implemented in the web workspace yet.</p>
+            </section>
+
+            <section class="workspace-card more-panel more-placeholder" data-more-panel="spliceAssist">
+              <div class="section-heading"><div><p class="eyebrow">Splice Assist</p><h2>Splice Assist</h2></div></div>
+              <p>This native destination is not implemented in the web workspace yet.</p>
+            </section>
+
+            <section class="workspace-card more-panel more-placeholder" data-more-panel="supervisor">
+              <div class="section-heading"><div><p class="eyebrow">Supervisor</p><h2>Supervisor</h2></div></div>
+              <p>This native destination is not implemented in the web workspace yet.</p>
+            </section>
+
+            <section class="workspace-card more-panel more-placeholder" data-more-panel="admin">
+              <div class="section-heading"><div><p class="eyebrow">Admin</p><h2>Admin</h2></div></div>
+              <p>This native destination is not implemented in the web workspace yet.</p>
+            </section>
+
+            <section class="workspace-card more-panel more-placeholder" data-more-panel="helpCenter">
+              <div class="section-heading"><div><p class="eyebrow">Help Center</p><h2>Help Center</h2></div></div>
+              <p>This native destination is not implemented in the web workspace yet.</p>
+            </section>
+          </div>
         </section>
       </main>
     </div>

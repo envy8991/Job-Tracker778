@@ -12,7 +12,7 @@ let currentUser = null;
 let authSession = readSession();
 let selectedDate = workdayForToday();
 let appState = { jobs: [], users: [], timesheets: {}, yellowSheets: {}, partnerRequests: [] };
-let currentMoreTab = "profile";
+let currentMoreDestination = null;
 
 const authCopy = {
   login: { headline: "Welcome Back", lead: "Sign in with the credentials you use across the Job Tracker apps." },
@@ -698,7 +698,55 @@ async function saveSettings() {
   showToast("Settings saved to Firebase.");
 }
 
-function setMoreTab(tab) { currentMoreTab = tab; $$('[data-more-tab]').forEach((button) => button.classList.toggle("active", button.dataset.moreTab === tab)); $$('[data-more-panel]').forEach((panel) => panel.classList.toggle("active", panel.dataset.morePanel === tab)); }
+function destinationTitle(destination) {
+  const titles = {
+    profile: "Profile",
+    settings: "Settings",
+    partner: "Find a Partner",
+    recentCrewJobs: "Recent Crew Jobs",
+    maps: "Route Mapper",
+    spliceAssist: "Splice Assist",
+    supervisor: "Supervisor",
+    admin: "Admin",
+    helpCenter: "Help Center",
+  };
+  return titles[destination] || "More";
+}
+
+function isAllowedMoreDestination(destination) {
+  if (destination === "supervisor") return Boolean(currentUser?.isSupervisor || currentUser?.isAdmin || currentUser?.position === "Supervisor");
+  if (destination === "admin") return Boolean(currentUser?.isAdmin || currentUser?.position === "Admin");
+  return true;
+}
+
+function renderMoreMenu() {
+  const supervisorSection = $('[data-more-role-section="supervisor"]');
+  const adminSection = $('[data-more-role-section="admin"]');
+  if (supervisorSection) supervisorSection.hidden = !isAllowedMoreDestination("supervisor");
+  if (adminSection) adminSection.hidden = !isAllowedMoreDestination("admin");
+  if (currentMoreDestination && !isAllowedMoreDestination(currentMoreDestination)) navigateMore(null);
+}
+
+function navigateMore(destination = null) {
+  currentMoreDestination = destination && isAllowedMoreDestination(destination) ? destination : null;
+  const showingDetail = Boolean(currentMoreDestination);
+  const menu = $("#moreMenu");
+  const heading = $("#moreMenuHeading");
+  const detailShell = $("#moreDetailShell");
+  if (menu) menu.hidden = showingDetail;
+  if (heading) heading.hidden = showingDetail;
+  if (detailShell) detailShell.hidden = !showingDetail;
+  $$('[data-more-panel]').forEach((panel) => panel.classList.toggle("active", panel.dataset.morePanel === currentMoreDestination));
+  if (showingDetail) {
+    const activePanel = $(`[data-more-panel="${currentMoreDestination}"]`);
+    activePanel?.querySelector("input, select, textarea, button")?.focus({ preventScroll: true });
+    document.title = `${destinationTitle(currentMoreDestination)} • Job Tracker Web`;
+  } else {
+    document.title = "Job Tracker Web";
+  }
+}
+
+function backMore() { navigateMore(null); }
 function userName(uid) { const user = appState.users.find((item) => item.id === uid); return user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email : uid; }
 function partnerName(request) { return request.fromUid === currentUser.id ? userName(request.toUid) : userName(request.fromUid); }
 
@@ -759,7 +807,8 @@ function navigate(route) {
   if (route === "timesheets") renderTimesheet();
   if (route === "yellowSheets") renderYellowSheet();
   if (route === "search") renderSearch();
-  if (route === "more") setMoreTab(currentMoreTab);
+  if (route === "more") { renderMoreMenu(); navigateMore(currentMoreDestination); }
+  else { document.title = "Job Tracker Web"; }
 }
 
 function renderAll() {
@@ -771,6 +820,7 @@ function renderAll() {
   renderYellowSheet();
   renderSearch();
   renderPartnerRequests();
+  renderMoreMenu();
 }
 
 function bindEvents() {
@@ -792,7 +842,8 @@ function bindEvents() {
   $("#saveYellowSheetButton").addEventListener("click", () => handleSaveYellowSheet().catch((error) => showToast(error.message)));
   $("#exportYellowSheetButton").addEventListener("click", () => downloadText(`yellow-sheet-${$("#yellowDateInput").value}.txt`, yellowSheetText()));
   $("#jobSearchInput").addEventListener("input", renderSearch);
-  $$('[data-more-tab]').forEach((button) => button.addEventListener("click", () => setMoreTab(button.dataset.moreTab)));
+  $$('[data-more-destination]').forEach((button) => button.addEventListener("click", () => navigateMore(button.dataset.moreDestination)));
+  $("#moreBackButton").addEventListener("click", backMore);
   $("#saveProfileButton").addEventListener("click", () => saveProfile().catch((error) => showToast(error.message)));
   $("#saveSettingsButton").addEventListener("click", () => saveSettings().catch((error) => showToast(error.message)));
   $("#partnerForm").addEventListener("submit", (event) => handlePartnerSubmit(event).catch((error) => showToast(error.message)));
