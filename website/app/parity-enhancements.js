@@ -239,10 +239,12 @@ async function importSharedJob(token, payload) {
 }
 
 function hydrateShareTokenFromUrl() {
+  const input = $("#shareTokenInput");
+  if (!input) return;
   const params = new URLSearchParams(window.location?.search || "");
   const hashParams = new URLSearchParams((window.location?.hash || "").replace(/^#?\??/, ""));
   const token = params.get("token") || hashParams.get("token");
-  if (token) $("#shareTokenInput").value = token;
+  if (token) input.value = token;
 }
 
 function renderProfileShortcuts() {
@@ -293,7 +295,8 @@ function bindParityEnhancementEvents() {
   $("#routeJobButton").addEventListener("click", () => openRouteForJob(currentDetailJob()));
   $("#shareJobDetailButton").addEventListener("click", () => shareDetailJob().catch((error) => showToast(error.message)));
   $("#removeJobDetailButton").addEventListener("click", () => removeDetailJob().catch((error) => showToast(error.message)));
-  $("#shareImportForm").addEventListener("submit", (event) => previewSharedJob(event).catch((error) => showToast(error.message)));
+  const shareImportForm = $("#shareImportForm");
+  if (shareImportForm) shareImportForm.addEventListener("submit", (event) => previewSharedJob(event).catch((error) => showToast(error.message)));
 }
 
 bindParityEnhancementEvents();

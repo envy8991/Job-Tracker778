@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="A browser version of Job Tracker for dashboards, jobs, timesheets, yellow sheets, search, profile, settings, and partner finding."
+      content="A browser version of Job Tracker for jobs, timesheets, yellow sheets, search, profile, settings, and partner finding."
     />
     <title>Job Tracker Web</title>
     <link rel="stylesheet" href="styles.css" />
@@ -85,11 +85,6 @@
           <button class="nav-link" type="button" data-route="more">More</button>
         </nav>
 
-        <div class="sidebar-card">
-          <small>Today</small>
-          <strong id="sidebarDate">Loading...</strong>
-          <span id="sidebarSummary">0 jobs scheduled</span>
-        </div>
 
         <button class="button ghost full-width" id="signOutButton" type="button">Sign out</button>
       </aside>
@@ -98,16 +93,10 @@
         <section class="view active" id="dashboardView" data-view="dashboard">
           <header class="hero">
             <div class="hero-copy">
-              <p class="eyebrow">Dashboard</p>
-              <h1>Plan the day, route the next stop, and close the paperwork loop.</h1>
-              <p id="dashboardGreeting">
-                Your web dashboard mirrors the app's daily assignment workflow with weekday filters,
-                smart routing hints, sync status, quick job actions, and shareable summaries.
-              </p>
+              <p class="eyebrow">Jobs</p>
+              <h1 id="dashboardGreeting">Today</h1>
               <div class="hero-actions">
                 <button class="button primary" type="button" data-focus-job-form>Add job</button>
-                <button class="button secondary" id="shareDailySummaryButton" type="button">Share day summary</button>
-                <button class="button secondary" id="downloadDailySummaryButton" type="button">Download summary</button>
               </div>
             </div>
             <section class="hero-panel" aria-label="Selected day summary">
@@ -128,15 +117,9 @@
 
           <div class="sync-banner" id="syncBanner">
             <span class="pulse"></span>
-            <span id="syncText">All local changes saved.</span>
+            <span id="syncText">All changes saved.</span>
           </div>
 
-          <section class="section-grid four" aria-label="Dashboard rollups">
-            <article class="feature-card"><span class="icon">📍</span><h2 id="nextJobAddress">No next job</h2><p id="nextJobHint">Add jobs to get routing hints.</p></article>
-            <article class="feature-card"><span class="icon">⏱️</span><h2 id="dashboardHours">0 hrs</h2><p>Timesheet hours logged for the selected day.</p></article>
-            <article class="feature-card"><span class="icon">🟨</span><h2 id="yellowStatus">Not started</h2><p>Yellow sheet compliance status for the selected day.</p></article>
-            <article class="feature-card"><span class="icon">👥</span><h2 id="partnerStatus">No partner</h2><p>Current partner request or active crew pairing.</p></article>
-          </section>
 
           <section class="workspace-card">
             <div class="section-heading">
@@ -173,14 +156,13 @@
         </section>
 
         <section class="view" id="timesheetsView" data-view="timesheets">
-          <div class="page-heading"><p class="eyebrow">Timesheets</p><h1>Weekly timesheet</h1><p>Log Gibson, Cable South, and total hours by day, attach job notes, save the week, and export a supervisor-ready summary.</p></div>
+          <div class="page-heading"><p class="eyebrow">Timesheets</p><h1>Weekly timesheet</h1><p>Log Gibson, Cable South, and total hours by day, then save the week.</p></div>
           <section class="workspace-card">
             <div class="timesheet-toolbar">
               <label>Week start<input id="timesheetWeekInput" type="date" /></label>
               <label>Supervisor<input id="timesheetSupervisorInput" placeholder="Supervisor name" /></label>
               <label>Partner<input id="timesheetPartnerInput" placeholder="Partner name" /></label>
               <button class="button primary" id="saveTimesheetButton" type="button">Save timesheet</button>
-              <button class="button secondary" id="exportTimesheetButton" type="button">Export</button>
             </div>
             <div class="table-wrap">
               <table class="data-table">
@@ -211,7 +193,7 @@
               <label>Material usage<textarea id="yellowMaterialsInput" rows="4" placeholder="Drops, connectors, enclosures, NIDs"></textarea></label>
               <label>Daily notes<textarea id="yellowNotesInput" rows="4" placeholder="Safety notes, blockers, extra work"></textarea></label>
             </div>
-            <div class="hero-actions"><button class="button primary" id="saveYellowSheetButton" type="button">Save yellow sheet</button><button class="button secondary" id="exportYellowSheetButton" type="button">Export</button></div>
+            <div class="hero-actions"><button class="button primary" id="saveYellowSheetButton" type="button">Save yellow sheet</button></div>
           </section>
           <section class="workspace-card"><p class="eyebrow">History</p><h2>Past yellow sheets</h2><div class="compact-list" id="pastYellowSheetsList"></div></section>
         </section>
@@ -222,21 +204,10 @@
             <label class="search-box">Search jobs<input id="jobSearchInput" placeholder="Try: Maple, JT-1001, pending, splice, 2026-05-07" /></label>
             <div class="job-list" id="searchResults"></div>
           </section>
-
-          <section class="workspace-card">
-            <div class="section-heading">
-              <div><p class="eyebrow">Shared jobs</p><h2>Import shared job link</h2></div>
-            </div>
-            <form class="share-import-form" id="shareImportForm">
-              <label>Token or link<input id="shareTokenInput" placeholder="jobtracker://importJob?token=..." /></label>
-              <button class="button primary" type="submit">Preview import</button>
-            </form>
-            <div class="compact-list" id="shareImportPreview"></div>
-          </section>
         </section>
 
         <section class="view" id="moreView" data-view="more">
-          <div class="page-heading"><p class="eyebrow">More</p><h1>Profile, settings, and partner tools</h1><p>The required More sections are available here with Firebase-backed persistence.</p></div>
+          <div class="page-heading"><p class="eyebrow">More</p><h1>Profile, settings, and partner tools</h1></div>
           <section class="more-tabs" role="tablist" aria-label="More sections">
             <button class="segment active" type="button" data-more-tab="profile">Profile</button>
             <button class="segment" type="button" data-more-tab="settings">Settings</button>

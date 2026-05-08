@@ -99,7 +99,7 @@ function setMessage(message) {
   $("#authMessage").textContent = message;
 }
 
-function showSync(message = "All server changes synced.") {
+function showSync(message = "All changes saved.") {
   $("#syncText").textContent = message;
 }
 
@@ -226,7 +226,7 @@ async function loadCurrentUser() {
 }
 
 async function loadAppData() {
-  showSync("Syncing with Firebase…");
+  showSync("Syncing…");
   const [jobs, users, timesheets, yellowSheets, partnerRequests] = await Promise.all([
     listDocs("jobs"),
     listDocs("users"),
@@ -380,10 +380,6 @@ function logout() {
   showToast("Signed out.");
 }
 
-function renderDate() {
-  $("#sidebarDate").textContent = dateLabel(toInputDate(new Date()), { weekday: "long", month: "short", day: "numeric" });
-}
-
 function selectedJobs() {
   return appState.jobs.filter((job) => job.date === selectedDate);
 }
@@ -412,24 +408,12 @@ function renderDashboard() {
   const pending = jobs.filter(isOpen);
   const done = jobs.filter((job) => job.status === "Done");
   const completion = jobs.length === 0 ? 0 : Math.round((done.length / jobs.length) * 100);
-  const nextJob = pending[0];
-  const timesheet = getTimesheet(mondayFor(selectedDate));
-  const dayIndex = Math.max(0, Math.min(4, new Date(`${selectedDate}T12:00:00`).getDay() - 1));
-  const yellow = getYellowSheet(selectedDate);
-  const partner = appState.partnerRequests.find((request) => request.status === "accepted");
-
-  $("#dashboardGreeting").textContent = `Hi ${currentUser.firstName}, here is ${dateLabel(selectedDate)}. Updates save to Firebase and stay aligned with the native app collections.`;
-  $("#sidebarSummary").textContent = `${jobs.length} jobs on selected day`;
+  $("#dashboardGreeting").textContent = dateLabel(selectedDate, { weekday: "long", month: "long", day: "numeric" });
   $("#totalCount").textContent = jobs.length;
   $("#pendingCount").textContent = pending.length;
   $("#doneCount").textContent = done.length;
   $("#completionRate").textContent = `${completion}%`;
   $("#completionBar").style.width = `${completion}%`;
-  $("#nextJobAddress").textContent = nextJob ? nextJob.address : "No next job";
-  $("#nextJobHint").textContent = nextJob ? `${nextJob.jobNumber || "No job #"} • ${nextJob.status}` : "Create or assign jobs to get routing hints.";
-  $("#dashboardHours").textContent = `${sumDay(timesheet.days[dayIndex]).toFixed(1)} hrs`;
-  $("#yellowStatus").textContent = yellow.signature ? "Signed" : yellowHasContent(yellow) ? "In progress" : "Not started";
-  $("#partnerStatus").textContent = partner ? partnerName(partner) : "No partner";
   renderJobList($("#pendingJobList"), pending, true);
   renderJobList($("#completedJobList"), done, true);
 }
@@ -481,7 +465,7 @@ async function updateJob(id, patch) {
   await setDoc("jobs", id, updated);
   await loadAppData();
   renderAll();
-  showToast("Job saved to Firebase.");
+  showToast("Job saved.");
 }
 
 async function removeJob(id) {
@@ -538,7 +522,7 @@ async function handleJobSubmit(event) {
   $("#scheduledDateInput").value = selectedDate;
   await loadAppData();
   renderAll();
-  showToast("Job created in Firebase.");
+  showToast("Job created.");
 }
 
 function getTimesheet(weekStart) {
@@ -588,7 +572,7 @@ async function handleSaveTimesheet() {
   await setDoc("timesheets", sheet.id, sheet);
   await loadAppData();
   renderAll();
-  showToast("Timesheet saved to Firebase.");
+  showToast("Timesheet saved.");
 }
 
 function renderPastTimesheets() {
@@ -640,7 +624,7 @@ async function handleSaveYellowSheet() {
   await setDoc("yellowSheets", sheet.id, sheet);
   await loadAppData();
   renderAll();
-  showToast("Yellow sheet saved to Firebase.");
+  showToast("Yellow sheet saved.");
 }
 
 function renderPastYellowSheets() {
@@ -652,10 +636,7 @@ function renderPastYellowSheets() {
 }
 
 function downloadText(filename, text) { const blob = new Blob([text], { type: "text/plain" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); URL.revokeObjectURL(link.href); }
-async function copyText(text, fallbackName) { try { await navigator.clipboard.writeText(text); showToast("Summary copied to clipboard."); } catch { downloadText(fallbackName, text); showToast("Clipboard unavailable, downloaded a text summary instead."); } }
-function dailySummaryText() { const lines = [`Job Tracker Daily Summary`, `Date: ${dateLabel(selectedDate)}`, `Technician: ${currentUser.firstName} ${currentUser.lastName}`, ""]; selectedJobs().forEach((job) => lines.push(`${job.jobNumber || "No job #"} • ${job.status} • ${job.address} • ${job.notes || "No note"}`)); if (selectedJobs().length === 0) lines.push("No jobs scheduled."); return lines.join("\n"); }
-function timesheetText() { const sheet = captureTimesheet(); return [`Job Tracker Timesheet`, `Week: ${sheet.weekStart}`, `Technician: ${sheet.name1}`, `Supervisor: ${sheet.supervisor || "Not set"}`, `Partner: ${sheet.name2 || "None"}`, "", ...sheet.days.map((day) => `${day.name}: ${sumDay(day).toFixed(2)} hrs - ${day.notes || "No notes"}`), `Total: ${sheet.totalHours} hrs`].join("\n"); }
-function yellowSheetText() { const sheet = captureYellowSheet(); const checks = Object.entries(sheet.checks).map(([key, value]) => `${key}: ${value ? "yes" : "no"}`).join("\n"); return [`Job Tracker Yellow Sheet`, `Date: ${sheet.date}`, `Technician: ${currentUser.firstName} ${currentUser.lastName}`, `Signature: ${sheet.signature || "Missing"}`, "", checks, "", `Materials: ${sheet.materials || "None"}`, `Notes: ${sheet.notes || "None"}`].join("\n"); }
+async function copyText(text, fallbackName) { try { await navigator.clipboard.writeText(text); showToast("Link copied to clipboard."); } catch { downloadText(fallbackName, text); showToast("Clipboard unavailable, saved the link instead."); } }
 
 function renderSearch() {
   const query = $("#jobSearchInput").value.trim().toLowerCase();
@@ -686,7 +667,7 @@ async function saveProfile() {
   await loadAppData();
   hydrateUserForms();
   renderAll();
-  showToast("Profile saved to Firebase.");
+  showToast("Profile saved.");
 }
 
 function applyTheme(theme) { document.body.classList.toggle("high-contrast", theme === "High contrast"); document.body.classList.toggle("ocean", theme === "Ocean"); }
@@ -695,7 +676,7 @@ async function saveSettings() {
   currentUser.webSettings = { smartRouting: $("#smartRoutingInput").checked, arrivalAlerts: $("#arrivalAlertsInput").checked, optimizeBy: $("#routingOptimizeInput").value, addressProvider: $("#addressProviderInput").value, theme: $("#themeInput").value };
   await setDoc("users", currentUser.id, currentUser);
   applyTheme(currentUser.webSettings.theme);
-  showToast("Settings saved to Firebase.");
+  showToast("Settings saved.");
 }
 
 function setMoreTab(tab) { currentMoreTab = tab; $$('[data-more-tab]').forEach((button) => button.classList.toggle("active", button.dataset.moreTab === tab)); $$('[data-more-panel]').forEach((panel) => panel.classList.toggle("active", panel.dataset.morePanel === tab)); }
@@ -764,7 +745,6 @@ function navigate(route) {
 
 function renderAll() {
   if (!currentUser) return;
-  renderDate();
   renderWeekdayPicker();
   renderDashboard();
   renderTimesheet();
@@ -782,15 +762,11 @@ function bindEvents() {
   $$('[data-route]').forEach((button) => button.addEventListener("click", (event) => { event.preventDefault(); navigate(button.dataset.route); }));
   $$('[data-focus-job-form]').forEach((button) => button.addEventListener("click", () => $("#jobNumberInput").focus()));
   $("#jobForm").addEventListener("submit", (event) => handleJobSubmit(event).catch((error) => showToast(error.message)));
-  $("#refreshJobsButton").addEventListener("click", () => loadAppData().then(renderAll).then(() => showToast("Jobs refreshed from Firebase.")));
-  $("#shareDailySummaryButton").addEventListener("click", () => copyText(dailySummaryText(), `job-tracker-${selectedDate}.txt`));
-  $("#downloadDailySummaryButton").addEventListener("click", () => downloadText(`job-tracker-${selectedDate}.txt`, dailySummaryText()));
+  $("#refreshJobsButton").addEventListener("click", () => loadAppData().then(renderAll).then(() => showToast("Jobs refreshed.")));
   $("#timesheetWeekInput").addEventListener("change", renderTimesheet);
   $("#saveTimesheetButton").addEventListener("click", () => handleSaveTimesheet().catch((error) => showToast(error.message)));
-  $("#exportTimesheetButton").addEventListener("click", () => downloadText(`timesheet-${$("#timesheetWeekInput").value}.txt`, timesheetText()));
   $("#yellowDateInput").addEventListener("change", renderYellowSheet);
   $("#saveYellowSheetButton").addEventListener("click", () => handleSaveYellowSheet().catch((error) => showToast(error.message)));
-  $("#exportYellowSheetButton").addEventListener("click", () => downloadText(`yellow-sheet-${$("#yellowDateInput").value}.txt`, yellowSheetText()));
   $("#jobSearchInput").addEventListener("input", renderSearch);
   $$('[data-more-tab]').forEach((button) => button.addEventListener("click", () => setMoreTab(button.dataset.moreTab)));
   $("#saveProfileButton").addEventListener("click", () => saveProfile().catch((error) => showToast(error.message)));
