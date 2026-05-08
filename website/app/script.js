@@ -13,6 +13,7 @@ let authSession = readSession();
 let selectedDate = workdayForToday();
 let appState = { jobs: [], users: [], timesheets: {}, yellowSheets: {}, partnerRequests: [] };
 let currentMoreTab = "profile";
+let createAddressCount = 1;
 
 const authCopy = {
   login: { headline: "Welcome Back", lead: "Sign in with the credentials you use across the Job Tracker apps." },
@@ -402,7 +403,7 @@ function renderWeekdayPicker() {
     button.className = `day-button ${date === selectedDate ? "active" : ""}`.trim();
     button.type = "button";
     button.innerHTML = `<strong>${shortDays[index]}</strong><span>${dateLabel(date, { month: "short", day: "numeric" })}</span><small>${jobs.length} jobs</small>`;
-    button.addEventListener("click", () => { selectedDate = date; $("#scheduledDateInput").value = selectedDate; renderAll(); });
+    button.addEventListener("click", () => { selectedDate = date; updateCreateDateInput(selectedDate); renderAll(); });
     picker.append(button);
   });
 }
@@ -519,26 +520,124 @@ async function shareJob(id) {
   } catch (error) { showToast(error.message); }
 }
 
+function sanitizeAssignmentValue(raw = "", { allowTrailingDot = false } = {}) {
+  let value = String(raw).trim().replace(/[^0-9.]/g, "");
+  while (value.includes("..")) value = value.replaceAll("..", ".");
+  while (value.startsWith(".")) value = value.slice(1);
+  if (!allowTrailingDot) value = value.replace(/\.+$/g, "");
+  return value.slice(0, 32);
+}
+
+function isValidAssignmentValue(value) {
+  return !value || /^[0-9]+(\.[0-9]+)*$/.test(value);
+}
+
+async function saveJobsFromCreateValues({ addresses, date, status, jobNumber, assignments = "", materialsUsed = "", notes = "" }) {
+  const trimmedAddresses = addresses.map((address) => address.trim()).filter(Boolean);
+  const trimmedJobNumber = jobNumber.trim();
+  const sanitizedAssignments = sanitizeAssignmentValue(assignments);
+
+  if (!trimmedJobNumber) throw new Error("Please enter a Job Number before saving.");
+  if (trimmedAddresses.length === 0) throw new Error("Please enter at least one address before saving.");
+  if (!date) throw new Error("Please select a date before saving.");
+  if (!isValidAssignmentValue(sanitizedAssignments)) throw new Error("Assignments must use digits separated by single dots.");
+
+  const jobs = trimmedAddresses.map((address) => normalizeJob({
+    id: createId(),
+    jobNumber: trimmedJobNumber,
+    address,
+    date,
+    status,
+    assignments: sanitizedAssignments,
+    materialsUsed: materialsUsed.trim(),
+    notes: notes.trim(),
+  }));
+
+  await Promise.all(jobs.map((job) => setDoc("jobs", job.id, job)));
+  selectedDate = date;
+  await loadAppData();
+  renderAll();
+  showToast(jobs.length > 1 ? `${jobs.length} jobs created in Firebase.` : "Job created in Firebase.");
+}
+
 async function handleJobSubmit(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
-  const job = normalizeJob({
-    id: createId(),
-    jobNumber: formData.get("jobNumber").trim(),
-    address: formData.get("address").trim(),
+  await saveJobsFromCreateValues({
+    addresses: formData.getAll("address"),
     date: formData.get("scheduledDate"),
-    type: formData.get("type"),
-    assignments: formData.get("type"),
     status: formData.get("status"),
-    notes: formData.get("note").trim(),
+    jobNumber: formData.get("jobNumber"),
+    assignments: formData.get("assignments"),
+    materialsUsed: formData.get("materialsUsed"),
+    notes: formData.get("notes"),
   });
-  await setDoc("jobs", job.id, job);
-  selectedDate = job.date;
-  event.currentTarget.reset();
-  $("#scheduledDateInput").value = selectedDate;
-  await loadAppData();
-  renderAll();
-  showToast("Job created in Firebase.");
+}
+
+async function saveJobFromCreatePanel(event) {
+  await handleJobSubmit(event);
+  navigate("dashboard");
+  closeCreateJobPanel();
+  resetCreateJobPanel();
+}
+
+function updateCreateDateChip() {
+  const dateInput = $("#createDateInput");
+  const chip = $("#createDateChip");
+  if (!dateInput || !chip) return;
+  chip.textContent = dateInput.value ? dateLabel(dateInput.value, { weekday: "short", month: "short", day: "numeric" }) : "Select a date";
+}
+
+function updateCreateDateInput(date = selectedDate) {
+  const input = $("#createDateInput");
+  if (!input) return;
+  input.value = date;
+  updateCreateDateChip();
+}
+
+function updateCreateStatusPicker() {
+  $$("#createJobForm .status-picker .segment").forEach((label) => {
+    const input = label.querySelector('input[type="radio"]');
+    label.classList.toggle("active", Boolean(input?.checked));
+  });
+}
+
+function openCreateJobPanel() {
+  updateCreateDateInput(selectedDate);
+  updateCreateStatusPicker();
+  $("#createJobModal").classList.remove("hidden");
+  document.body.classList.add("modal-open");
+  window.setTimeout(() => $("#createAddressInput0")?.focus(), 0);
+}
+
+function closeCreateJobPanel() {
+  $("#createJobModal").classList.add("hidden");
+  document.body.classList.remove("modal-open");
+}
+
+function resetCreateJobPanel() {
+  const form = $("#createJobForm");
+  form.reset();
+  createAddressCount = 1;
+  $("#createAddressList").innerHTML = `<label class="sr-only" for="createAddressInput0">Address</label><input id="createAddressInput0" name="address" placeholder="Enter address" autocomplete="street-address" required />`;
+  updateCreateDateInput(selectedDate);
+  updateCreateStatusPicker();
+}
+
+function addCreateAddressField() {
+  const id = `createAddressInput${createAddressCount}`;
+  const label = document.createElement("label");
+  label.className = "sr-only";
+  label.htmlFor = id;
+  label.textContent = `Address ${createAddressCount + 1}`;
+  const input = document.createElement("input");
+  input.id = id;
+  input.name = "address";
+  input.placeholder = "Enter address";
+  input.autocomplete = "street-address";
+  $("#createAddressList").append(label, input);
+  createAddressCount += 1;
+  input.focus();
 }
 
 function getTimesheet(weekStart) {
@@ -780,8 +879,15 @@ function bindEvents() {
   $("#resetForm").addEventListener("submit", resetPassword);
   $("#signOutButton").addEventListener("click", logout);
   $$('[data-route]').forEach((button) => button.addEventListener("click", (event) => { event.preventDefault(); navigate(button.dataset.route); }));
-  $$('[data-focus-job-form]').forEach((button) => button.addEventListener("click", () => $("#jobNumberInput").focus()));
-  $("#jobForm").addEventListener("submit", (event) => handleJobSubmit(event).catch((error) => showToast(error.message)));
+  $$('[data-open-create-job]').forEach((button) => button.addEventListener("click", openCreateJobPanel));
+  $("#closeCreateJobButton").addEventListener("click", closeCreateJobPanel);
+  $("#addCreateAddressButton").addEventListener("click", addCreateAddressField);
+  $("#createJobForm").addEventListener("submit", (event) => saveJobFromCreatePanel(event).catch((error) => showToast(error.message)));
+  $("#createDateInput").addEventListener("change", updateCreateDateChip);
+  $("#createAssignmentsInput").addEventListener("input", (event) => { event.target.value = sanitizeAssignmentValue(event.target.value, { allowTrailingDot: true }); });
+  $$("#createJobForm .status-picker input").forEach((input) => input.addEventListener("change", updateCreateStatusPicker));
+  $("#createJobModal").addEventListener("click", (event) => { if (event.target.id === "createJobModal") closeCreateJobPanel(); });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !$("#createJobModal").classList.contains("hidden")) closeCreateJobPanel(); });
   $("#refreshJobsButton").addEventListener("click", () => loadAppData().then(renderAll).then(() => showToast("Jobs refreshed from Firebase.")));
   $("#shareDailySummaryButton").addEventListener("click", () => copyText(dailySummaryText(), `job-tracker-${selectedDate}.txt`));
   $("#downloadDailySummaryButton").addEventListener("click", () => downloadText(`job-tracker-${selectedDate}.txt`, dailySummaryText()));
@@ -799,7 +905,8 @@ function bindEvents() {
 }
 
 function initializeInputs() {
-  $("#scheduledDateInput").value = selectedDate;
+  updateCreateDateInput(selectedDate);
+  updateCreateStatusPicker();
   $("#timesheetWeekInput").value = mondayFor(selectedDate);
   $("#yellowDateInput").value = selectedDate;
 }
