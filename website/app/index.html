@@ -95,80 +95,37 @@
       </aside>
 
       <main class="content">
-        <section class="view active" id="dashboardView" data-view="dashboard">
-          <header class="hero">
-            <div class="hero-copy">
-              <p class="eyebrow">Dashboard</p>
-              <h1>Plan the day, route the next stop, and close the paperwork loop.</h1>
-              <p id="dashboardGreeting">
-                Your web dashboard mirrors the app's daily assignment workflow with weekday filters,
-                smart routing hints, sync status, quick job actions, and shareable summaries.
-              </p>
-              <div class="hero-actions">
-                <button class="button primary" type="button" data-focus-job-form>Add job</button>
-                <button class="button secondary" id="shareDailySummaryButton" type="button">Share day summary</button>
-                <button class="button secondary" id="downloadDailySummaryButton" type="button">Download summary</button>
-              </div>
+        <section class="view active native-jobs-view" id="dashboardView" data-view="dashboard">
+          <header class="jobs-toolbar" aria-label="Jobs toolbar">
+            <div>
+              <h1>Jobs</h1>
+              <p id="dashboardSelectedDate">Today</p>
             </div>
-            <section class="hero-panel" aria-label="Selected day summary">
-              <div>
-                <span class="metric-label">Completion</span>
-                <strong id="completionRate">0%</strong>
-              </div>
-              <div class="progress-track" aria-hidden="true"><span id="completionBar"></span></div>
-              <dl class="metric-grid">
-                <div><dt>Total</dt><dd id="totalCount">0</dd></div>
-                <div><dt>Pending</dt><dd id="pendingCount">0</dd></div>
-                <div><dt>Done</dt><dd id="doneCount">0</dd></div>
-              </dl>
-            </section>
+            <div class="jobs-toolbar-actions">
+              <button class="icon-button" id="calendarButton" type="button" aria-label="Choose dashboard date">📅</button>
+              <input class="native-date-input" id="dashboardDateInput" type="date" aria-label="Selected dashboard date" />
+              <button class="icon-button" id="shareDailySummaryButton" type="button" aria-label="Share selected day summary">↗</button>
+            </div>
           </header>
 
-          <div class="weekday-picker" id="weekdayPicker" aria-label="Work week selector"></div>
-
-          <div class="sync-banner" id="syncBanner">
-            <span class="pulse"></span>
-            <span id="syncText">All local changes saved.</span>
-          </div>
-
-          <section class="section-grid four" aria-label="Dashboard rollups">
-            <article class="feature-card"><span class="icon">📍</span><h2 id="nextJobAddress">No next job</h2><p id="nextJobHint">Add jobs to get routing hints.</p></article>
-            <article class="feature-card"><span class="icon">⏱️</span><h2 id="dashboardHours">0 hrs</h2><p>Timesheet hours logged for the selected day.</p></article>
-            <article class="feature-card"><span class="icon">🟨</span><h2 id="yellowStatus">Not started</h2><p>Yellow sheet compliance status for the selected day.</p></article>
-            <article class="feature-card"><span class="icon">👥</span><h2 id="partnerStatus">No partner</h2><p>Current partner request or active crew pairing.</p></article>
-          </section>
-
-          <section class="workspace-card">
-            <div class="section-heading">
-              <div><p class="eyebrow">Create job</p><h2>Daily job entry</h2></div>
-              <button class="button secondary" id="refreshJobsButton" type="button">Refresh jobs</button>
+          <section class="today-summary-card" aria-label="Today summary">
+            <div>
+              <p class="eyebrow">Today</p>
+              <h2 id="todaySummaryDate">Loading...</h2>
             </div>
-            <form class="job-form" id="jobForm">
-              <label>Job #<input id="jobNumberInput" name="jobNumber" placeholder="JT-1042" required /></label>
-              <label>Address<input id="addressInput" name="address" placeholder="123 Fiber Rd" required /></label>
-              <label>Scheduled date<input id="scheduledDateInput" name="scheduledDate" type="date" required /></label>
-              <label>
-                Type
-                <select id="typeInput" name="type"><option>Install</option><option>Repair</option><option>Survey</option><option>Maintenance</option><option>Splice</option></select>
-              </label>
-              <label>
-                Status
-                <select id="statusInput" name="status"><option>Pending</option><option>In Progress</option><option>Needs Ariel</option><option>Needs Underground</option><option>Needs Nid</option><option>Needs Can</option><option>Done</option><option>Talk to Rick</option></select>
-              </label>
-              <label>Crew note<input id="noteInput" name="note" placeholder="Gate code, splice count, material needs" /></label>
-              <button class="button primary" type="submit">Save job</button>
-            </form>
+            <dl class="native-counts">
+              <div><dt>Total</dt><dd id="totalCount">0</dd></div>
+              <div><dt>Pending</dt><dd id="pendingCount">0</dd></div>
+              <div><dt>Done</dt><dd id="doneCount">0</dd></div>
+            </dl>
           </section>
 
-          <section class="two-column">
-            <article class="workspace-card">
-              <div class="section-heading"><div><p class="eyebrow">Pending work</p><h2>Open jobs</h2></div></div>
-              <div class="job-list" id="pendingJobList" aria-live="polite"></div>
-            </article>
-            <article class="workspace-card">
-              <div class="section-heading"><div><p class="eyebrow">Completed</p><h2>Closed jobs</h2></div></div>
-              <div class="job-list" id="completedJobList" aria-live="polite"></div>
-            </article>
+          <div class="weekday-picker compact" id="weekdayPicker" aria-label="Work week selector"></div>
+
+          <button class="create-job-button" id="createJobButton" type="button" data-focus-job-form>+ Create Job</button>
+
+          <section class="selected-day-jobs" aria-label="Selected day jobs">
+            <div class="job-list native-job-list" id="selectedDayJobList" aria-live="polite"></div>
           </section>
         </section>
 
@@ -282,6 +239,33 @@
         </section>
       </main>
     </div>
+
+
+    <dialog class="job-detail-dialog" id="createJobDialog" aria-labelledby="createJobTitle">
+      <form class="job-detail-panel" id="jobForm" method="dialog">
+        <div class="section-heading">
+          <div><p class="eyebrow">Create job</p><h2 id="createJobTitle">New job</h2></div>
+          <button class="button ghost" id="closeCreateJobButton" type="button">Close</button>
+        </div>
+        <div class="form-grid two">
+          <label>Job #<input id="jobNumberInput" name="jobNumber" placeholder="JT-1042" required /></label>
+          <label>Scheduled date<input id="scheduledDateInput" name="scheduledDate" type="date" required /></label>
+          <label>Address<input id="addressInput" name="address" placeholder="123 Fiber Rd" required /></label>
+          <label>
+            Type
+            <select id="typeInput" name="type"><option>Install</option><option>Repair</option><option>Survey</option><option>Maintenance</option><option>Splice</option></select>
+          </label>
+          <label>
+            Status
+            <select id="statusInput" name="status"><option>Pending</option><option>In Progress</option><option>Needs Ariel</option><option>Needs Underground</option><option>Needs Nid</option><option>Needs Can</option><option>Done</option><option>Talk to Rick</option></select>
+          </label>
+        </div>
+        <label>Crew note<input id="noteInput" name="note" placeholder="Gate code, splice count, material needs" /></label>
+        <div class="detail-actions">
+          <button class="button primary" type="submit">Save job</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog class="job-detail-dialog" id="jobDetailDialog" aria-labelledby="jobDetailTitle">
       <form class="job-detail-panel" id="jobDetailForm" method="dialog">

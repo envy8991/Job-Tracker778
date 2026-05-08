@@ -100,7 +100,8 @@ function setMessage(message) {
 }
 
 function showSync(message = "All server changes synced.") {
-  $("#syncText").textContent = message;
+  const syncText = $("#syncText");
+  if (syncText) syncText.textContent = message;
 }
 
 async function authRequest(path, payload) {
@@ -401,42 +402,39 @@ function renderWeekdayPicker() {
     const button = document.createElement("button");
     button.className = `day-button ${date === selectedDate ? "active" : ""}`.trim();
     button.type = "button";
-    button.innerHTML = `<strong>${shortDays[index]}</strong><span>${dateLabel(date, { month: "short", day: "numeric" })}</span><small>${jobs.length} jobs</small>`;
-    button.addEventListener("click", () => { selectedDate = date; $("#scheduledDateInput").value = selectedDate; renderAll(); });
+    button.innerHTML = `<strong>${shortDays[index]}</strong><span>${dateLabel(date, { month: "short", day: "numeric" })}</span><small>${jobs.length}</small>`;
+    button.addEventListener("click", () => { selectedDate = date; syncSelectedDateInputs(); renderAll(); });
     picker.append(button);
   });
+}
+
+function syncSelectedDateInputs() {
+  const scheduledDateInput = $("#scheduledDateInput");
+  const dashboardDateInput = $("#dashboardDateInput");
+  if (scheduledDateInput) scheduledDateInput.value = selectedDate;
+  if (dashboardDateInput) dashboardDateInput.value = selectedDate;
 }
 
 function renderDashboard() {
   const jobs = selectedJobs();
   const pending = jobs.filter(isOpen);
   const done = jobs.filter((job) => job.status === "Done");
-  const completion = jobs.length === 0 ? 0 : Math.round((done.length / jobs.length) * 100);
-  const nextJob = pending[0];
-  const timesheet = getTimesheet(mondayFor(selectedDate));
-  const dayIndex = Math.max(0, Math.min(4, new Date(`${selectedDate}T12:00:00`).getDay() - 1));
-  const yellow = getYellowSheet(selectedDate);
-  const partner = appState.partnerRequests.find((request) => request.status === "accepted");
+  const selectedDateText = dateLabel(selectedDate, { weekday: "long", month: "long", day: "numeric" });
 
-  $("#dashboardGreeting").textContent = `Hi ${currentUser.firstName}, here is ${dateLabel(selectedDate)}. Updates save to Firebase and stay aligned with the native app collections.`;
+  $("#dashboardSelectedDate").textContent = selectedDateText;
+  $("#todaySummaryDate").textContent = selectedDateText;
   $("#sidebarSummary").textContent = `${jobs.length} jobs on selected day`;
   $("#totalCount").textContent = jobs.length;
   $("#pendingCount").textContent = pending.length;
   $("#doneCount").textContent = done.length;
-  $("#completionRate").textContent = `${completion}%`;
-  $("#completionBar").style.width = `${completion}%`;
-  $("#nextJobAddress").textContent = nextJob ? nextJob.address : "No next job";
-  $("#nextJobHint").textContent = nextJob ? `${nextJob.jobNumber || "No job #"} • ${nextJob.status}` : "Create or assign jobs to get routing hints.";
-  $("#dashboardHours").textContent = `${sumDay(timesheet.days[dayIndex]).toFixed(1)} hrs`;
-  $("#yellowStatus").textContent = yellow.signature ? "Signed" : yellowHasContent(yellow) ? "In progress" : "Not started";
-  $("#partnerStatus").textContent = partner ? partnerName(partner) : "No partner";
-  renderJobList($("#pendingJobList"), pending, true);
-  renderJobList($("#completedJobList"), done, true);
+  $("#createJobButton").disabled = !currentUser;
+  syncSelectedDateInputs();
+  renderJobList($("#selectedDayJobList"), jobs, true, "No jobs for this date");
 }
 
-function renderJobList(container, jobs, withActions = false) {
+function renderJobList(container, jobs, withActions = false, emptyMessage = "No jobs match this section.") {
   container.innerHTML = "";
-  if (jobs.length === 0) { container.innerHTML = `<p class="empty-state">No jobs match this section.</p>`; return; }
+  if (jobs.length === 0) { container.innerHTML = `<p class="${emptyMessage === "No jobs for this date" ? "empty-pill" : "empty-state"}">${emptyMessage}</p>`; return; }
   jobs.forEach((job) => container.append(jobCard(job, withActions)));
 }
 
@@ -535,7 +533,8 @@ async function handleJobSubmit(event) {
   await setDoc("jobs", job.id, job);
   selectedDate = job.date;
   event.currentTarget.reset();
-  $("#scheduledDateInput").value = selectedDate;
+  closeCreateJobDialog();
+  syncSelectedDateInputs();
   await loadAppData();
   renderAll();
   showToast("Job created in Firebase.");
@@ -773,6 +772,20 @@ function renderAll() {
   renderPartnerRequests();
 }
 
+function openCreateJobDialog() {
+  syncSelectedDateInputs();
+  const dialog = $("#createJobDialog");
+  if (dialog.showModal) dialog.showModal();
+  else dialog.setAttribute("open", "");
+  $("#jobNumberInput").focus();
+}
+
+function closeCreateJobDialog() {
+  const dialog = $("#createJobDialog");
+  if (dialog.close) dialog.close();
+  else dialog.removeAttribute("open");
+}
+
 function bindEvents() {
   $$('[data-auth-mode]').forEach((button) => button.addEventListener("click", () => setAuthMode(button.dataset.authMode)));
   $("#loginForm").addEventListener("submit", handleLogin);
@@ -780,11 +793,16 @@ function bindEvents() {
   $("#resetForm").addEventListener("submit", resetPassword);
   $("#signOutButton").addEventListener("click", logout);
   $$('[data-route]').forEach((button) => button.addEventListener("click", (event) => { event.preventDefault(); navigate(button.dataset.route); }));
-  $$('[data-focus-job-form]').forEach((button) => button.addEventListener("click", () => $("#jobNumberInput").focus()));
+  $$('[data-focus-job-form]').forEach((button) => button.addEventListener("click", openCreateJobDialog));
   $("#jobForm").addEventListener("submit", (event) => handleJobSubmit(event).catch((error) => showToast(error.message)));
-  $("#refreshJobsButton").addEventListener("click", () => loadAppData().then(renderAll).then(() => showToast("Jobs refreshed from Firebase.")));
+  $("#closeCreateJobButton").addEventListener("click", closeCreateJobDialog);
+  $("#calendarButton").addEventListener("click", () => {
+    const input = $("#dashboardDateInput");
+    if (input.showPicker) input.showPicker();
+    else input.click();
+  });
+  $("#dashboardDateInput").addEventListener("change", (event) => { selectedDate = event.target.value || selectedDate; syncSelectedDateInputs(); renderAll(); });
   $("#shareDailySummaryButton").addEventListener("click", () => copyText(dailySummaryText(), `job-tracker-${selectedDate}.txt`));
-  $("#downloadDailySummaryButton").addEventListener("click", () => downloadText(`job-tracker-${selectedDate}.txt`, dailySummaryText()));
   $("#timesheetWeekInput").addEventListener("change", renderTimesheet);
   $("#saveTimesheetButton").addEventListener("click", () => handleSaveTimesheet().catch((error) => showToast(error.message)));
   $("#exportTimesheetButton").addEventListener("click", () => downloadText(`timesheet-${$("#timesheetWeekInput").value}.txt`, timesheetText()));
@@ -799,7 +817,7 @@ function bindEvents() {
 }
 
 function initializeInputs() {
-  $("#scheduledDateInput").value = selectedDate;
+  syncSelectedDateInputs();
   $("#timesheetWeekInput").value = mondayFor(selectedDate);
   $("#yellowDateInput").value = selectedDate;
 }
