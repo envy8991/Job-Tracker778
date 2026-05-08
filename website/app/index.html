@@ -217,21 +217,11 @@
         </section>
 
         <section class="view" id="searchView" data-view="search">
-          <div class="page-heading"><p class="eyebrow">Job Search</p><h1>Address-aware job index</h1><p>Search by job number, address, type, status, date, or crew note, then inspect and update matching jobs.</p></div>
-          <section class="workspace-card">
-            <label class="search-box">Search jobs<input id="jobSearchInput" placeholder="Try: Maple, JT-1001, pending, splice, 2026-05-07" /></label>
-            <div class="job-list" id="searchResults"></div>
-          </section>
-
-          <section class="workspace-card">
-            <div class="section-heading">
-              <div><p class="eyebrow">Shared jobs</p><h2>Import shared job link</h2></div>
-            </div>
-            <form class="share-import-form" id="shareImportForm">
-              <label>Token or link<input id="shareTokenInput" placeholder="jobtracker://importJob?token=..." /></label>
-              <button class="button primary" type="submit">Preview import</button>
-            </form>
-            <div class="compact-list" id="shareImportPreview"></div>
+          <div class="page-heading"><p class="eyebrow">Job Search</p><h1>Job Search</h1><p>Look up any job across Cable South in seconds.</p></div>
+          <section class="workspace-card search-workspace">
+            <label class="search-box">Search jobs<input id="jobSearchInput" placeholder="Address, job #, status, or teammate" /></label>
+            <div class="quick-filters" id="searchQuickFilters" aria-label="Quick filters"></div>
+            <div class="job-list search-results" id="searchResults"></div>
           </section>
         </section>
 
