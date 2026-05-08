@@ -172,25 +172,46 @@
           </section>
         </section>
 
-        <section class="view" id="timesheetsView" data-view="timesheets">
-          <div class="page-heading"><p class="eyebrow">Timesheets</p><h1>Weekly timesheet</h1><p>Log Gibson, Cable South, and total hours by day, attach job notes, save the week, and export a supervisor-ready summary.</p></div>
-          <section class="workspace-card">
-            <div class="timesheet-toolbar">
-              <label>Week start<input id="timesheetWeekInput" type="date" /></label>
-              <label>Supervisor<input id="timesheetSupervisorInput" placeholder="Supervisor name" /></label>
-              <label>Partner<input id="timesheetPartnerInput" placeholder="Partner name" /></label>
-              <button class="button primary" id="saveTimesheetButton" type="button">Save timesheet</button>
-              <button class="button secondary" id="exportTimesheetButton" type="button">Export</button>
+        <section class="view native-timesheet-view" id="timesheetsView" data-view="timesheets">
+          <header class="native-top-bar" aria-label="Timesheet actions">
+            <span aria-hidden="true"></span>
+            <h1>Timesheet</h1>
+            <div class="native-top-actions">
+              <button class="icon-button" id="saveTimesheetButton" type="button" aria-label="Save timesheet" title="Save timesheet">⇩</button>
+              <button class="icon-button" id="previewTimesheetButton" type="button" aria-label="PDF preview" title="PDF preview is available in the native app">▤</button>
             </div>
-            <div class="table-wrap">
-              <table class="data-table">
-                <thead><tr><th>Day</th><th>Job / location notes</th><th>Gibson</th><th>Cable South</th><th>Other</th><th>Total</th></tr></thead>
-                <tbody id="timesheetRows"></tbody>
-              </table>
+          </header>
+
+          <input class="visually-hidden" id="timesheetWeekInput" type="date" aria-label="Week start" />
+
+          <div class="native-week-picker" aria-label="Timesheet week selector">
+            <button class="week-chevron" id="previousTimesheetWeekButton" type="button" aria-label="Previous week">‹</button>
+            <button class="week-label" id="timesheetWeekLabel" type="button">Week of May 3, 2026</button>
+            <button class="week-chevron" id="nextTimesheetWeekButton" type="button" aria-label="Next week">›</button>
+          </div>
+
+          <section class="native-card supervisor-card" aria-labelledby="timesheetSupervisorHeading">
+            <h2 class="visually-hidden" id="timesheetSupervisorHeading">Timesheet supervisor and crew totals</h2>
+            <label class="supervisor-row">
+              <span>Supervisor:</span>
+              <input id="timesheetSupervisorInput" placeholder="Supervisor name" />
+            </label>
+
+            <div class="worker-grid worker-grid-heading" aria-hidden="true">
+              <span>Name</span>
+              <span>Gibson</span>
+              <span>CS Hours</span>
+              <span>Total</span>
+              <span></span>
             </div>
-            <div class="summary-strip"><strong id="timesheetTotal">0 total hours</strong><span id="timesheetSavedState">Not saved yet</span></div>
+            <div class="worker-rows" id="timesheetWorkerRows"></div>
+            <button class="add-name-button" id="addTimesheetNameButton" type="button">＋ Add Name</button>
           </section>
-          <section class="workspace-card"><p class="eyebrow">History</p><h2>Past timesheets</h2><div class="compact-list" id="pastTimesheetsList"></div></section>
+
+          <h2 class="native-section-title">Gibson Connect Weekly</h2>
+          <div class="daily-timesheet-list" id="timesheetDailyCards" aria-live="polite"></div>
+
+          <div class="native-total-strip" id="timesheetTotal">Total: 0.0 hrs</div>
         </section>
 
         <section class="view" id="yellowSheetsView" data-view="yellowSheets">

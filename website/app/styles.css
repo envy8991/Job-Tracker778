@@ -276,3 +276,250 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   .share-import-form, .profile-shortcuts { grid-template-columns: 1fr; }
   .detail-actions { justify-content: flex-start; }
 }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.native-timesheet-view {
+  position: relative;
+  gap: 1rem;
+  padding-bottom: 4.75rem;
+}
+
+.native-top-bar {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) 3.5rem;
+  align-items: center;
+  min-height: 3rem;
+}
+
+.native-top-bar h1 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 850;
+  text-align: center;
+}
+
+.native-top-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.icon-button, .week-chevron, .week-label, .add-name-button, .remove-name-button {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+}
+
+.icon-button {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 1.15rem;
+}
+
+.icon-button:hover, .week-chevron:hover, .week-label:hover, .add-name-button:hover, .remove-name-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.native-week-picker, .native-card, .day-timesheet-card {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(18px);
+}
+
+.native-week-picker {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.8rem;
+}
+
+.week-chevron {
+  min-height: 2.25rem;
+  border-radius: 0.7rem;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.week-label {
+  min-width: 0;
+  padding: 0.55rem;
+  border-radius: 0.7rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.native-card, .day-timesheet-card {
+  border-radius: 1rem;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.supervisor-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.supervisor-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: center;
+  color: var(--text);
+}
+
+.supervisor-row span, .daily-total-row span {
+  font-weight: 800;
+}
+
+.supervisor-card input, .day-timesheet-card input {
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.92);
+  color: #08111f;
+  padding: 0.42rem 0.5rem;
+}
+
+.worker-grid {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 1fr) 4rem 5.25rem 3.8rem 1.8rem;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.worker-grid-heading {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.worker-rows {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.worker-row strong {
+  font-size: 1rem;
+}
+
+.remove-name-button {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  color: var(--danger);
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+.remove-name-button:disabled, .add-name-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.add-name-button {
+  justify-self: start;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.6rem;
+  font-weight: 850;
+}
+
+.native-section-title {
+  margin: 0.35rem 0 0;
+  font-size: clamp(1.35rem, 3vw, 1.65rem);
+}
+
+.daily-timesheet-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.day-timesheet-card {
+  display: grid;
+  min-height: 8rem;
+  gap: 0.55rem;
+  padding: 0.75rem;
+}
+
+.day-timesheet-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.day-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.job-summary-heading, .job-summary-row {
+  display: grid;
+  grid-template-columns: 4.2rem 3.6rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.job-summary-heading {
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 850;
+}
+
+.job-summary-row {
+  font-size: 0.85rem;
+}
+
+.job-summary-row span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.daily-total-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.25rem;
+  color: var(--text);
+}
+
+.daily-total-row input {
+  max-width: 5.5rem;
+}
+
+.native-total-strip {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 18rem;
+  z-index: 4;
+  padding: 0.65rem 1rem;
+  border-top: 1px solid var(--line);
+  background: rgba(12, 21, 37, 0.86);
+  backdrop-filter: blur(20px);
+  font-weight: 850;
+  text-align: center;
+}
+
+@media (max-width: 1120px) {
+  .native-total-strip { left: 0; }
+}
+
+@media (max-width: 760px) {
+  .native-top-bar { grid-template-columns: 2.5rem minmax(0, 1fr) 3.5rem; }
+  .worker-grid { grid-template-columns: minmax(4.5rem, 1fr) 3.8rem 4.6rem 3.2rem 1.7rem; gap: 0.35rem; }
+  .worker-grid-heading, .worker-row strong, .job-summary-row, .job-summary-heading { font-size: 0.78rem; }
+  .supervisor-card input, .day-timesheet-card input { padding-inline: 0.38rem; }
+}

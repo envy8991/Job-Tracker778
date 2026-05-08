@@ -6,6 +6,7 @@ const sessionKey = "job-tracker-web-firebase-session";
 const statuses = ["Pending", "In Progress", "Needs Ariel", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick"];
 const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const timesheetDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const shareTokenAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
 let currentUser = null;
@@ -70,6 +71,12 @@ function mondayFor(date = new Date()) {
   const value = new Date(date);
   const day = value.getDay();
   value.setDate(value.getDate() - day + (day === 0 ? -6 : 1));
+  return toInputDate(value);
+}
+
+function sundayFor(date = new Date()) {
+  const value = new Date(date);
+  value.setDate(value.getDate() - value.getDay());
   return toInputDate(value);
 }
 
@@ -270,8 +277,9 @@ function normalizeJob(job) {
 }
 
 function normalizeTimesheet(sheet) {
-  const days = sheet.days || weekDays.map((name) => ({ name, notes: "", gibson: 0, cableSouth: 0, other: 0 }));
-  return { id: sheet.id || sheet.weekStart, userId: currentUser.id, partnerId: sheet.partnerId || "", weekStart: sheet.weekStart, supervisor: sheet.supervisor || "", name1: sheet.name1 || `${currentUser.firstName} ${currentUser.lastName}`.trim(), name2: sheet.name2 || "", gibsonHours: sheet.gibsonHours || "0", cableSouthHours: sheet.cableSouthHours || "0", totalHours: sheet.totalHours || "0", dailyTotalHours: sheet.dailyTotalHours || {}, days, savedAt: sheet.savedAt || null, pdfURL: sheet.pdfURL || "" };
+  const sourceDays = sheet.days || [];
+  const days = timesheetDays.map((name, index) => ({ notes: "", gibson: 0, cableSouth: 0, other: 0, ...(sourceDays[index] || {}), name }));
+  return { id: sheet.id || sheet.weekStart, userId: currentUser.id, partnerId: sheet.partnerId || "", weekStart: sheet.weekStart, supervisor: sheet.supervisor || "", name1: sheet.name1 || `${currentUser.firstName} ${currentUser.lastName}`.trim(), name2: sheet.name2 || "", gibsonHours: sheet.gibsonHours || "0", cableSouthHours: sheet.cableSouthHours || "0", totalHours: sheet.totalHours || "0", gibsonHours2: sheet.gibsonHours2 || "0", cableSouthHours2: sheet.cableSouthHours2 || "0", totalHours2: sheet.totalHours2 || "0", dailyTotalHours: sheet.dailyTotalHours || {}, days, savedAt: sheet.savedAt || null, pdfURL: sheet.pdfURL || "" };
 }
 
 function normalizeYellowSheet(sheet) {
@@ -413,8 +421,8 @@ function renderDashboard() {
   const done = jobs.filter((job) => job.status === "Done");
   const completion = jobs.length === 0 ? 0 : Math.round((done.length / jobs.length) * 100);
   const nextJob = pending[0];
-  const timesheet = getTimesheet(mondayFor(selectedDate));
-  const dayIndex = Math.max(0, Math.min(4, new Date(`${selectedDate}T12:00:00`).getDay() - 1));
+  const timesheet = getTimesheet(sundayFor(selectedDate));
+  const dayIndex = new Date(`${selectedDate}T12:00:00`).getDay();
   const yellow = getYellowSheet(selectedDate);
   const partner = appState.partnerRequests.find((request) => request.status === "accepted");
 
@@ -548,37 +556,179 @@ function getTimesheet(weekStart) {
 
 function sumDay(day) { return Number(day?.gibson || 0) + Number(day?.cableSouth || 0) + Number(day?.other || 0); }
 
+function workerRows(sheet) {
+  const fallbackName = `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim();
+  const rows = [
+    { name: sheet.name1 || fallbackName, gibson: sheet.gibsonHours || "", cs: sheet.cableSouthHours || "" },
+    { name: sheet.name2 || "", gibson: sheet.gibsonHours2 || "", cs: sheet.cableSouthHours2 || "" },
+  ];
+  return rows.filter((row, index) => index === 0 || sheet.showSecondWorker || row.name || row.gibson || row.cs);
+}
+
+function renderWorkerRows(sheet) {
+  const container = $("#timesheetWorkerRows");
+  container.innerHTML = "";
+  const rows = workerRows(sheet).slice(0, 2);
+  rows.forEach((worker, index) => {
+    const row = document.createElement("div");
+    row.className = "worker-grid worker-row";
+    const name = document.createElement("input");
+    name.placeholder = "Name";
+    name.value = worker.name;
+    name.dataset.workerField = "name";
+    name.dataset.workerIndex = String(index);
+    const gibson = document.createElement("input");
+    gibson.type = "number";
+    gibson.min = "0";
+    gibson.step = "0.25";
+    gibson.placeholder = "0";
+    gibson.value = worker.gibson;
+    gibson.dataset.workerField = "gibson";
+    gibson.dataset.workerIndex = String(index);
+    const cs = document.createElement("input");
+    cs.type = "number";
+    cs.min = "0";
+    cs.step = "0.25";
+    cs.placeholder = "0";
+    cs.value = worker.cs;
+    cs.dataset.workerField = "cs";
+    cs.dataset.workerIndex = String(index);
+    const total = document.createElement("strong");
+    total.textContent = (Number(worker.gibson || 0) + Number(worker.cs || 0)).toFixed(1);
+    const remove = document.createElement("button");
+    remove.className = "remove-name-button";
+    remove.type = "button";
+    remove.textContent = "−";
+    remove.ariaLabel = "Remove name";
+    remove.disabled = rows.length <= 1;
+    remove.addEventListener("click", () => {
+      captureTimesheet();
+      if (index === 0) {
+        sheet.name1 = sheet.name2;
+        sheet.gibsonHours = sheet.gibsonHours2;
+        sheet.cableSouthHours = sheet.cableSouthHours2;
+      }
+      sheet.name2 = "";
+      sheet.gibsonHours2 = "";
+      sheet.cableSouthHours2 = "";
+      renderTimesheet();
+    });
+    [name, gibson, cs].forEach((input) => input.addEventListener("input", () => { total.textContent = (Number(gibson.value || 0) + Number(cs.value || 0)).toFixed(1); }));
+    row.append(name, gibson, cs, total, remove);
+    container.append(row);
+  });
+  $("#addTimesheetNameButton").disabled = rows.length >= 2;
+}
+
+function jobsForTimesheetDay(date) {
+  return appState.jobs
+    .filter((job) => job.date === date && (job.status || "").toLowerCase() !== "pending")
+    .sort((a, b) => (a.jobNumber || "").localeCompare(b.jobNumber || "") || (a.address || "").localeCompare(b.address || ""));
+}
+
+function dayTotalValue(sheet, date, jobs, day) {
+  if (sheet.dailyTotalHours?.[date] !== undefined) return String(sheet.dailyTotalHours[date]);
+  const jobHours = jobs.reduce((sum, job) => sum + Number(job.hours || 0), 0);
+  if (jobHours) return jobHours.toFixed(1);
+  return sumDay(day).toFixed(1);
+}
+
 function renderTimesheet() {
-  const weekStart = $("#timesheetWeekInput").value || mondayFor(selectedDate);
+  const weekStart = $("#timesheetWeekInput").value || sundayFor(selectedDate);
   const sheet = getTimesheet(weekStart);
   $("#timesheetWeekInput").value = weekStart;
+  $("#timesheetWeekLabel").textContent = `Week of ${dateLabel(weekStart, { month: "long", day: "numeric", year: "numeric" })}`;
   $("#timesheetSupervisorInput").value = sheet.supervisor;
-  $("#timesheetPartnerInput").value = sheet.name2;
-  const tbody = $("#timesheetRows");
-  tbody.innerHTML = "";
+  renderWorkerRows(sheet);
+
+  const list = $("#timesheetDailyCards");
+  list.innerHTML = "";
   sheet.days.forEach((day, index) => {
-    const row = document.createElement("tr");
-    row.innerHTML = `<td><strong>${day.name}</strong><br><small>${dateLabel(addDays(weekStart, index), { month: "short", day: "numeric" })}</small></td><td><textarea rows="2" data-timesheet-field="notes" data-day-index="${index}">${day.notes || ""}</textarea></td><td><input type="number" min="0" step="0.25" value="${day.gibson || 0}" data-timesheet-field="gibson" data-day-index="${index}"></td><td><input type="number" min="0" step="0.25" value="${day.cableSouth || 0}" data-timesheet-field="cableSouth" data-day-index="${index}"></td><td><input type="number" min="0" step="0.25" value="${day.other || 0}" data-timesheet-field="other" data-day-index="${index}"></td><td><strong>${sumDay(day).toFixed(2)}</strong></td>`;
-    tbody.append(row);
+    const date = addDays(weekStart, index);
+    const jobs = jobsForTimesheetDay(date);
+    const card = document.createElement("article");
+    card.className = "day-timesheet-card";
+
+    const title = document.createElement("h3");
+    title.textContent = dateLabel(date, { weekday: "long", month: "short", day: "numeric" });
+    card.append(title);
+
+    if (jobs.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "day-empty";
+      empty.textContent = "No jobs";
+      card.append(empty);
+    } else {
+      const heading = document.createElement("div");
+      heading.className = "job-summary-heading";
+      heading.innerHTML = "<span>Job #</span><span>Hours</span><span>Address</span>";
+      card.append(heading);
+      jobs.forEach((job) => {
+        const row = document.createElement("div");
+        row.className = "job-summary-row";
+        const number = document.createElement("span");
+        number.textContent = job.jobNumber || "—";
+        const hours = document.createElement("span");
+        hours.textContent = Number(job.hours || 0).toFixed(1);
+        const address = document.createElement("span");
+        address.textContent = job.address || "No address";
+        row.append(number, hours, address);
+        card.append(row);
+      });
+    }
+
+    const totalRow = document.createElement("label");
+    totalRow.className = "daily-total-row";
+    const totalLabel = document.createElement("span");
+    totalLabel.textContent = "Total Hours:";
+    const totalInput = document.createElement("input");
+    totalInput.type = "number";
+    totalInput.min = "0";
+    totalInput.step = "0.25";
+    totalInput.value = dayTotalValue(sheet, date, jobs, day);
+    totalInput.dataset.timesheetField = "dailyTotal";
+    totalInput.dataset.dayIndex = String(index);
+    totalInput.dataset.date = date;
+    totalInput.addEventListener("input", updateTimesheetTotalStrip);
+    totalRow.append(totalLabel, totalInput);
+    card.append(totalRow);
+    list.append(card);
   });
-  const total = sheet.days.reduce((sum, day) => sum + sumDay(day), 0);
-  $("#timesheetTotal").textContent = `${total.toFixed(2)} total hours`;
-  $("#timesheetSavedState").textContent = sheet.savedAt ? `Saved ${new Date(sheet.savedAt).toLocaleString()}` : "Not saved yet";
-  renderPastTimesheets();
+  updateTimesheetTotalStrip();
+}
+
+function updateTimesheetTotalStrip() {
+  const total = $$('[data-timesheet-field="dailyTotal"]').reduce((sum, input) => sum + Number(input.value || 0), 0);
+  $("#timesheetTotal").textContent = `Total: ${total.toFixed(1)} hrs`;
 }
 
 function captureTimesheet() {
   const weekStart = $("#timesheetWeekInput").value;
   const sheet = getTimesheet(weekStart);
   sheet.supervisor = $("#timesheetSupervisorInput").value.trim();
-  sheet.name1 = `${currentUser.firstName} ${currentUser.lastName}`.trim();
-  sheet.name2 = $("#timesheetPartnerInput").value.trim();
-  $$("[data-timesheet-field]").forEach((input) => { const day = sheet.days[Number(input.dataset.dayIndex)]; const field = input.dataset.timesheetField; day[field] = field === "notes" ? input.value : Number(input.value || 0); });
-  const total = sheet.days.reduce((sum, day) => sum + sumDay(day), 0);
-  sheet.gibsonHours = String(sheet.days.reduce((sum, day) => sum + Number(day.gibson || 0), 0));
-  sheet.cableSouthHours = String(sheet.days.reduce((sum, day) => sum + Number(day.cableSouth || 0), 0));
-  sheet.totalHours = String(total);
-  sheet.dailyTotalHours = Object.fromEntries(sheet.days.map((day, index) => [addDays(weekStart, index), String(sumDay(day))]));
+  const workers = [{ name: "", gibson: "", cs: "" }, { name: "", gibson: "", cs: "" }];
+  $$('[data-worker-field]').forEach((input) => {
+    const worker = workers[Number(input.dataset.workerIndex)];
+    if (worker) worker[input.dataset.workerField] = input.value.trim();
+  });
+  sheet.name1 = workers[0].name;
+  sheet.gibsonHours = workers[0].gibson;
+  sheet.cableSouthHours = workers[0].cs;
+  sheet.totalHours = String(Number(workers[0].gibson || 0) + Number(workers[0].cs || 0));
+  sheet.name2 = workers[1].name;
+  sheet.gibsonHours2 = workers[1].gibson;
+  sheet.cableSouthHours2 = workers[1].cs;
+  sheet.totalHours2 = String(Number(workers[1].gibson || 0) + Number(workers[1].cs || 0));
+  $$('[data-timesheet-field="dailyTotal"]').forEach((input) => {
+    const index = Number(input.dataset.dayIndex);
+    const value = Number(input.value || 0);
+    sheet.days[index].other = value;
+    sheet.days[index].gibson = 0;
+    sheet.days[index].cableSouth = 0;
+    sheet.dailyTotalHours[input.dataset.date] = String(value);
+  });
+  const total = $$('[data-timesheet-field="dailyTotal"]').reduce((sum, input) => sum + Number(input.value || 0), 0);
+  sheet.weeklyTotalHours = String(total);
   return sheet;
 }
 
@@ -594,6 +744,7 @@ async function handleSaveTimesheet() {
 function renderPastTimesheets() {
   const sheets = Object.values(appState.timesheets).filter((sheet) => sheet.savedAt);
   const list = $("#pastTimesheetsList");
+  if (!list) return;
   list.innerHTML = "";
   if (sheets.length === 0) { list.innerHTML = `<p class="empty-state">Saved weekly timesheets will appear here.</p>`; return; }
   sheets.sort((a, b) => b.weekStart.localeCompare(a.weekStart)).forEach((sheet) => { const item = document.createElement("article"); item.className = "compact-item"; item.innerHTML = `<div><h3>Week of ${dateLabel(sheet.weekStart)}</h3><span>${Number(sheet.totalHours || 0).toFixed(2)} hours • Supervisor: ${sheet.supervisor || "Not set"}</span></div>`; list.append(item); });
@@ -786,8 +937,16 @@ function bindEvents() {
   $("#shareDailySummaryButton").addEventListener("click", () => copyText(dailySummaryText(), `job-tracker-${selectedDate}.txt`));
   $("#downloadDailySummaryButton").addEventListener("click", () => downloadText(`job-tracker-${selectedDate}.txt`, dailySummaryText()));
   $("#timesheetWeekInput").addEventListener("change", renderTimesheet);
+  $("#timesheetWeekLabel").addEventListener("click", () => {
+    const input = $("#timesheetWeekInput");
+    if (input.showPicker) input.showPicker();
+    else input.focus();
+  });
+  $("#previousTimesheetWeekButton").addEventListener("click", () => { $("#timesheetWeekInput").value = addDays($("#timesheetWeekInput").value || sundayFor(selectedDate), -7); renderTimesheet(); });
+  $("#nextTimesheetWeekButton").addEventListener("click", () => { $("#timesheetWeekInput").value = addDays($("#timesheetWeekInput").value || sundayFor(selectedDate), 7); renderTimesheet(); });
+  $("#addTimesheetNameButton").addEventListener("click", () => { const sheet = captureTimesheet(); sheet.showSecondWorker = true; renderTimesheet(); });
   $("#saveTimesheetButton").addEventListener("click", () => handleSaveTimesheet().catch((error) => showToast(error.message)));
-  $("#exportTimesheetButton").addEventListener("click", () => downloadText(`timesheet-${$("#timesheetWeekInput").value}.txt`, timesheetText()));
+  $("#previewTimesheetButton").addEventListener("click", () => showToast("PDF preview is generated by the native app."));
   $("#yellowDateInput").addEventListener("change", renderYellowSheet);
   $("#saveYellowSheetButton").addEventListener("click", () => handleSaveYellowSheet().catch((error) => showToast(error.message)));
   $("#exportYellowSheetButton").addEventListener("click", () => downloadText(`yellow-sheet-${$("#yellowDateInput").value}.txt`, yellowSheetText()));
@@ -800,7 +959,7 @@ function bindEvents() {
 
 function initializeInputs() {
   $("#scheduledDateInput").value = selectedDate;
-  $("#timesheetWeekInput").value = mondayFor(selectedDate);
+  $("#timesheetWeekInput").value = sundayFor(selectedDate);
   $("#yellowDateInput").value = selectedDate;
 }
 
