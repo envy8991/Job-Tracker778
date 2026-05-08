@@ -229,7 +229,7 @@ async function importSharedJob(token, payload) {
   await setDoc("jobs", job.id, job);
   await setDoc("sharedJobs", token, { ...payload, claimedBy: currentUser.id, claimedAt: new Date().toISOString() });
   selectedDate = job.date;
-  $("#scheduledDateInput").value = selectedDate;
+  updateCreateDateInput(selectedDate);
   $("#shareImportPreview").innerHTML = "";
   $("#shareTokenInput").value = "";
   await loadAppData();

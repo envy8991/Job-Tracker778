@@ -79,7 +79,7 @@
                 smart routing hints, sync status, quick job actions, and shareable summaries.
               </p>
               <div class="hero-actions">
-                <button class="button primary" type="button" data-focus-job-form>Add job</button>
+                <button class="button primary" id="openCreateJobButton" type="button" data-open-create-job>+ Create Job</button>
                 <button class="button secondary" id="shareDailySummaryButton" type="button">Share day summary</button>
                 <button class="button secondary" id="downloadDailySummaryButton" type="button">Download summary</button>
               </div>
@@ -112,26 +112,13 @@
             <article class="feature-card"><span class="icon">👥</span><h2 id="partnerStatus">No partner</h2><p>Current partner request or active crew pairing.</p></article>
           </section>
 
-          <section class="workspace-card">
+          <section class="workspace-card create-job-launcher">
             <div class="section-heading">
               <div><p class="eyebrow">Create job</p><h2>Daily job entry</h2></div>
               <button class="button secondary" id="refreshJobsButton" type="button">Refresh jobs</button>
             </div>
-            <form class="job-form" id="jobForm">
-              <label>Job #<input id="jobNumberInput" name="jobNumber" placeholder="JT-1042" required /></label>
-              <label>Address<input id="addressInput" name="address" placeholder="123 Fiber Rd" required /></label>
-              <label>Scheduled date<input id="scheduledDateInput" name="scheduledDate" type="date" required /></label>
-              <label>
-                Type
-                <select id="typeInput" name="type"><option>Install</option><option>Repair</option><option>Survey</option><option>Maintenance</option><option>Splice</option></select>
-              </label>
-              <label>
-                Status
-                <select id="statusInput" name="status"><option>Pending</option><option>In Progress</option><option>Needs Ariel</option><option>Needs Underground</option><option>Needs Nid</option><option>Needs Can</option><option>Done</option><option>Talk to Rick</option></select>
-              </label>
-              <label>Crew note<input id="noteInput" name="note" placeholder="Gate code, splice count, material needs" /></label>
-              <button class="button primary" type="submit">Save job</button>
-            </form>
+            <p>Open the native-aligned Create Job panel to add addresses, date, status, assignments, materials, and notes.</p>
+            <button class="button primary" type="button" data-open-create-job>+ Create Job</button>
           </section>
 
           <section class="two-column">
@@ -285,6 +272,73 @@
         </button>
       </nav>
     </div>
+
+
+    <section class="create-job-modal hidden" id="createJobModal" role="dialog" aria-modal="true" aria-labelledby="createJobTitle">
+      <div class="create-job-panel">
+        <form class="create-job-form" id="createJobForm">
+          <div class="create-job-topbar">
+            <button class="link-button" type="button" id="closeCreateJobButton">Close</button>
+            <h2 id="createJobTitle">Create Job</h2>
+            <button class="link-button" type="submit">Save</button>
+          </div>
+
+          <div class="create-job-content">
+            <section class="create-section-card" aria-labelledby="createAddressTitle">
+              <h3 id="createAddressTitle">Address</h3>
+              <div class="address-stack" id="createAddressList">
+                <label class="sr-only" for="createAddressInput0">Address</label>
+                <input id="createAddressInput0" name="address" placeholder="Enter address" autocomplete="street-address" required />
+              </div>
+              <button class="link-button add-address-button" id="addCreateAddressButton" type="button">+ Add Another Address</button>
+            </section>
+
+            <section class="create-section-card" aria-labelledby="createDateTitle">
+              <h3 id="createDateTitle">Date</h3>
+              <div class="date-picker-row">
+                <label>Select Date<input id="createDateInput" name="scheduledDate" type="date" required /></label>
+                <span class="date-chip" id="createDateChip">Selected date</span>
+              </div>
+            </section>
+
+            <section class="create-section-card status-card" aria-labelledby="createStatusTitle">
+              <h3 id="createStatusTitle">Status</h3>
+              <div class="segmented status-picker" role="radiogroup" aria-label="Job status">
+                <label class="segment"><input type="radio" name="status" value="Pending" checked />Pending</label>
+                <label class="segment"><input type="radio" name="status" value="Done" />Done</label>
+              </div>
+            </section>
+
+            <section class="create-section-card" aria-labelledby="createJobNumberTitle">
+              <h3 id="createJobNumberTitle">Job Number *</h3>
+              <label class="sr-only" for="createJobNumberInput">Job Number</label>
+              <input id="createJobNumberInput" name="jobNumber" placeholder="Required" autocomplete="off" required />
+            </section>
+
+            <section class="create-section-card" aria-labelledby="createAssignmentsTitle">
+              <h3 id="createAssignmentsTitle">Assignments</h3>
+              <label class="sr-only" for="createAssignmentsInput">Assignments</label>
+              <input id="createAssignmentsInput" name="assignments" inputmode="decimal" placeholder="e.g. 12.3.2" autocomplete="off" />
+              <p class="helper-text">Digits and dots only • examples: 12.3.2, 123.2.4</p>
+            </section>
+
+            <section class="create-section-card" aria-labelledby="createMaterialsTitle">
+              <h3 id="createMaterialsTitle">Materials Used</h3>
+              <label class="sr-only" for="createMaterialsInput">Materials Used</label>
+              <input id="createMaterialsInput" name="materialsUsed" placeholder="Enter materials info…" />
+            </section>
+
+            <section class="create-section-card" aria-labelledby="createNotesTitle">
+              <h3 id="createNotesTitle">Notes</h3>
+              <label class="sr-only" for="createNotesInput">Notes</label>
+              <textarea id="createNotesInput" name="notes" rows="5"></textarea>
+            </section>
+
+            <button class="button primary create-save-button" type="submit">✓ Save Job</button>
+          </div>
+        </form>
+      </div>
+    </section>
 
     <dialog class="job-detail-dialog" id="jobDetailDialog" aria-labelledby="jobDetailTitle">
       <form class="job-detail-panel" id="jobDetailForm" method="dialog">
