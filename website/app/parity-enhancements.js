@@ -10,49 +10,197 @@ encodeValue = function enhancedEncodeValue(value, key = "") {
   return parityBase.encodeValue(value, key);
 };
 
-function hydrateStatusSelect(select, selectedStatus = "Pending") {
+const nativeStatusOptions = ["Pending", "Needs Aerial", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick"];
+
+function hydrateStatusSelect(select, selectedStatus = "Pending", includeCustom = false) {
   select.innerHTML = "";
-  statuses.forEach((status) => {
+  const options = includeCustom ? nativeStatusOptions : statuses;
+  const normalizedSelected = selectedStatus === "Needs Ariel" ? "Needs Aerial" : selectedStatus;
+  const needsCustom = includeCustom && normalizedSelected && !options.includes(normalizedSelected);
+  [...options, ...(includeCustom ? ["Custom"] : [])].forEach((status) => {
     const option = document.createElement("option");
     option.value = status;
     option.textContent = status;
-    option.selected = status === selectedStatus;
+    option.selected = needsCustom ? status === "Custom" : status === normalizedSelected;
     select.append(option);
   });
+}
+
+function currentUserRole() {
+  const raw = currentUser?.position || "";
+  if (["Ariel", "Aerial"].includes(raw)) return "Aerial";
+  if (raw === "Nid") return "Nid";
+  if (raw === "Can") return "Can";
+  if (raw === "Underground") return "Underground";
+  return "Default";
+}
+
+function intAfter(label, text) {
+  const match = String(text || "").match(new RegExp(`${label}\\s*:\\s*(\\d+)`, "i"));
+  return match ? match[1] : "0";
+}
+
+function materialHas(token, text) {
+  return String(text || "").toLowerCase().includes(token.toLowerCase());
+}
+
+function parseFiberType(materials = "") {
+  const match = String(materials).match(/fiber\s*:\s*(flat|round|mainline)/i);
+  return match ? match[1][0].toUpperCase() + match[1].slice(1).toLowerCase() : "";
+}
+
+function materialsWithoutManagedTokens(materials = "") {
+  const managed = [/^fiber\s*:/i, /^u-guard\s*:/i, /^preforms\s*:/i, /^j hooks\s*:/i, /^jumpers\s*:/i, /^1 nid box$/i, /^storage bracket$/i, /^weatherhead$/i, /^rams head$/i];
+  return String(materials)
+    .split(",")
+    .map((token) => token.trim())
+    .filter((token) => token && !managed.some((pattern) => pattern.test(token)))
+    .join(", ");
+}
+
+function appendMaterial(parts, token) {
+  const trimmed = String(token || "").trim();
+  if (!trimmed) return;
+  if (!parts.some((part) => part.toLowerCase() === trimmed.toLowerCase())) parts.push(trimmed);
+}
+
+function setFiberType(value) {
+  $("#detailFiberValue").value = value || "";
+  $$('[data-fiber-type]').forEach((button) => {
+    const active = button.dataset.fiberType === value;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-checked", String(active));
+  });
+}
+
+function renderDetailDateChip() {
+  const date = $("#detailDate").value;
+  $("#detailDateChip").textContent = date ? dateLabel(date) : "No date";
+}
+
+function renderExistingPhotos(job) {
+  const container = $("#detailExistingPhotos");
+  container.innerHTML = "";
+  if (!job.photos?.length) {
+    container.innerHTML = `<p class="empty-state">No existing photos</p>`;
+    return;
+  }
+  job.photos.forEach((url) => {
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.className = "photo-thumb";
+    const image = document.createElement("img");
+    image.src = url;
+    image.alt = "Job photo";
+    image.loading = "lazy";
+    link.append(image);
+    container.append(link);
+  });
+}
+
+function showRoleMaterials(role) {
+  const display = role === "Default" ? currentUser?.position || "Technician" : role;
+  $("#detailMaterialsHeading").textContent = `MATERIALS — ${display.toUpperCase()}`;
+  $$('[data-materials-role]').forEach((section) => section.classList.toggle("hidden", section.dataset.materialsRole !== role));
+  $("#detailAssignmentsSection").classList.toggle("hidden", role !== "Can");
 }
 
 function openJobDetail(id) {
   const job = appState.jobs.find((item) => item.id === id);
   if (!job) return;
 
-  hydrateStatusSelect($("#detailStatus"), job.status);
+  const role = currentUserRole();
+  const materials = job.materialsUsed || "";
+  hydrateStatusSelect($("#detailStatus"), job.status, true);
   $("#detailJobId").value = job.id;
   $("#detailJobNumber").value = job.jobNumber || "";
   $("#detailDate").value = job.date || selectedDate;
   $("#detailAddress").value = job.address || "";
   $("#detailAssignments").value = job.assignments || job.type || "";
-  $("#detailMaterials").value = job.materialsUsed || "";
-  $("#detailNidFootage").value = job.nidFootage || "";
-  $("#detailCanFootage").value = job.canFootage || "";
   $("#detailNotes").value = job.notes || "";
+  const normalizedStatus = job.status === "Needs Ariel" ? "Needs Aerial" : job.status;
+  const customStatus = normalizedStatus && !nativeStatusOptions.includes(normalizedStatus) ? normalizedStatus : "";
+  $("#detailCustomStatus").value = customStatus;
+  $("#detailCustomStatusLabel").classList.toggle("hidden", $("#detailStatus").value !== "Custom");
   $("#detailParticipants").value = (job.participants || []).join(", ");
-  $("#jobDetailTitle").textContent = `${job.jobNumber || "No job #"} · ${job.address || "Job detail"}`;
+  $("#detailNewPhotos").value = "";
+  $("#jobDetailTitle").textContent = "Job Detail";
+  renderDetailDateChip();
+  renderExistingPhotos(job);
+  setFiberType(parseFiberType(materials));
+  showRoleMaterials(role);
 
-  const dialog = $("#jobDetailDialog");
-  if (dialog.showModal) dialog.showModal();
-  else dialog.setAttribute("open", "");
+  $("#detailAerialHead").value = materialHas("Weatherhead", materials) ? "Weatherhead" : materialHas("Rams Head", materials) ? "Rams Head" : "None";
+  $("#detailPreforms").value = intAfter("Preforms", materials);
+  $("#detailJHooks").value = intAfter("J Hooks", materials);
+  $("#detailAerialUGuard").value = intAfter("U-Guard", materials);
+  $("#detailStorageBracket").checked = materialHas("Storage Bracket", materials);
+  $("#detailAerialCanFootage").value = job.canFootage || "";
+  $("#detailAerialNidFootage").value = job.nidFootage || "";
+
+  $("#detailNidBox").checked = materialHas("1 NID Box", materials);
+  $("#detailJumpers").value = intAfter("Jumpers", materials);
+
+  $("#detailCanUGuard").value = intAfter("U-Guard", materials);
+  $("#detailCanFootage").value = job.canFootage || "";
+  $("#detailNidFootage").value = job.nidFootage || "";
+  $("#detailCanMaterialsText").value = materialsWithoutManagedTokens(materials);
+
+  $("#detailUndergroundCanFootage").value = job.canFootage || "";
+  $("#detailUndergroundNidFootage").value = job.nidFootage || "";
+  $("#detailUndergroundMaterialsText").value = materialsWithoutManagedTokens(materials);
+
+  $("#jobDetailScreen").classList.remove("hidden");
+  document.body.classList.add("detail-open");
 }
 
 function closeJobDetail() {
-  const dialog = $("#jobDetailDialog");
-  if (dialog.close) dialog.close();
-  else dialog.removeAttribute("open");
+  $("#jobDetailScreen").classList.add("hidden");
+  document.body.classList.remove("detail-open");
+}
+
+function buildMaterialsForRole(role) {
+  const parts = [];
+  const fiberType = $("#detailFiberValue").value;
+  appendMaterial(parts, fiberType ? `Fiber: ${fiberType}` : "");
+
+  if (role === "Aerial") {
+    appendMaterial(parts, $("#detailAerialHead").value === "None" ? "" : $("#detailAerialHead").value);
+    if (Number($("#detailPreforms").value || 0) > 0) appendMaterial(parts, `Preforms: ${$("#detailPreforms").value}`);
+    if (Number($("#detailJHooks").value || 0) > 0) appendMaterial(parts, `J Hooks: ${$("#detailJHooks").value}`);
+    if (Number($("#detailAerialUGuard").value || 0) > 0) appendMaterial(parts, `U-Guard: ${$("#detailAerialUGuard").value}`);
+    if ($("#detailStorageBracket").checked) appendMaterial(parts, "Storage Bracket");
+  } else if (role === "Nid") {
+    if ($("#detailNidBox").checked) appendMaterial(parts, "1 NID Box");
+    if (Number($("#detailJumpers").value || 0) > 0) appendMaterial(parts, `Jumpers: ${$("#detailJumpers").value}`);
+  } else if (role === "Can") {
+    $("#detailCanMaterialsText").value.split(",").forEach((token) => appendMaterial(parts, token));
+    if (Number($("#detailCanUGuard").value || 0) > 0) appendMaterial(parts, `U-Guard: ${$("#detailCanUGuard").value}`);
+  } else if (role === "Underground") {
+    $("#detailUndergroundMaterialsText").value.split(",").forEach((token) => appendMaterial(parts, token));
+  }
+  return parts.join(", ");
+}
+
+function detailFootageForRole(role) {
+  if (role === "Aerial") return { canFootage: $("#detailAerialCanFootage").value.trim(), nidFootage: $("#detailAerialNidFootage").value.trim() };
+  if (role === "Can") return { canFootage: $("#detailCanFootage").value.trim(), nidFootage: $("#detailNidFootage").value.trim() };
+  if (role === "Underground") return { canFootage: $("#detailUndergroundCanFootage").value.trim(), nidFootage: $("#detailUndergroundNidFootage").value.trim() };
+  return { canFootage: "", nidFootage: "" };
 }
 
 async function saveJobDetail(event) {
   event.preventDefault();
   const id = $("#detailJobId").value;
+  const role = currentUserRole();
   const participants = $("#detailParticipants").value
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const existing = currentDetailJob();
+  const newPhotos = $("#detailNewPhotos").value
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
@@ -61,14 +209,14 @@ async function saveJobDetail(event) {
     jobNumber: $("#detailJobNumber").value.trim(),
     date: $("#detailDate").value,
     address: $("#detailAddress").value.trim(),
-    status: $("#detailStatus").value,
-    assignments: $("#detailAssignments").value.trim(),
-    type: $("#detailAssignments").value.trim(),
-    materialsUsed: $("#detailMaterials").value.trim(),
-    nidFootage: $("#detailNidFootage").value.trim(),
-    canFootage: $("#detailCanFootage").value.trim(),
+    status: $("#detailStatus").value === "Custom" ? $("#detailCustomStatus").value.trim() : $("#detailStatus").value,
+    assignments: role === "Can" ? $("#detailAssignments").value.trim() : existing?.assignments || "",
+    type: role === "Can" ? $("#detailAssignments").value.trim() : existing?.type || existing?.assignments || "",
+    materialsUsed: buildMaterialsForRole(role),
+    ...detailFootageForRole(role),
     notes: $("#detailNotes").value.trim(),
     participants,
+    photos: [...(existing?.photos || []), ...newPhotos],
   });
   closeJobDetail();
 }
@@ -97,6 +245,17 @@ async function shareDetailJob() {
 jobCard = function enhancedJobCard(job, withActions = false) {
   const item = document.createElement("article");
   item.className = "job-item";
+  item.tabIndex = 0;
+  item.addEventListener("click", (event) => {
+    if (event.target.closest("button, select, input, a, textarea")) return;
+    openJobDetail(job.id);
+  });
+  item.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openJobDetail(job.id);
+    }
+  });
 
   const details = document.createElement("div");
   const title = document.createElement("h3");
@@ -290,6 +449,10 @@ function bindParityEnhancementEvents() {
   hydrateShareTokenFromUrl();
   $("#jobDetailForm").addEventListener("submit", (event) => saveJobDetail(event).catch((error) => showToast(error.message)));
   $("#closeJobDetailButton").addEventListener("click", closeJobDetail);
+  $("#detailDate").addEventListener("change", renderDetailDateChip);
+  $("#detailStatus").addEventListener("change", () => $("#detailCustomStatusLabel").classList.toggle("hidden", $("#detailStatus").value !== "Custom"));
+  $("#detailDateChip").addEventListener("click", () => $("#detailDate").showPicker?.() || $("#detailDate").focus());
+  $$('[data-fiber-type]').forEach((button) => button.addEventListener("click", () => setFiberType(button.dataset.fiberType)));
   $("#routeJobButton").addEventListener("click", () => openRouteForJob(currentDetailJob()));
   $("#shareJobDetailButton").addEventListener("click", () => shareDetailJob().catch((error) => showToast(error.message)));
   $("#removeJobDetailButton").addEventListener("click", () => removeDetailJob().catch((error) => showToast(error.message)));

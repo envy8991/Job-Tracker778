@@ -283,33 +283,115 @@
       </main>
     </div>
 
-    <dialog class="job-detail-dialog" id="jobDetailDialog" aria-labelledby="jobDetailTitle">
-      <form class="job-detail-panel" id="jobDetailForm" method="dialog">
-        <div class="section-heading">
-          <div><p class="eyebrow">Job Detail</p><h2 id="jobDetailTitle">Edit job</h2></div>
-          <button class="button ghost" id="closeJobDetailButton" type="button">Close</button>
-        </div>
+    <section class="job-detail-screen hidden" id="jobDetailScreen" aria-labelledby="jobDetailTitle" aria-modal="true" role="dialog">
+      <form class="job-detail-panel" id="jobDetailForm">
+        <nav class="native-detail-bar" aria-label="Job detail actions">
+          <button class="native-bar-button" id="closeJobDetailButton" type="button">Cancel</button>
+          <h2 id="jobDetailTitle">Job Detail</h2>
+          <div class="native-bar-actions">
+            <button class="native-bar-button save" id="saveJobDetailButton" type="submit">Save</button>
+            <button class="native-icon-button" id="removeJobDetailButton" type="button" aria-label="Remove job">🗑</button>
+          </div>
+        </nav>
+
         <input id="detailJobId" type="hidden" />
-        <div class="form-grid two">
-          <label>Job #<input id="detailJobNumber" /></label>
-          <label>Scheduled date<input id="detailDate" type="date" /></label>
-          <label>Address<input id="detailAddress" /></label>
-          <label>Status<select id="detailStatus"></select></label>
-          <label>Assignment / type<input id="detailAssignments" /></label>
-          <label>Materials used<input id="detailMaterials" /></label>
-          <label>NID footage<input id="detailNidFootage" /></label>
-          <label>CAN footage<input id="detailCanFootage" /></label>
-        </div>
-        <label>Notes<textarea id="detailNotes" rows="4"></textarea></label>
-        <label>Participants<input id="detailParticipants" placeholder="Comma-separated user IDs" /></label>
-        <div class="detail-actions">
-          <button class="button primary" id="saveJobDetailButton" type="submit">Save detail</button>
-          <button class="button secondary" id="routeJobButton" type="button">Open route</button>
-          <button class="button secondary" id="shareJobDetailButton" type="button">Share</button>
-          <button class="button danger" id="removeJobDetailButton" type="button">Remove</button>
+        <input id="detailFiberValue" type="hidden" />
+
+        <div class="detail-scroll">
+          <section class="native-section">
+            <h3>ADDRESS</h3>
+            <label>Address<input id="detailAddress" autocomplete="street-address" placeholder="Enter address" /></label>
+          </section>
+
+          <section class="native-section">
+            <h3>DETAILS</h3>
+            <div class="form-grid two">
+              <label>Job #<input id="detailJobNumber" placeholder="Job #" /></label>
+              <label>Status<select id="detailStatus"></select></label>
+            </div>
+            <label class="hidden" id="detailCustomStatusLabel">Custom status<input id="detailCustomStatus" placeholder="Enter custom status" /></label>
+            <div class="detail-date-row">
+              <span class="date-chip" id="detailDateChip">No date</span>
+              <label class="sr-only">Scheduled date<input id="detailDate" type="date" /></label>
+            </div>
+          </section>
+
+          <section class="native-section" id="detailAssignmentsSection">
+            <h3>ASSIGNMENTS</h3>
+            <label>Assignment code<input id="detailAssignments" inputmode="decimal" placeholder="e.g. 54, 54.1, 12.3.2" /></label>
+            <p class="field-hint">1–3 groups of digits separated by single dots.</p>
+          </section>
+
+          <section class="native-section">
+            <h3>FIBER TYPE</h3>
+            <div class="segmented detail-segmented" role="radiogroup" aria-label="Fiber type">
+              <button class="segment" type="button" data-fiber-type="Flat">Flat</button>
+              <button class="segment" type="button" data-fiber-type="Round">Round</button>
+              <button class="segment" type="button" data-fiber-type="Mainline">Mainline</button>
+            </div>
+          </section>
+
+          <section class="native-section" id="detailMaterialsSection">
+            <h3 id="detailMaterialsHeading">MATERIALS</h3>
+            <div class="role-materials" data-materials-role="Aerial">
+              <label>Head Type<select id="detailAerialHead"><option>None</option><option>Weatherhead</option><option>Rams Head</option></select></label>
+              <div class="form-grid two">
+                <label>Preforms<input id="detailPreforms" type="number" min="0" max="50" step="1" /></label>
+                <label>J Hooks<input id="detailJHooks" type="number" min="0" max="50" step="1" /></label>
+                <label>U-Guard<input id="detailAerialUGuard" type="number" min="0" max="5" step="1" /></label>
+                <label class="toggle-row"><span><strong>Storage Bracket</strong></span><input id="detailStorageBracket" type="checkbox" /></label>
+                <label>CAN Footage<input id="detailAerialCanFootage" inputmode="numeric" /></label>
+                <label>NID Footage<input id="detailAerialNidFootage" inputmode="numeric" /></label>
+              </div>
+            </div>
+            <div class="role-materials hidden" data-materials-role="Nid">
+              <label class="toggle-row"><span><strong>1 NID Box</strong></span><input id="detailNidBox" type="checkbox" /></label>
+              <label>Jumpers<input id="detailJumpers" type="number" min="0" max="4" step="1" /></label>
+            </div>
+            <div class="role-materials hidden" data-materials-role="Can">
+              <div class="form-grid two">
+                <label>U-Guard<input id="detailCanUGuard" type="number" min="0" max="5" step="1" /></label>
+                <label>CAN Footage<input id="detailCanFootage" inputmode="numeric" /></label>
+                <label>NID Footage<input id="detailNidFootage" inputmode="numeric" /></label>
+              </div>
+              <label>Materials Notes<textarea id="detailCanMaterialsText" rows="4"></textarea></label>
+            </div>
+            <div class="role-materials hidden" data-materials-role="Underground">
+              <div class="form-grid two">
+                <label>CAN Footage<input id="detailUndergroundCanFootage" inputmode="numeric" /></label>
+                <label>NID Footage<input id="detailUndergroundNidFootage" inputmode="numeric" /></label>
+              </div>
+              <label>Materials Notes<textarea id="detailUndergroundMaterialsText" rows="4"></textarea></label>
+            </div>
+            <div class="role-materials hidden" data-materials-role="Default">
+              <p class="empty-state">No role-specific materials for this position.</p>
+            </div>
+          </section>
+
+          <section class="native-section">
+            <h3>NOTES</h3>
+            <label>Notes<textarea id="detailNotes" rows="5"></textarea></label>
+            <label>Participants<input id="detailParticipants" placeholder="Comma-separated user IDs" /></label>
+          </section>
+
+          <section class="native-section">
+            <h3>EXISTING PHOTOS</h3>
+            <div class="photo-strip" id="detailExistingPhotos"><p class="empty-state">No existing photos</p></div>
+          </section>
+
+          <section class="native-section">
+            <h3>NEW PHOTOS</h3>
+            <label>Photo URLs<input id="detailNewPhotos" placeholder="Paste comma-separated image URLs" /></label>
+            <p class="field-hint">Web detail saves pasted URLs alongside existing job photos.</p>
+          </section>
+
+          <div class="detail-actions">
+            <button class="button secondary" id="routeJobButton" type="button">Open route</button>
+            <button class="button secondary" id="shareJobDetailButton" type="button">Share</button>
+          </div>
         </div>
       </form>
-    </dialog>
+    </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="config.js"></script>

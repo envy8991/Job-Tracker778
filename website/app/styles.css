@@ -265,9 +265,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .profile-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
 .shortcut-card { display: grid; gap: 0.35rem; padding: 1rem; border: 1px solid var(--line); border-radius: 1rem; background: rgba(255,255,255,0.05); text-align: left; color: var(--text); }
 .shortcut-card strong { font-size: 1.5rem; }
-.job-detail-dialog { width: min(94vw, 920px); border: 1px solid var(--line); border-radius: 1.5rem; padding: 0; background: transparent; color: var(--text); }
-.job-detail-dialog::backdrop { background: rgba(3, 8, 16, 0.72); backdrop-filter: blur(8px); }
-.job-detail-panel { display: grid; gap: 1rem; padding: clamp(1rem, 4vw, 1.5rem); background: var(--card-strong); box-shadow: var(--shadow); }
 .detail-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; justify-content: flex-end; }
 .job-item h3 button { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .job-item h3 button:hover, .job-item h3 button:focus-visible { color: var(--accent); text-decoration: underline; }
@@ -275,4 +272,35 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 @media (max-width: 760px) {
   .share-import-form, .profile-shortcuts { grid-template-columns: 1fr; }
   .detail-actions { justify-content: flex-start; }
+}
+
+body.detail-open { overflow: hidden; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.job-detail-screen { position: fixed; inset: 0; z-index: 20; background: var(--bg); color: var(--text); }
+.job-detail-screen.hidden { display: none; }
+.job-detail-panel { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100dvh; background: linear-gradient(180deg, rgba(7,17,31,0.98), rgba(10,24,42,0.98)); }
+.native-detail-bar { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1rem; min-height: 4.25rem; padding: max(env(safe-area-inset-top), 0.8rem) clamp(1rem, 4vw, 2rem) 0.8rem; border-bottom: 1px solid var(--line); background: rgba(7,17,31,0.88); backdrop-filter: blur(18px); }
+.native-detail-bar h2 { margin: 0; font-size: 1.05rem; text-align: center; }
+.native-bar-actions { display: flex; justify-content: flex-end; align-items: center; gap: 0.65rem; }
+.native-bar-button, .native-icon-button { border: 0; background: transparent; color: var(--accent); font-weight: 850; cursor: pointer; }
+.native-bar-button.save { color: var(--success); }
+.native-icon-button { display: inline-grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 999px; color: var(--danger); font-size: 1.1rem; }
+.native-icon-button:hover, .native-icon-button:focus-visible { background: rgba(255,122,144,0.14); }
+.detail-scroll { overflow: auto; display: grid; gap: 1rem; width: min(960px, 100%); margin: 0 auto; padding: 1rem clamp(1rem, 4vw, 2rem) calc(2rem + env(safe-area-inset-bottom)); }
+.native-section { display: grid; gap: 0.9rem; padding: 1rem; border: 1px solid var(--line); border-radius: 1.2rem; background: rgba(255,255,255,0.055); box-shadow: 0 14px 40px rgba(0,0,0,0.18); }
+.native-section h3 { margin: 0; color: var(--muted); font-size: 0.78rem; letter-spacing: 0.12em; }
+.detail-date-row { display: flex; align-items: center; gap: 0.75rem; }
+.date-chip { display: inline-flex; align-items: center; width: fit-content; border-radius: 999px; padding: 0.45rem 0.8rem; background: rgba(98,213,255,0.13); color: var(--accent); font-weight: 850; cursor: pointer; }
+.field-hint { margin: -0.35rem 0 0; color: var(--muted); font-size: 0.82rem; }
+.detail-segmented { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.role-materials { display: grid; gap: 0.9rem; }
+.photo-strip { display: flex; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.2rem; }
+.photo-thumb { flex: 0 0 auto; width: 6.5rem; height: 6.5rem; border: 1px solid var(--line); border-radius: 1rem; overflow: hidden; background: rgba(255,255,255,0.08); }
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.job-item { cursor: pointer; }
+.job-item:focus-visible { outline: 3px solid rgba(98,213,255,0.55); outline-offset: 3px; }
+
+@media (max-width: 760px) {
+  .native-detail-bar { grid-template-columns: auto 1fr auto; padding-inline: 0.85rem; }
+  .detail-segmented { grid-template-columns: 1fr; }
 }
