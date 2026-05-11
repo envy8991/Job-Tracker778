@@ -11,8 +11,10 @@ encodeValue = function enhancedEncodeValue(value, key = "") {
 };
 
 function hydrateStatusSelect(select, selectedStatus = "Pending") {
+  if (!select) return;
   select.innerHTML = "";
-  statuses.forEach((status) => {
+  const optionValues = statuses.includes(selectedStatus) ? statuses : [selectedStatus, ...statuses];
+  optionValues.forEach((status) => {
     const option = document.createElement("option");
     option.value = status;
     option.textContent = status;
@@ -288,12 +290,12 @@ renderAll = function enhancedRenderAll() {
 function bindParityEnhancementEvents() {
   hydrateStatusSelect($("#detailStatus"));
   hydrateShareTokenFromUrl();
-  $("#jobDetailForm").addEventListener("submit", (event) => saveJobDetail(event).catch((error) => showToast(error.message)));
-  $("#closeJobDetailButton").addEventListener("click", closeJobDetail);
-  $("#routeJobButton").addEventListener("click", () => openRouteForJob(currentDetailJob()));
-  $("#shareJobDetailButton").addEventListener("click", () => shareDetailJob().catch((error) => showToast(error.message)));
-  $("#removeJobDetailButton").addEventListener("click", () => removeDetailJob().catch((error) => showToast(error.message)));
-  $("#shareImportForm").addEventListener("submit", (event) => previewSharedJob(event).catch((error) => showToast(error.message)));
+  $("#jobDetailForm")?.addEventListener("submit", (event) => saveJobDetail(event).catch((error) => showToast(error.message)));
+  $("#closeJobDetailButton")?.addEventListener("click", closeJobDetail);
+  $("#routeJobButton")?.addEventListener("click", () => openRouteForJob(currentDetailJob()));
+  $("#shareJobDetailButton")?.addEventListener("click", () => shareDetailJob().catch((error) => showToast(error.message)));
+  $("#removeJobDetailButton")?.addEventListener("click", () => removeDetailJob().catch((error) => showToast(error.message)));
+  $("#shareImportForm")?.addEventListener("submit", (event) => previewSharedJob(event).catch((error) => showToast(error.message)));
 }
 
 bindParityEnhancementEvents();
