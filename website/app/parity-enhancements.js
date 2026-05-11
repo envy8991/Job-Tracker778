@@ -165,6 +165,7 @@ async function previewSharedJob(event) {
   event?.preventDefault();
   const token = extractShareToken($("#shareTokenInput").value);
   const preview = $("#shareImportPreview");
+  if (!preview) return;
   preview.innerHTML = "";
 
   if (!token) {
@@ -230,8 +231,8 @@ async function importSharedJob(token, payload) {
   await setDoc("sharedJobs", token, { ...payload, claimedBy: currentUser.id, claimedAt: new Date().toISOString() });
   selectedDate = job.date;
   updateCreateDateInput(selectedDate);
-  $("#shareImportPreview").innerHTML = "";
-  $("#shareTokenInput").value = "";
+  if ($("#shareImportPreview")) $("#shareImportPreview").innerHTML = "";
+  if ($("#shareTokenInput")) $("#shareTokenInput").value = "";
   await loadAppData();
   renderAll();
   navigate("dashboard");
@@ -242,7 +243,7 @@ function hydrateShareTokenFromUrl() {
   const params = new URLSearchParams(window.location?.search || "");
   const hashParams = new URLSearchParams((window.location?.hash || "").replace(/^#?\??/, ""));
   const token = params.get("token") || hashParams.get("token");
-  if (token) $("#shareTokenInput").value = token;
+  if (token && $("#shareTokenInput")) $("#shareTokenInput").value = token;
 }
 
 function renderProfileShortcuts() {
@@ -252,12 +253,12 @@ function renderProfileShortcuts() {
   const timesheets = Object.values(appState.timesheets).filter((sheet) => sheet.savedAt);
   const yellowSheets = Object.values(appState.yellowSheets).filter((sheet) => sheet.savedAt);
   const latestTimesheet = [...timesheets].sort((a, b) => b.weekStart.localeCompare(a.weekStart))[0];
-  const latestYellow = [...yellowSheets].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const latestYellow = [...yellowSheets].sort((a, b) => b.weekStart.localeCompare(a.weekStart))[0];
 
   container.innerHTML = "";
   [
     { label: "Past Timesheets", count: timesheets.length, detail: latestTimesheet ? `Latest week of ${dateLabel(latestTimesheet.weekStart)}` : "No saved weeks yet", route: "timesheets" },
-    { label: "Past Yellow Sheets", count: yellowSheets.length, detail: latestYellow ? `Latest ${dateLabel(latestYellow.date)}` : "No saved sheets yet", route: "yellowSheets" },
+    { label: "Past Yellow Sheets", count: yellowSheets.length, detail: latestYellow ? `Latest week of ${dateLabel(latestYellow.weekStart)}` : "No saved sheets yet", route: "yellowSheets" },
   ].forEach((shortcut) => {
     const button = document.createElement("button");
     const label = document.createElement("span");
@@ -288,12 +289,12 @@ renderAll = function enhancedRenderAll() {
 function bindParityEnhancementEvents() {
   hydrateStatusSelect($("#detailStatus"));
   hydrateShareTokenFromUrl();
-  $("#jobDetailForm").addEventListener("submit", (event) => saveJobDetail(event).catch((error) => showToast(error.message)));
-  $("#closeJobDetailButton").addEventListener("click", closeJobDetail);
-  $("#routeJobButton").addEventListener("click", () => openRouteForJob(currentDetailJob()));
-  $("#shareJobDetailButton").addEventListener("click", () => shareDetailJob().catch((error) => showToast(error.message)));
-  $("#removeJobDetailButton").addEventListener("click", () => removeDetailJob().catch((error) => showToast(error.message)));
-  $("#shareImportForm").addEventListener("submit", (event) => previewSharedJob(event).catch((error) => showToast(error.message)));
+  $("#jobDetailForm")?.addEventListener("submit", (event) => saveJobDetail(event).catch((error) => showToast(error.message)));
+  $("#closeJobDetailButton")?.addEventListener("click", closeJobDetail);
+  $("#routeJobButton")?.addEventListener("click", () => openRouteForJob(currentDetailJob()));
+  $("#shareJobDetailButton")?.addEventListener("click", () => shareDetailJob().catch((error) => showToast(error.message)));
+  $("#removeJobDetailButton")?.addEventListener("click", () => removeDetailJob().catch((error) => showToast(error.message)));
+  $("#shareImportForm")?.addEventListener("submit", (event) => previewSharedJob(event).catch((error) => showToast(error.message)));
 }
 
 bindParityEnhancementEvents();

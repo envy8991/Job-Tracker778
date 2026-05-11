@@ -3,193 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="refresh" content="0; url=app/" />
     <meta
       name="description"
-      content="A responsive web dashboard for Job Tracker technicians and supervisors."
+      content="Redirects to the Firebase-backed Job Tracker web app."
     />
     <title>Job Tracker Web</title>
+    <link rel="canonical" href="app/" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <aside class="sidebar" aria-label="Primary">
-        <a class="brand" href="#top" aria-label="Job Tracker home">
-          <span class="brand-mark">JT</span>
-          <span>
-            <strong>Job Tracker</strong>
-            <small>Web workspace</small>
-          </span>
-        </a>
-
-        <nav class="nav-links" aria-label="Workspace sections">
-          <a href="#dashboard">Dashboard</a>
-          <a href="#jobs">Jobs</a>
-          <a href="#team">Team</a>
-          <a href="#documents">Docs</a>
-          <a href="#assist">Assist</a>
-        </nav>
-
-        <div class="sidebar-card">
-          <small>Today</small>
-          <strong id="sidebarDate">Loading...</strong>
-          <span id="sidebarSummary">0 jobs scheduled</span>
-        </div>
-      </aside>
-
-      <main id="top" class="content">
-        <header class="hero" id="dashboard">
-          <div class="hero-copy">
-            <p class="eyebrow">Fiber field operations</p>
-            <h1>Plan routes, track job status, and finish paperwork from any browser.</h1>
-            <p>
-              This web version brings the core Job Tracker workflow to desktop and tablet teams:
-              daily dashboards, job creation, crew collaboration, document checklists, and splice support.
-            </p>
-            <div class="hero-actions">
-              <a class="button primary" href="#jobs">Add a job</a>
-              <a class="button secondary" href="#documents">Review paperwork</a>
-            </div>
-          </div>
-
-          <section class="hero-panel" aria-label="Daily progress summary">
-            <div>
-              <span class="metric-label">Completion</span>
-              <strong id="completionRate">0%</strong>
-            </div>
-            <div class="progress-track" aria-hidden="true">
-              <span id="completionBar"></span>
-            </div>
-            <dl class="metric-grid">
-              <div>
-                <dt>Pending</dt>
-                <dd id="pendingCount">0</dd>
-              </div>
-              <div>
-                <dt>In progress</dt>
-                <dd id="activeCount">0</dd>
-              </div>
-              <div>
-                <dt>Done</dt>
-                <dd id="doneCount">0</dd>
-              </div>
-            </dl>
-          </section>
-        </header>
-
-        <section class="section-grid" aria-label="Workspace overview">
-          <article class="feature-card">
-            <span class="icon">📍</span>
-            <h2>Smart routing</h2>
-            <p>Keep addresses, arrival windows, and status notes visible before the next dispatch.</p>
-          </article>
-          <article class="feature-card">
-            <span class="icon">🧾</span>
-            <h2>Paperwork hub</h2>
-            <p>Track weekly timesheets and yellow sheet readiness without leaving the dashboard.</p>
-          </article>
-          <article class="feature-card">
-            <span class="icon">💬</span>
-            <h2>Crew updates</h2>
-            <p>Coordinate partner requests, quick notes, and supervisor escalations in one place.</p>
-          </article>
-        </section>
-
-        <section class="workspace-card" id="jobs">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Daily job board</p>
-              <h2>Create and update jobs</h2>
-            </div>
-            <button class="button secondary" id="resetJobsButton" type="button">Reset demo data</button>
-          </div>
-
-          <form class="job-form" id="jobForm">
-            <label>
-              Job address
-              <input id="addressInput" name="address" placeholder="123 Fiber Rd" required />
-            </label>
-            <label>
-              Job type
-              <select id="typeInput" name="type">
-                <option>Install</option>
-                <option>Repair</option>
-                <option>Survey</option>
-                <option>Maintenance</option>
-              </select>
-            </label>
-            <label>
-              Status
-              <select id="statusInput" name="status">
-                <option>Pending</option>
-                <option>In Progress</option>
-                <option>Needs Ariel</option>
-                <option>Needs Underground</option>
-                <option>Done</option>
-              </select>
-            </label>
-            <label>
-              Crew note
-              <input id="noteInput" name="note" placeholder="Gate code, splice count, material needs" />
-            </label>
-            <button class="button primary" type="submit">Save job</button>
-          </form>
-
-          <div class="job-list" id="jobList" aria-live="polite"></div>
-        </section>
-
-        <section class="two-column">
-          <article class="workspace-card" id="team">
-            <p class="eyebrow">Crew room</p>
-            <h2>Team coordination</h2>
-            <ul class="timeline">
-              <li>
-                <strong>Partner finder</strong>
-                <span>Post help requests for long pulls, aerial work, and late-day callbacks.</span>
-              </li>
-              <li>
-                <strong>Supervisor view</strong>
-                <span>Review stuck jobs, imports, and status exceptions from the same web surface.</span>
-              </li>
-              <li>
-                <strong>Recent crew jobs</strong>
-                <span>Reuse notes from recent nearby jobs to speed up troubleshooting.</span>
-              </li>
-            </ul>
-          </article>
-
-          <article class="workspace-card" id="documents">
-            <p class="eyebrow">Compliance</p>
-            <h2>Paperwork checklist</h2>
-            <div class="checklist">
-              <label><input type="checkbox" /> Weekly timesheet reviewed</label>
-              <label><input type="checkbox" /> Yellow sheet photos attached</label>
-              <label><input type="checkbox" /> Extra work notes submitted</label>
-              <label><input type="checkbox" /> PDF export ready for supervisor</label>
-            </div>
-          </article>
-        </section>
-
-        <section class="workspace-card assist-card" id="assist">
-          <div>
-            <p class="eyebrow">Splice assist</p>
-            <h2>Bring troubleshooting prompts to the web.</h2>
-            <p>
-              The website shell leaves room for the same AI-assisted splice workflow as the iOS app:
-              upload a splice map, summarize CAN issues, and capture recommended next steps.
-            </p>
-          </div>
-          <form class="assist-form" id="assistForm">
-            <label>
-              Describe the issue
-              <textarea id="assistInput" rows="4" placeholder="Example: customer light is low after 288-count enclosure swap"></textarea>
-            </label>
-            <button class="button secondary" type="submit">Generate checklist</button>
-            <output id="assistOutput" aria-live="polite"></output>
-          </form>
-        </section>
-      </main>
-    </div>
-
+    <main class="redirect-card">
+      <span class="brand-mark">JT</span>
+      <p class="eyebrow">Job Tracker Web</p>
+      <h1>Opening the app…</h1>
+      <p>The website version of Job Tracker now lives in the Firebase-backed app shell.</p>
+      <a class="button" href="app/">Continue to Job Tracker</a>
+    </main>
     <script src="script.js"></script>
   </body>
 </html>
