@@ -69,92 +69,73 @@
 
     <div id="appShell" class="app-shell hidden">
       <main class="content">
-        <section class="view active" id="dashboardView" data-view="dashboard">
-          <header class="hero">
-            <div class="hero-copy">
-              <p class="eyebrow">Dashboard</p>
-              <h1>Plan the day, route the next stop, and close the paperwork loop.</h1>
-              <p id="dashboardGreeting">
-                Your web dashboard mirrors the app's daily assignment workflow with weekday filters,
-                smart routing hints, sync status, quick job actions, and shareable summaries.
-              </p>
-              <div class="hero-actions">
-                <button class="button primary" id="openCreateJobButton" type="button" data-open-create-job>+ Create Job</button>
-                <button class="button secondary" id="shareDailySummaryButton" type="button">Share day summary</button>
-                <button class="button secondary" id="downloadDailySummaryButton" type="button">Download summary</button>
-              </div>
+        <section class="view active native-screen dashboard-screen" id="dashboardView" data-view="dashboard">
+          <header class="native-dashboard-header">
+            <button class="native-icon-button" type="button" aria-label="Open calendar">▦</button>
+            <div>
+              <h1>Jobs</h1>
+              <p id="dashboardHeaderDate">Selected date</p>
             </div>
-            <section class="hero-panel" aria-label="Selected day summary">
-              <div>
-                <span class="metric-label">Completion</span>
-                <strong id="completionRate">0%</strong>
-              </div>
-              <div class="progress-track" aria-hidden="true"><span id="completionBar"></span></div>
-              <dl class="metric-grid">
-                <div><dt>Total</dt><dd id="totalCount">0</dd></div>
-                <div><dt>Pending</dt><dd id="pendingCount">0</dd></div>
-                <div><dt>Done</dt><dd id="doneCount">0</dd></div>
-              </dl>
-            </section>
+            <button class="native-icon-button" id="shareDailySummaryButton" type="button" aria-label="Share daily summary">⇧</button>
           </header>
 
+          <section class="native-summary-card" aria-label="Selected day summary">
+            <div class="native-today-block">
+              <span>Today</span>
+              <strong id="selectedDateLarge">Selected date</strong>
+            </div>
+            <dl class="native-metrics">
+              <div><dt>Total</dt><dd id="totalCount">0</dd></div>
+              <div><dt>Pending</dt><dd id="pendingCount">0</dd></div>
+              <div><dt>Done</dt><dd id="doneCount">0</dd></div>
+            </dl>
+            <span class="sr-only" id="completionRate">0%</span>
+            <span class="sr-only progress-track"><span id="completionBar"></span></span>
+          </section>
+
           <div class="weekday-picker" id="weekdayPicker" aria-label="Work week selector"></div>
+
+          <button class="button primary native-create-button" id="openCreateJobButton" type="button" data-open-create-job>+ Create Job</button>
 
           <div class="sync-banner" id="syncBanner">
             <span class="pulse"></span>
             <span id="syncText">All local changes saved.</span>
           </div>
 
-          <section class="section-grid four" aria-label="Dashboard rollups">
-            <article class="feature-card"><span class="icon">📍</span><h2 id="nextJobAddress">No next job</h2><p id="nextJobHint">Add jobs to get routing hints.</p></article>
-            <article class="feature-card"><span class="icon">⏱️</span><h2 id="dashboardHours">0 hrs</h2><p>Timesheet hours logged for the selected day.</p></article>
-            <article class="feature-card"><span class="icon">🟨</span><h2 id="yellowStatus">Not started</h2><p>Yellow sheet compliance status for the selected day.</p></article>
-            <article class="feature-card"><span class="icon">👥</span><h2 id="partnerStatus">No partner</h2><p>Current partner request or active crew pairing.</p></article>
-          </section>
-
-          <section class="workspace-card create-job-launcher">
-            <div class="section-heading">
-              <div><p class="eyebrow">Create job</p><h2>Daily job entry</h2></div>
-              <button class="button secondary" id="refreshJobsButton" type="button">Refresh jobs</button>
-            </div>
-            <p>Open the native-aligned Create Job panel to add addresses, date, status, assignments, materials, and notes.</p>
-            <button class="button primary" type="button" data-open-create-job>+ Create Job</button>
-          </section>
-
-          <section class="two-column">
-            <article class="workspace-card">
-              <div class="section-heading"><div><p class="eyebrow">Pending work</p><h2>Open jobs</h2></div></div>
-              <div class="job-list" id="pendingJobList" aria-live="polite"></div>
-            </article>
-            <article class="workspace-card">
-              <div class="section-heading"><div><p class="eyebrow">Completed</p><h2>Closed jobs</h2></div></div>
-              <div class="job-list" id="completedJobList" aria-live="polite"></div>
-            </article>
+          <section class="native-job-section" aria-label="Jobs for selected date">
+            <div class="job-list" id="pendingJobList" aria-live="polite"></div>
+            <div class="job-list" id="completedJobList" aria-live="polite"></div>
           </section>
         </section>
 
-        <section class="view" id="timesheetsView" data-view="timesheets">
-          <div class="page-heading"><p class="eyebrow">Timesheets</p><h1>Weekly timesheet</h1><p>Log Gibson, Cable South, and total hours by day, attach job notes, save the week, and export a supervisor-ready summary.</p></div>
-          <section class="workspace-card">
-            <div class="timesheet-toolbar">
-              <label>Week start<input id="timesheetWeekInput" type="date" /></label>
-              <label>Supervisor<input id="timesheetSupervisorInput" placeholder="Supervisor name" /></label>
-              <label>Partner<input id="timesheetPartnerInput" placeholder="Partner name" /></label>
-              <button class="button primary" id="saveTimesheetButton" type="button">Save timesheet</button>
-              <button class="button secondary" id="exportTimesheetButton" type="button">Export</button>
-            </div>
-            <div class="table-wrap">
-              <table class="data-table">
-                <thead><tr><th>Day</th><th>Job / location notes</th><th>Gibson</th><th>Cable South</th><th>Other</th><th>Total</th></tr></thead>
-                <tbody id="timesheetRows"></tbody>
-              </table>
-            </div>
-            <div class="summary-strip"><strong id="timesheetTotal">0 total hours</strong><span id="timesheetSavedState">Not saved yet</span></div>
+        <section class="view native-screen timesheet-screen" id="timesheetsView" data-view="timesheets" hidden>
+          <header class="native-titlebar">
+            <span></span>
+            <h1>Timesheet</h1>
+            <div class="native-title-actions"><button class="native-plain-icon" id="exportTimesheetButton" type="button" aria-label="Export timesheet">⇩</button><button class="native-plain-icon" id="saveTimesheetButton" type="button" aria-label="Save timesheet">▣</button></div>
+          </header>
+
+          <div class="native-week-switcher">
+            <button type="button" id="previousTimesheetWeek" aria-label="Previous week">‹</button>
+            <label><span id="weekRangeLabel">Week</span><input id="timesheetWeekInput" type="date" /></label>
+            <button type="button" id="nextTimesheetWeek" aria-label="Next week">›</button>
+          </div>
+
+          <section class="workspace-card native-crew-card">
+            <label class="supervisor-row">Supervisor:<input id="timesheetSupervisorInput" placeholder="" /></label>
+            <div class="crew-grid-head"><span>Name</span><span>Gibson</span><span>CS Hours</span><span>Total</span><span></span></div>
+            <div class="crew-grid-row"><input placeholder="Name" disabled /><input placeholder="0" disabled /><input placeholder="0" disabled /><strong>0.0</strong><button type="button" aria-label="Remove row">−</button></div>
+            <div class="crew-grid-row"><input id="timesheetPartnerInput" placeholder="Name" /><input placeholder="0" disabled /><input placeholder="0" disabled /><strong>0.0</strong><button type="button" aria-label="Remove row">−</button></div>
+            <button class="link-button add-name-button" type="button">Add Name</button>
           </section>
-          <section class="workspace-card"><p class="eyebrow">History</p><h2>Past timesheets</h2><div class="compact-list" id="pastTimesheetsList"></div></section>
+
+          <h2 class="native-section-title">Gibson Connect Weekly</h2>
+          <section class="native-day-list" id="timesheetRows" aria-label="Daily timesheet rows"></section>
+          <div class="native-total-bar"><strong id="timesheetTotal">Total: 0.0 hrs</strong><span id="timesheetSavedState">Not saved yet</span></div>
+          <section class="workspace-card native-history-card"><p class="eyebrow">History</p><h2>Past timesheets</h2><div class="compact-list" id="pastTimesheetsList"></div></section>
         </section>
 
-        <section class="view" id="yellowSheetsView" data-view="yellowSheets">
+        <section class="view" id="yellowSheetsView" data-view="yellowSheets" hidden>
           <div class="page-heading"><p class="eyebrow">Yellow Sheets</p><h1>Daily compliance sheet</h1><p>Capture safety checks, material usage, job notes, and technician signature for the selected date.</p></div>
           <section class="workspace-card yellow-form">
             <div class="form-grid three">
@@ -177,7 +158,7 @@
           <section class="workspace-card"><p class="eyebrow">History</p><h2>Past yellow sheets</h2><div class="compact-list" id="pastYellowSheetsList"></div></section>
         </section>
 
-        <section class="view" id="searchView" data-view="search">
+        <section class="view" id="searchView" data-view="search" hidden>
           <div class="page-heading"><p class="eyebrow">Job Search</p><h1>Job Search</h1><p>Look up any job across Cable South in seconds.</p></div>
           <section class="workspace-card search-workspace">
             <label class="search-box">Search jobs<input id="jobSearchInput" placeholder="Address, job #, status, or teammate" /></label>
@@ -186,15 +167,37 @@
           </section>
         </section>
 
-        <section class="view" id="moreView" data-view="more">
-          <div class="page-heading"><p class="eyebrow">More</p><h1>Profile, settings, and partner tools</h1><p>The required More sections are available here with Firebase-backed persistence.</p></div>
-          <section class="more-tabs" role="tablist" aria-label="More sections">
-            <button class="segment active" type="button" data-more-tab="profile">Profile</button>
-            <button class="segment" type="button" data-more-tab="settings">Settings</button>
-            <button class="segment" type="button" data-more-tab="partner">Find a partner</button>
+        <section class="view" id="moreView" data-view="more" hidden>
+          <div class="page-heading"><p class="eyebrow">More</p><h1>More</h1><p>Choose one of the same secondary sections that live under the iOS app's More tab.</p></div>
+          <section class="more-menu" aria-label="More sections">
+            <div class="more-menu-section">
+              <h2>Account</h2>
+              <button class="more-menu-item" type="button" data-more-tab="profile"><span aria-hidden="true">◎</span><strong>Profile</strong><span class="chevron" aria-hidden="true">›</span></button>
+              <button class="more-menu-item" type="button" data-more-tab="settings"><span aria-hidden="true">⚙</span><strong>Settings</strong><span class="chevron" aria-hidden="true">›</span></button>
+            </div>
+            <div class="more-menu-section">
+              <h2>Team</h2>
+              <button class="more-menu-item" type="button" data-more-tab="partner"><span aria-hidden="true">♧</span><strong>Find a Partner</strong><span class="chevron" aria-hidden="true">›</span></button>
+            </div>
+            <div class="more-menu-section">
+              <h2>Jobs</h2>
+              <button class="more-menu-item" type="button"><span aria-hidden="true">↺</span><strong>Recent Crew Jobs</strong><span class="chevron" aria-hidden="true">›</span></button>
+            </div>
+            <div class="more-menu-section">
+              <h2>Resources</h2>
+              <button class="more-menu-item" type="button"><span aria-hidden="true">♢</span><strong>Route Mapper</strong><span class="chevron" aria-hidden="true">›</span></button>
+            </div>
+            <div class="more-menu-section">
+              <h2>Splice Assist</h2>
+              <button class="more-menu-item" type="button"><span aria-hidden="true">⌁</span><strong>Splice Assist</strong><span class="chevron" aria-hidden="true">›</span></button>
+            </div>
+            <div class="more-menu-section">
+              <h2>Support</h2>
+              <button class="more-menu-item" type="button"><span aria-hidden="true">?</span><strong>Help Center</strong><span class="chevron" aria-hidden="true">›</span></button>
+            </div>
           </section>
 
-          <section class="workspace-card more-panel active" id="profilePanel" data-more-panel="profile">
+          <section class="workspace-card more-panel" id="profilePanel" data-more-panel="profile">
             <div class="section-heading">
               <div><p class="eyebrow">Profile</p><h2>Account details</h2></div>
               <div class="detail-actions">
@@ -240,7 +243,7 @@
       </main>
 
       <nav class="bottom-tab-bar" aria-label="Primary">
-        <button class="tab-button active" type="button" data-route="dashboard" aria-label="Dashboard" data-symbol="rectangle.grid.2x2">
+        <button class="tab-button active" type="button" data-route="dashboard" aria-label="Dashboard" aria-current="page" data-symbol="rectangle.grid.2x2">
           <span class="tab-symbol" aria-hidden="true">▦</span>
           <span class="tab-label">Dashboard</span>
         </button>
@@ -293,10 +296,15 @@
 
             <section class="create-section-card status-card" aria-labelledby="createStatusTitle">
               <h3 id="createStatusTitle">Status</h3>
-              <div class="segmented status-picker" role="radiogroup" aria-label="Job status">
-                <label class="segment"><input type="radio" name="status" value="Pending" checked />Pending</label>
-                <label class="segment"><input type="radio" name="status" value="Done" />Done</label>
-              </div>
+              <select class="status-picker" id="createStatusInput" name="status" aria-label="Job status">
+                <option>Pending</option>
+                <option>Aerial</option>
+                <option>UG</option>
+                <option>Nid</option>
+                <option>Can</option>
+                <option>Done</option>
+                <option>Talk to Rick</option>
+              </select>
             </section>
 
             <section class="create-section-card" aria-labelledby="createJobNumberTitle">

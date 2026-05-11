@@ -3,7 +3,7 @@ const authBase = "https://identitytoolkit.googleapis.com/v1";
 const tokenBase = "https://securetoken.googleapis.com/v1/token";
 const firestoreBase = config.projectId ? `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents` : "";
 const sessionKey = "job-tracker-web-firebase-session";
-const statuses = ["Pending", "In Progress", "Needs Ariel", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick"];
+const statuses = ["Pending", "Aerial", "UG", "Nid", "Can", "Done", "Talk to Rick", "Custom"];
 const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const shareTokenAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -11,8 +11,8 @@ const shareTokenAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz234
 let currentUser = null;
 let authSession = readSession();
 let selectedDate = workdayForToday();
-let appState = { jobs: [], users: [], timesheets: {}, yellowSheets: {}, partnerRequests: [] };
-let currentMoreTab = "profile";
+let appState = { jobs: [], searchJobs: [], users: [], timesheets: {}, yellowSheets: {}, partnerRequests: [] };
+let currentMoreTab = "";
 let createAddressCount = 1;
 
 const authCopy = {
@@ -190,8 +190,26 @@ async function getDoc(collection, id) {
 }
 
 async function listDocs(collection) {
-  const body = await apiFetch(`${firestoreBase}/${collection}`);
-  return (body.documents || []).map(decodeDoc);
+  const documents = [];
+  let pageToken = "";
+  do {
+    const params = new URLSearchParams({ pageSize: "1000" });
+    if (pageToken) params.set("pageToken", pageToken);
+    const body = await apiFetch(`${firestoreBase}/${collection}?${params}`);
+    documents.push(...(body.documents || []).map(decodeDoc));
+    pageToken = body.nextPageToken || "";
+  } while (pageToken);
+  return documents;
+}
+
+
+async function safeListDocs(collection) {
+  try { return await listDocs(collection); }
+  catch (error) {
+    console.warn(`Could not load ${collection}:`, error);
+    showToast(`Some Firebase ${collection} data could not be loaded.`);
+    return [];
+  }
 }
 
 async function setDoc(collection, id, data) {
@@ -229,13 +247,14 @@ async function loadCurrentUser() {
 async function loadAppData() {
   showSync("Syncing with Firebase…");
   const [jobs, users, timesheets, yellowSheets, partnerRequests] = await Promise.all([
-    listDocs("jobs"),
-    listDocs("users"),
-    listDocs("timesheets"),
-    listDocs("yellowSheets"),
-    listDocs("partnerRequests"),
+    safeListDocs("jobs"),
+    safeListDocs("users"),
+    safeListDocs("timesheets"),
+    safeListDocs("yellowSheets"),
+    safeListDocs("partnerRequests"),
   ]);
   appState.users = users;
+  appState.searchJobs = jobs;
   appState.jobs = jobs.filter((job) => canSeeJob(job));
   appState.timesheets = Object.fromEntries(timesheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.weekStart, normalizeTimesheet(sheet)]));
   appState.yellowSheets = Object.fromEntries(yellowSheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.date || sheet.weekStart, normalizeYellowSheet(sheet)]));
@@ -376,13 +395,17 @@ async function resetPassword(event) {
 function logout() {
   clearSession();
   currentUser = null;
-  appState = { jobs: [], users: [], timesheets: {}, yellowSheets: {}, partnerRequests: [] };
+  appState = { jobs: [], searchJobs: [], users: [], timesheets: {}, yellowSheets: {}, partnerRequests: [] };
   showAuth();
   showToast("Signed out.");
 }
 
 function selectedJobs() {
   return appState.jobs.filter((job) => job.date === selectedDate);
+}
+
+function allSearchJobs() {
+  return (appState.searchJobs?.length ? appState.searchJobs : appState.jobs);
 }
 
 function isOpen(job) { return job.status !== "Done"; }
@@ -398,7 +421,7 @@ function renderWeekdayPicker() {
     const button = document.createElement("button");
     button.className = `day-button ${date === selectedDate ? "active" : ""}`.trim();
     button.type = "button";
-    button.innerHTML = `<strong>${shortDays[index]}</strong><span>${dateLabel(date, { month: "short", day: "numeric" })}</span><small>${jobs.length} jobs</small>`;
+    button.innerHTML = `<strong>${shortDays[index]}</strong><span>${jobs.length ? `${jobs.length} jobs` : ""}</span>`;
     button.addEventListener("click", () => { selectedDate = date; updateCreateDateInput(selectedDate); renderAll(); });
     picker.append(button);
   });
@@ -409,30 +432,25 @@ function renderDashboard() {
   const pending = jobs.filter(isOpen);
   const done = jobs.filter((job) => job.status === "Done");
   const completion = jobs.length === 0 ? 0 : Math.round((done.length / jobs.length) * 100);
-  const nextJob = pending[0];
-  const timesheet = getTimesheet(mondayFor(selectedDate));
-  const dayIndex = Math.max(0, Math.min(4, new Date(`${selectedDate}T12:00:00`).getDay() - 1));
-  const yellow = getYellowSheet(selectedDate);
-  const partner = appState.partnerRequests.find((request) => request.status === "accepted");
+  const fullDate = dateLabel(selectedDate, { month: "long", day: "numeric", year: "numeric" });
 
-  $("#dashboardGreeting").textContent = `Hi ${currentUser.firstName}, here is ${dateLabel(selectedDate)}. Updates save to Firebase and stay aligned with the native app collections.`;
+  $("#dashboardHeaderDate").textContent = fullDate;
+  $("#selectedDateLarge").textContent = fullDate.replace(", ", ",\n");
   $("#totalCount").textContent = jobs.length;
   $("#pendingCount").textContent = pending.length;
   $("#doneCount").textContent = done.length;
   $("#completionRate").textContent = `${completion}%`;
   $("#completionBar").style.width = `${completion}%`;
-  $("#nextJobAddress").textContent = nextJob ? nextJob.address : "No next job";
-  $("#nextJobHint").textContent = nextJob ? `${nextJob.jobNumber || "No job #"} • ${nextJob.status}` : "Create or assign jobs to get routing hints.";
-  $("#dashboardHours").textContent = `${sumDay(timesheet.days[dayIndex]).toFixed(1)} hrs`;
-  $("#yellowStatus").textContent = yellow.signature ? "Signed" : yellowHasContent(yellow) ? "In progress" : "Not started";
-  $("#partnerStatus").textContent = partner ? partnerName(partner) : "No partner";
-  renderJobList($("#pendingJobList"), pending, true);
-  renderJobList($("#completedJobList"), done, true);
+  renderJobList($("#pendingJobList"), pending, true, "No jobs for this date");
+  renderJobList($("#completedJobList"), done, true, "");
 }
 
-function renderJobList(container, jobs, withActions = false) {
+function renderJobList(container, jobs, withActions = false, emptyMessage = "No jobs match this section.") {
   container.innerHTML = "";
-  if (jobs.length === 0) { container.innerHTML = `<p class="empty-state">No jobs match this section.</p>`; return; }
+  if (jobs.length === 0) {
+    if (emptyMessage) container.innerHTML = `<p class="empty-state native-empty-pill">${emptyMessage}</p>`;
+    return;
+  }
   jobs.forEach((job) => container.append(jobCard(job, withActions)));
 }
 
@@ -646,17 +664,20 @@ function renderTimesheet() {
   const weekStart = $("#timesheetWeekInput").value || mondayFor(selectedDate);
   const sheet = getTimesheet(weekStart);
   $("#timesheetWeekInput").value = weekStart;
+  $("#weekRangeLabel").textContent = `Week of ${dateLabel(weekStart, { month: "long", day: "numeric", year: "numeric" })}`;
   $("#timesheetSupervisorInput").value = sheet.supervisor;
   $("#timesheetPartnerInput").value = sheet.name2;
-  const tbody = $("#timesheetRows");
-  tbody.innerHTML = "";
+  const rows = $("#timesheetRows");
+  rows.innerHTML = "";
   sheet.days.forEach((day, index) => {
-    const row = document.createElement("tr");
-    row.innerHTML = `<td><strong>${day.name}</strong><br><small>${dateLabel(addDays(weekStart, index), { month: "short", day: "numeric" })}</small></td><td><textarea rows="2" data-timesheet-field="notes" data-day-index="${index}">${day.notes || ""}</textarea></td><td><input type="number" min="0" step="0.25" value="${day.gibson || 0}" data-timesheet-field="gibson" data-day-index="${index}"></td><td><input type="number" min="0" step="0.25" value="${day.cableSouth || 0}" data-timesheet-field="cableSouth" data-day-index="${index}"></td><td><input type="number" min="0" step="0.25" value="${day.other || 0}" data-timesheet-field="other" data-day-index="${index}"></td><td><strong>${sumDay(day).toFixed(2)}</strong></td>`;
-    tbody.append(row);
+    const date = addDays(weekStart, index);
+    const card = document.createElement("article");
+    card.className = "native-day-card";
+    card.innerHTML = `<div><h3>${dateLabel(date, { weekday: "long", month: "long", day: "numeric" })}</h3><p>${day.notes || "No jobs"}</p></div><label>Total Hours:<input type="number" min="0" step="0.25" value="${sumDay(day).toFixed(1)}" data-timesheet-field="gibson" data-day-index="${index}"></label><input type="hidden" value="${day.notes || ""}" data-timesheet-field="notes" data-day-index="${index}"><input type="hidden" value="0" data-timesheet-field="cableSouth" data-day-index="${index}"><input type="hidden" value="0" data-timesheet-field="other" data-day-index="${index}">`;
+    rows.append(card);
   });
   const total = sheet.days.reduce((sum, day) => sum + sumDay(day), 0);
-  $("#timesheetTotal").textContent = `${total.toFixed(2)} total hours`;
+  $("#timesheetTotal").textContent = `Total: ${total.toFixed(1)} hrs`;
   $("#timesheetSavedState").textContent = sheet.savedAt ? `Saved ${new Date(sheet.savedAt).toLocaleString()}` : "Not saved yet";
   renderPastTimesheets();
 }
@@ -831,7 +852,7 @@ function compareSearchJobs(a, b) {
 function buildQuickFilters() {
   const countBy = (valueFor) => {
     const counts = new Map();
-    appState.jobs.forEach((job) => {
+    allSearchJobs().forEach((job) => {
       const value = String(valueFor(job) || "").trim();
       if (!value) return;
       const key = value.toLowerCase();
@@ -923,7 +944,7 @@ function renderSearchResultCard(job, tokens) {
     snippetBlock.append(snippetTitle, snippetValue);
     item.append(snippetBlock);
   }
-  if ([job.createdBy, job.assignedTo].includes(currentUser.id) || (job.participants || []).includes(currentUser.id)) {
+  if (currentUser && ([job.createdBy, job.assignedTo].includes(currentUser.id) || (job.participants || []).includes(currentUser.id))) {
     const owned = document.createElement("span");
     owned.className = "search-owned-label";
     owned.textContent = "✓ In your job list";
@@ -937,7 +958,7 @@ function renderSearch() {
   const results = $("#searchResults");
   const query = input.value.trim();
   const tokens = searchTokens(query);
-  const sortedJobs = [...appState.jobs].sort(compareSearchJobs);
+  const sortedJobs = [...allSearchJobs()].sort(compareSearchJobs);
   const matches = tokens.length ? sortedJobs.filter((job) => {
     const haystack = searchHaystack(job);
     return tokens.every((token) => haystack.includes(token));
@@ -1006,7 +1027,15 @@ async function saveSettings() {
   showToast("Settings saved to Firebase.");
 }
 
-function setMoreTab(tab) { currentMoreTab = tab; $$('[data-more-tab]').forEach((button) => button.classList.toggle("active", button.dataset.moreTab === tab)); $$('[data-more-panel]').forEach((panel) => panel.classList.toggle("active", panel.dataset.morePanel === tab)); }
+function setMoreTab(tab) {
+  currentMoreTab = tab;
+  $$('[data-more-tab]').forEach((button) => {
+    const isActive = button.dataset.moreTab === tab;
+    button.classList.toggle("active", isActive);
+    button.toggleAttribute("aria-current", isActive);
+  });
+  $$('[data-more-panel]').forEach((panel) => panel.classList.toggle("active", panel.dataset.morePanel === tab));
+}
 function userName(uid) { const user = appState.users.find((item) => item.id === uid); return user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email : uid; }
 function partnerName(request) { return request.fromUid === currentUser.id ? userName(request.toUid) : userName(request.fromUid); }
 
@@ -1061,13 +1090,30 @@ async function updatePartnerRequest(id, status) {
   showToast(`Request ${status}.`);
 }
 
-function navigate(route) {
-  $$('[data-view]').forEach((view) => view.classList.toggle("active", view.dataset.view === route));
-  $$('[data-route]').forEach((button) => button.classList.toggle("active", button.dataset.route === route));
-  if (route === "timesheets") renderTimesheet();
-  if (route === "yellowSheets") renderYellowSheet();
-  if (route === "search") renderSearch();
-  if (route === "more") setMoreTab(currentMoreTab);
+function normalizeRoute(route) {
+  const aliases = { yellowSheet: "yellowSheets", jobSearch: "search" };
+  const requestedRoute = aliases[route] || route;
+  return $(`[data-view="${requestedRoute}"]`) ? requestedRoute : "dashboard";
+}
+
+function navigate(route, options = {}) {
+  const nextRoute = normalizeRoute(route);
+  $$('[data-view]').forEach((view) => {
+    const isActive = view.dataset.view === nextRoute;
+    view.classList.toggle("active", isActive);
+    view.hidden = !isActive;
+  });
+  $$('[data-route]').forEach((button) => {
+    const isActive = button.dataset.route === nextRoute;
+    button.classList.toggle("active", isActive);
+    button.toggleAttribute("aria-current", isActive);
+  });
+  if (currentUser && nextRoute === "timesheets") renderTimesheet();
+  if (currentUser && nextRoute === "yellowSheets") renderYellowSheet();
+  if (currentUser && nextRoute === "search") renderSearch();
+  if (nextRoute === "more") setMoreTab(currentMoreTab);
+  if (!options.skipHash) history.replaceState(null, "", `#${nextRoute}`);
+  if (!options.skipScroll) $("#appShell")?.scrollIntoView({ block: "start" });
 }
 
 function renderAll() {
@@ -1096,10 +1142,12 @@ function bindEvents() {
   $$("#createJobForm .status-picker input").forEach((input) => input.addEventListener("change", updateCreateStatusPicker));
   $("#createJobModal").addEventListener("click", (event) => { if (event.target.id === "createJobModal") closeCreateJobPanel(); });
   document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !$("#createJobModal").classList.contains("hidden")) closeCreateJobPanel(); });
-  $("#refreshJobsButton").addEventListener("click", () => loadAppData().then(renderAll).then(() => showToast("Jobs refreshed from Firebase.")));
-  $("#shareDailySummaryButton").addEventListener("click", () => copyText(dailySummaryText(), `job-tracker-${selectedDate}.txt`));
-  $("#downloadDailySummaryButton").addEventListener("click", () => downloadText(`job-tracker-${selectedDate}.txt`, dailySummaryText()));
+  $("#refreshJobsButton")?.addEventListener("click", () => loadAppData().then(renderAll).then(() => showToast("Jobs refreshed from Firebase.")));
+  $("#shareDailySummaryButton")?.addEventListener("click", () => copyText(dailySummaryText(), `job-tracker-${selectedDate}.txt`));
+  $("#downloadDailySummaryButton")?.addEventListener("click", () => downloadText(`job-tracker-${selectedDate}.txt`, dailySummaryText()));
   $("#timesheetWeekInput").addEventListener("change", renderTimesheet);
+  $("#previousTimesheetWeek")?.addEventListener("click", () => { $("#timesheetWeekInput").value = addDays($("#timesheetWeekInput").value || mondayFor(selectedDate), -7); renderTimesheet(); });
+  $("#nextTimesheetWeek")?.addEventListener("click", () => { $("#timesheetWeekInput").value = addDays($("#timesheetWeekInput").value || mondayFor(selectedDate), 7); renderTimesheet(); });
   $("#saveTimesheetButton").addEventListener("click", () => handleSaveTimesheet().catch((error) => showToast(error.message)));
   $("#exportTimesheetButton").addEventListener("click", () => downloadText(`timesheet-${$("#timesheetWeekInput").value}.txt`, timesheetText()));
   $("#yellowDateInput").addEventListener("change", renderYellowSheet);
@@ -1122,6 +1170,8 @@ function initializeInputs() {
 async function bootstrap() {
   bindEvents();
   initializeInputs();
+  navigate((window.location.hash || "#dashboard").slice(1), { skipHash: true, skipScroll: true });
+  window.addEventListener("hashchange", () => navigate((window.location.hash || "#dashboard").slice(1), { skipHash: true }));
   if (!config?.apiKey || !config?.projectId) { setMessage("Firebase config is missing. Update website/app/config.js before signing in."); return; }
   if (!authSession?.refreshToken) return;
   try { await refreshTokenIfNeeded(); await loadCurrentUser(); await enterApp(); }
