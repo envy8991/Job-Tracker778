@@ -3,7 +3,7 @@ const authBase = "https://identitytoolkit.googleapis.com/v1";
 const tokenBase = "https://securetoken.googleapis.com/v1/token";
 const firestoreBase = config.projectId ? `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents` : "";
 const sessionKey = "job-tracker-web-firebase-session";
-const statuses = ["Pending", "In Progress", "Needs Ariel", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick"];
+const statuses = ["Pending", "Aerial", "UG", "Nid", "Can", "Done", "Talk to Rick", "Custom"];
 const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const shareTokenAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -1006,7 +1006,15 @@ async function saveSettings() {
   showToast("Settings saved to Firebase.");
 }
 
-function setMoreTab(tab) { currentMoreTab = tab; $$('[data-more-tab]').forEach((button) => button.classList.toggle("active", button.dataset.moreTab === tab)); $$('[data-more-panel]').forEach((panel) => panel.classList.toggle("active", panel.dataset.morePanel === tab)); }
+function setMoreTab(tab) {
+  currentMoreTab = tab;
+  $$('[data-more-tab]').forEach((button) => {
+    const isActive = button.dataset.moreTab === tab;
+    button.classList.toggle("active", isActive);
+    button.toggleAttribute("aria-current", isActive);
+  });
+  $$('[data-more-panel]').forEach((panel) => panel.classList.toggle("active", panel.dataset.morePanel === tab));
+}
 function userName(uid) { const user = appState.users.find((item) => item.id === uid); return user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email : uid; }
 function partnerName(request) { return request.fromUid === currentUser.id ? userName(request.toUid) : userName(request.fromUid); }
 
@@ -1061,13 +1069,30 @@ async function updatePartnerRequest(id, status) {
   showToast(`Request ${status}.`);
 }
 
-function navigate(route) {
-  $$('[data-view]').forEach((view) => view.classList.toggle("active", view.dataset.view === route));
-  $$('[data-route]').forEach((button) => button.classList.toggle("active", button.dataset.route === route));
-  if (route === "timesheets") renderTimesheet();
-  if (route === "yellowSheets") renderYellowSheet();
-  if (route === "search") renderSearch();
-  if (route === "more") setMoreTab(currentMoreTab);
+function normalizeRoute(route) {
+  const aliases = { yellowSheet: "yellowSheets", jobSearch: "search" };
+  const requestedRoute = aliases[route] || route;
+  return $(`[data-view="${requestedRoute}"]`) ? requestedRoute : "dashboard";
+}
+
+function navigate(route, options = {}) {
+  const nextRoute = normalizeRoute(route);
+  $$('[data-view]').forEach((view) => {
+    const isActive = view.dataset.view === nextRoute;
+    view.classList.toggle("active", isActive);
+    view.hidden = !isActive;
+  });
+  $$('[data-route]').forEach((button) => {
+    const isActive = button.dataset.route === nextRoute;
+    button.classList.toggle("active", isActive);
+    button.toggleAttribute("aria-current", isActive);
+  });
+  if (currentUser && nextRoute === "timesheets") renderTimesheet();
+  if (currentUser && nextRoute === "yellowSheets") renderYellowSheet();
+  if (currentUser && nextRoute === "search") renderSearch();
+  if (nextRoute === "more") setMoreTab(currentMoreTab);
+  if (!options.skipHash) history.replaceState(null, "", `#${nextRoute}`);
+  if (!options.skipScroll) $("#appShell")?.scrollIntoView({ block: "start" });
 }
 
 function renderAll() {
@@ -1122,6 +1147,8 @@ function initializeInputs() {
 async function bootstrap() {
   bindEvents();
   initializeInputs();
+  navigate((window.location.hash || "#dashboard").slice(1), { skipHash: true, skipScroll: true });
+  window.addEventListener("hashchange", () => navigate((window.location.hash || "#dashboard").slice(1), { skipHash: true }));
   if (!config?.apiKey || !config?.projectId) { setMessage("Firebase config is missing. Update website/app/config.js before signing in."); return; }
   if (!authSession?.refreshToken) return;
   try { await refreshTokenIfNeeded(); await loadCurrentUser(); await enterApp(); }
