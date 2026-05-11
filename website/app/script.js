@@ -4,8 +4,8 @@ const tokenBase = "https://securetoken.googleapis.com/v1/token";
 const firestoreBase = config.projectId ? `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents` : "";
 const sessionKey = "job-tracker-web-firebase-session";
 const statuses = ["Pending", "In Progress", "Needs Ariel", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick"];
-const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+const weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const shortDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const shareTokenAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
 let currentUser = null;
@@ -67,19 +67,18 @@ function dateLabel(dateString, options = { weekday: "short", month: "short", day
   return new Intl.DateTimeFormat(undefined, options).format(new Date(`${dateString}T12:00:00`));
 }
 
-function mondayFor(date = new Date()) {
+function weekStartFor(date = new Date()) {
   const value = new Date(date);
-  const day = value.getDay();
-  value.setDate(value.getDate() - day + (day === 0 ? -6 : 1));
+  value.setDate(value.getDate() - value.getDay());
   return toInputDate(value);
 }
 
+function mondayFor(date = new Date()) {
+  return weekStartFor(date);
+}
+
 function workdayForToday() {
-  const today = new Date();
-  const day = today.getDay();
-  if (day === 0) return addDays(mondayFor(today), 4);
-  if (day === 6) return mondayFor(today);
-  return toInputDate(today);
+  return toInputDate(new Date());
 }
 
 function addDays(dateString, days) {
@@ -238,7 +237,7 @@ async function loadAppData() {
   appState.users = users;
   appState.jobs = jobs.filter((job) => canSeeJob(job));
   appState.timesheets = Object.fromEntries(timesheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.weekStart, normalizeTimesheet(sheet)]));
-  appState.yellowSheets = Object.fromEntries(yellowSheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.date || sheet.weekStart, normalizeYellowSheet(sheet)]));
+  appState.yellowSheets = Object.fromEntries(yellowSheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => { const normalized = normalizeYellowSheet(sheet); return [normalized.weekStart, normalized]; }));
   appState.partnerRequests = partnerRequests.filter((request) => request.fromUid === currentUser.id || request.toUid === currentUser.id);
   showSync();
 }
@@ -271,12 +270,13 @@ function normalizeJob(job) {
 }
 
 function normalizeTimesheet(sheet) {
-  const days = sheet.days || weekDays.map((name) => ({ name, notes: "", gibson: 0, cableSouth: 0, other: 0 }));
+  const days = sheet.days || weekDays.map((name) => ({ name, notes: "", gibson: 0, cableSouth: 0 }));
   return { id: sheet.id || sheet.weekStart, userId: currentUser.id, partnerId: sheet.partnerId || "", weekStart: sheet.weekStart, supervisor: sheet.supervisor || "", name1: sheet.name1 || `${currentUser.firstName} ${currentUser.lastName}`.trim(), name2: sheet.name2 || "", gibsonHours: sheet.gibsonHours || "0", cableSouthHours: sheet.cableSouthHours || "0", totalHours: sheet.totalHours || "0", dailyTotalHours: sheet.dailyTotalHours || {}, days, savedAt: sheet.savedAt || null, pdfURL: sheet.pdfURL || "" };
 }
 
 function normalizeYellowSheet(sheet) {
-  return { id: sheet.id || sheet.date, userId: currentUser.id, partnerId: sheet.partnerId || "", date: sheet.date || sheet.weekStart || selectedDate, weekStart: sheet.weekStart || mondayFor(sheet.date || selectedDate), totalJobs: Number(sheet.totalJobs || 0), jobId: sheet.jobId || "", checks: sheet.checks || {}, materials: sheet.materials || "", notes: sheet.notes || "", signature: sheet.signature || "", savedAt: sheet.savedAt || null, pdfURL: sheet.pdfURL || "" };
+  const weekStart = sheet.weekStart || weekStartFor(sheet.date || selectedDate);
+  return { id: sheet.id || `${currentUser.id}_${weekStart}`, userId: currentUser.id, partnerId: sheet.partnerId || "", weekStart, totalJobs: Number(sheet.totalJobs || 0), savedAt: sheet.savedAt || null, pdfURL: sheet.pdfURL || "" };
 }
 
 function showApp() {
@@ -409,23 +409,12 @@ function renderDashboard() {
   const pending = jobs.filter(isOpen);
   const done = jobs.filter((job) => job.status === "Done");
   const completion = jobs.length === 0 ? 0 : Math.round((done.length / jobs.length) * 100);
-  const nextJob = pending[0];
-  const timesheet = getTimesheet(mondayFor(selectedDate));
-  const dayIndex = Math.max(0, Math.min(4, new Date(`${selectedDate}T12:00:00`).getDay() - 1));
-  const yellow = getYellowSheet(selectedDate);
-  const partner = appState.partnerRequests.find((request) => request.status === "accepted");
-
-  $("#dashboardGreeting").textContent = `Hi ${currentUser.firstName}, here is ${dateLabel(selectedDate)}. Updates save to Firebase and stay aligned with the native app collections.`;
+  $("#dashboardGreeting").textContent = `Hi ${currentUser.firstName}, here is ${dateLabel(selectedDate)}. This tab only shows Dashboard jobs for the selected day.`;
   $("#totalCount").textContent = jobs.length;
   $("#pendingCount").textContent = pending.length;
   $("#doneCount").textContent = done.length;
   $("#completionRate").textContent = `${completion}%`;
   $("#completionBar").style.width = `${completion}%`;
-  $("#nextJobAddress").textContent = nextJob ? nextJob.address : "No next job";
-  $("#nextJobHint").textContent = nextJob ? `${nextJob.jobNumber || "No job #"} • ${nextJob.status}` : "Create or assign jobs to get routing hints.";
-  $("#dashboardHours").textContent = `${sumDay(timesheet.days[dayIndex]).toFixed(1)} hrs`;
-  $("#yellowStatus").textContent = yellow.signature ? "Signed" : yellowHasContent(yellow) ? "In progress" : "Not started";
-  $("#partnerStatus").textContent = partner ? partnerName(partner) : "No partner";
   renderJobList($("#pendingJobList"), pending, true);
   renderJobList($("#completedJobList"), done, true);
 }
@@ -640,7 +629,7 @@ function getTimesheet(weekStart) {
   return appState.timesheets[weekStart];
 }
 
-function sumDay(day) { return Number(day?.gibson || 0) + Number(day?.cableSouth || 0) + Number(day?.other || 0); }
+function sumDay(day) { return Number(day?.gibson || 0) + Number(day?.cableSouth || 0); }
 
 function renderTimesheet() {
   const weekStart = $("#timesheetWeekInput").value || mondayFor(selectedDate);
@@ -652,7 +641,7 @@ function renderTimesheet() {
   tbody.innerHTML = "";
   sheet.days.forEach((day, index) => {
     const row = document.createElement("tr");
-    row.innerHTML = `<td><strong>${day.name}</strong><br><small>${dateLabel(addDays(weekStart, index), { month: "short", day: "numeric" })}</small></td><td><textarea rows="2" data-timesheet-field="notes" data-day-index="${index}">${day.notes || ""}</textarea></td><td><input type="number" min="0" step="0.25" value="${day.gibson || 0}" data-timesheet-field="gibson" data-day-index="${index}"></td><td><input type="number" min="0" step="0.25" value="${day.cableSouth || 0}" data-timesheet-field="cableSouth" data-day-index="${index}"></td><td><input type="number" min="0" step="0.25" value="${day.other || 0}" data-timesheet-field="other" data-day-index="${index}"></td><td><strong>${sumDay(day).toFixed(2)}</strong></td>`;
+    row.innerHTML = `<td><strong>${day.name}</strong><br><small>${dateLabel(addDays(weekStart, index), { month: "short", day: "numeric" })}</small></td><td><textarea rows="2" data-timesheet-field="notes" data-day-index="${index}">${day.notes || ""}</textarea></td><td><input type="number" min="0" step="0.25" value="${day.gibson || 0}" data-timesheet-field="gibson" data-day-index="${index}"></td><td><input type="number" min="0" step="0.25" value="${day.cableSouth || 0}" data-timesheet-field="cableSouth" data-day-index="${index}"></td><td><strong>${sumDay(day).toFixed(2)}</strong></td>`;
     tbody.append(row);
   });
   const total = sheet.days.reduce((sum, day) => sum + sumDay(day), 0);
@@ -693,38 +682,35 @@ function renderPastTimesheets() {
   sheets.sort((a, b) => b.weekStart.localeCompare(a.weekStart)).forEach((sheet) => { const item = document.createElement("article"); item.className = "compact-item"; item.innerHTML = `<div><h3>Week of ${dateLabel(sheet.weekStart)}</h3><span>${Number(sheet.totalHours || 0).toFixed(2)} hours • Supervisor: ${sheet.supervisor || "Not set"}</span></div>`; list.append(item); });
 }
 
-function getYellowSheet(date) {
-  if (!appState.yellowSheets[date]) appState.yellowSheets[date] = normalizeYellowSheet({ id: `${currentUser.id}_${date}`, userId: currentUser.id, date });
-  return appState.yellowSheets[date];
+function getYellowSheet(weekStart) {
+  if (!appState.yellowSheets[weekStart]) appState.yellowSheets[weekStart] = normalizeYellowSheet({ id: `${currentUser.id}_${weekStart}`, userId: currentUser.id, weekStart });
+  return appState.yellowSheets[weekStart];
 }
 
-function yellowHasContent(sheet) { return Object.values(sheet.checks || {}).some(Boolean) || sheet.materials || sheet.notes || sheet.signature; }
+function jobsForWeek(weekStart) {
+  const weekDates = new Set(weekDays.map((_, index) => addDays(weekStart, index)));
+  return appState.jobs.filter((job) => weekDates.has(job.date));
+}
 
 function renderYellowSheet() {
-  const date = $("#yellowDateInput").value || selectedDate;
-  const sheet = getYellowSheet(date);
-  $("#yellowDateInput").value = date;
-  const select = $("#yellowJobSelect");
-  select.innerHTML = `<option value="">General day sheet</option>`;
-  appState.jobs.filter((job) => job.date === date).forEach((job) => { const option = document.createElement("option"); option.value = job.id; option.textContent = `${job.jobNumber || "No job #"} · ${job.address}`; option.selected = job.id === sheet.jobId; select.append(option); });
-  $$('[data-yellow-check]').forEach((input) => { input.checked = Boolean(sheet.checks?.[input.dataset.yellowCheck]); });
-  $("#yellowMaterialsInput").value = sheet.materials;
-  $("#yellowNotesInput").value = sheet.notes;
-  $("#yellowSignatureInput").value = sheet.signature;
+  const weekStart = $("#yellowWeekInput").value || weekStartFor(selectedDate);
+  const sheet = getYellowSheet(weekStart);
+  const jobs = jobsForWeek(weekStart);
+  $("#yellowWeekInput").value = weekStart;
+  $("#yellowWeekLabel").textContent = `Week of ${dateLabel(weekStart)}`;
+  $("#yellowTotalJobs").textContent = jobs.length;
+
+  const list = $("#yellowWeekJobList");
+  renderJobList(list, jobs, false);
+  sheet.totalJobs = jobs.length;
   renderPastYellowSheets();
 }
 
 function captureYellowSheet() {
-  const date = $("#yellowDateInput").value;
-  const sheet = getYellowSheet(date);
-  sheet.jobId = $("#yellowJobSelect").value;
-  sheet.materials = $("#yellowMaterialsInput").value.trim();
-  sheet.notes = $("#yellowNotesInput").value.trim();
-  sheet.signature = $("#yellowSignatureInput").value.trim();
-  sheet.weekStart = mondayFor(date);
-  sheet.totalJobs = appState.jobs.filter((job) => job.date === date).length;
-  sheet.checks = {};
-  $$('[data-yellow-check]').forEach((input) => { sheet.checks[input.dataset.yellowCheck] = input.checked; });
+  const weekStart = $("#yellowWeekInput").value || weekStartFor(selectedDate);
+  const sheet = getYellowSheet(weekStart);
+  sheet.weekStart = weekStart;
+  sheet.totalJobs = jobsForWeek(weekStart).length;
   return sheet;
 }
 
@@ -734,22 +720,22 @@ async function handleSaveYellowSheet() {
   await setDoc("yellowSheets", sheet.id, sheet);
   await loadAppData();
   renderAll();
-  showToast("Yellow sheet saved to Firebase.");
+  showToast("Yellow Sheet saved to Firebase.");
 }
 
 function renderPastYellowSheets() {
   const sheets = Object.values(appState.yellowSheets).filter((sheet) => sheet.savedAt);
   const list = $("#pastYellowSheetsList");
   list.innerHTML = "";
-  if (sheets.length === 0) { list.innerHTML = `<p class="empty-state">Saved yellow sheets will appear here.</p>`; return; }
-  sheets.sort((a, b) => b.date.localeCompare(a.date)).forEach((sheet) => { const checks = Object.values(sheet.checks || {}).filter(Boolean).length; const item = document.createElement("article"); item.className = "compact-item"; item.innerHTML = `<div><h3>${dateLabel(sheet.date)}</h3><span>${checks}/4 checks complete • Signature: ${sheet.signature || "Missing"}</span></div>`; list.append(item); });
+  if (sheets.length === 0) { list.innerHTML = `<p class="empty-state">Saved Yellow Sheets will appear here.</p>`; return; }
+  sheets.sort((a, b) => b.weekStart.localeCompare(a.weekStart)).forEach((sheet) => { const item = document.createElement("article"); item.className = "compact-item"; item.innerHTML = `<div><h3>Week of ${dateLabel(sheet.weekStart)}</h3><span>${sheet.totalJobs} total jobs</span></div>`; list.append(item); });
 }
 
 function downloadText(filename, text) { const blob = new Blob([text], { type: "text/plain" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = filename; link.click(); URL.revokeObjectURL(link.href); }
 async function copyText(text, fallbackName) { try { await navigator.clipboard.writeText(text); showToast("Summary copied to clipboard."); } catch { downloadText(fallbackName, text); showToast("Clipboard unavailable, downloaded a text summary instead."); } }
 function dailySummaryText() { const lines = [`Job Tracker Daily Summary`, `Date: ${dateLabel(selectedDate)}`, `Technician: ${currentUser.firstName} ${currentUser.lastName}`, ""]; selectedJobs().forEach((job) => lines.push(`${job.jobNumber || "No job #"} • ${job.status} • ${job.address} • ${job.notes || "No note"}`)); if (selectedJobs().length === 0) lines.push("No jobs scheduled."); return lines.join("\n"); }
 function timesheetText() { const sheet = captureTimesheet(); return [`Job Tracker Timesheet`, `Week: ${sheet.weekStart}`, `Technician: ${sheet.name1}`, `Supervisor: ${sheet.supervisor || "Not set"}`, `Partner: ${sheet.name2 || "None"}`, "", ...sheet.days.map((day) => `${day.name}: ${sumDay(day).toFixed(2)} hrs - ${day.notes || "No notes"}`), `Total: ${sheet.totalHours} hrs`].join("\n"); }
-function yellowSheetText() { const sheet = captureYellowSheet(); const checks = Object.entries(sheet.checks).map(([key, value]) => `${key}: ${value ? "yes" : "no"}`).join("\n"); return [`Job Tracker Yellow Sheet`, `Date: ${sheet.date}`, `Technician: ${currentUser.firstName} ${currentUser.lastName}`, `Signature: ${sheet.signature || "Missing"}`, "", checks, "", `Materials: ${sheet.materials || "None"}`, `Notes: ${sheet.notes || "None"}`].join("\n"); }
+function yellowSheetText() { const sheet = captureYellowSheet(); return [`Job Tracker Yellow Sheet`, `Week: ${sheet.weekStart}`, `Technician: ${currentUser.firstName} ${currentUser.lastName}`, `Total jobs: ${sheet.totalJobs}`].join("\n"); }
 
 function displayUserName(user) {
   if (!user) return "";
@@ -1098,13 +1084,10 @@ function bindEvents() {
   document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !$("#createJobModal").classList.contains("hidden")) closeCreateJobPanel(); });
   $("#refreshJobsButton").addEventListener("click", () => loadAppData().then(renderAll).then(() => showToast("Jobs refreshed from Firebase.")));
   $("#shareDailySummaryButton").addEventListener("click", () => copyText(dailySummaryText(), `job-tracker-${selectedDate}.txt`));
-  $("#downloadDailySummaryButton").addEventListener("click", () => downloadText(`job-tracker-${selectedDate}.txt`, dailySummaryText()));
   $("#timesheetWeekInput").addEventListener("change", renderTimesheet);
   $("#saveTimesheetButton").addEventListener("click", () => handleSaveTimesheet().catch((error) => showToast(error.message)));
-  $("#exportTimesheetButton").addEventListener("click", () => downloadText(`timesheet-${$("#timesheetWeekInput").value}.txt`, timesheetText()));
-  $("#yellowDateInput").addEventListener("change", renderYellowSheet);
+  $("#yellowWeekInput").addEventListener("change", renderYellowSheet);
   $("#saveYellowSheetButton").addEventListener("click", () => handleSaveYellowSheet().catch((error) => showToast(error.message)));
-  $("#exportYellowSheetButton").addEventListener("click", () => downloadText(`yellow-sheet-${$("#yellowDateInput").value}.txt`, yellowSheetText()));
   $("#jobSearchInput").addEventListener("input", renderSearch);
   $$('[data-more-tab]').forEach((button) => button.addEventListener("click", () => setMoreTab(button.dataset.moreTab)));
   $("#saveProfileButton").addEventListener("click", () => saveProfile().catch((error) => showToast(error.message)));
@@ -1116,7 +1099,7 @@ function initializeInputs() {
   updateCreateDateInput(selectedDate);
   updateCreateStatusPicker();
   $("#timesheetWeekInput").value = mondayFor(selectedDate);
-  $("#yellowDateInput").value = selectedDate;
+  $("#yellowWeekInput").value = weekStartFor(selectedDate);
 }
 
 async function bootstrap() {

@@ -464,3 +464,24 @@ body.modal-open { overflow: hidden; }
   .date-picker-row { grid-template-columns: 1fr; }
   .date-chip { justify-content: center; }
 }
+
+.yellow-total-card {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 10rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+}
+.yellow-total-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.yellow-total-card strong {
+  font-size: 1.8rem;
+  line-height: 1;
+}

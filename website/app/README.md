@@ -1,14 +1,14 @@
 # Job Tracker Firebase Web App
 
-This folder contains the Firebase-backed browser version of Job Tracker. It is intentionally nested under `website/app/` so it can be merged alongside the already-existing static website prototype without conflicting with `website/index.html`, `website/script.js`, `website/styles.css`, or `website/README.md` on `main`.
+This folder contains the Firebase-backed browser version of Job Tracker. The older top-level static prototype has been removed so `website/app/` is the single website implementation.
 
 ## Implemented app areas
 
 - **Authentication** – Firebase email/password login, signup, password reset email, persisted session refresh, and sign-out.
-- **Dashboard** – Monday-Friday selector, daily job rollups, completion progress, Firebase sync status, next-job hint, daily summary copy/download, quick job creation, status updates, and job removal.
-- **Timesheets** – weekly timesheet editor with supervisor/partner fields, Gibson/Cable South/Other hour totals, Firestore-backed history, and text export.
-- **Yellow Sheets** – daily compliance checklist with job reference, materials, notes, technician signature, Firestore-backed history, and text export.
-- **Job Search** – global searchable job index across job number, address, status, type/assignment, date, notes, and materials with inline status updates.
+- **Dashboard** – bottom-tab Dashboard view with a weekly selector, daily job rollups, completion progress, Firebase sync status, quick job creation, status updates, and job removal.
+- **Timesheets** – weekly timesheet editor with supervisor/partner fields, Gibson and Cable South hour totals, and Firestore-backed history.
+- **Yellow Sheet** – weekly Yellow Sheet view that shows jobs for the selected week, saves the native weekly record, and lists saved history.
+- **Job Search** – searchable job index across job number, address, status, assignment, date, notes, and materials.
 - **More** – functional Profile, Settings, and Find a Partner sections with Firestore-backed profile/settings and native-compatible partner request records.
 
 ## Run locally
@@ -28,12 +28,11 @@ The web app reads and writes these existing app collections:
 - `users/{uid}` for profile, role, and web settings.
 - `jobs/{jobId}` using the native `Job` fields, including `date`, `status`, `createdBy`, `assignedTo`, and `participants`.
 - `timesheets/{uid_weekStart}` using the native rollup fields plus web row details for editing.
-- `yellowSheets/{uid_date}` using the native weekly fields plus daily checklist details for editing.
+- `yellowSheets/{uid_weekStart}` using the native weekly fields: `userId`, `partnerId`, `weekStart`, `totalJobs`, and optional `pdfURL`.
 - `partnerRequests/{requestId}` and `partnerships/{pairId}` using native-compatible partner request fields.
 
 ## Deployment notes
 
 1. Keep `config.js` aligned with the Firebase project used by the native app.
 2. Ensure Firestore rules allow authenticated users to read/write their own `users`, visible `jobs`, personal timesheets/yellow sheets, and incoming/outgoing partner requests.
-3. Replace text exports with the native PDF generation pipeline or a shared server-side PDF service if browser-generated PDFs are required.
-4. Connect routing distances and address suggestions to production map providers when web mapping is added.
+3. Replace text summary sharing with the native PDF generation pipeline or a shared server-side PDF service if browser-generated PDFs are required.

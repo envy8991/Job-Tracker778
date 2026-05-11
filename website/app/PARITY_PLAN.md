@@ -1,6 +1,6 @@
 # Job Tracker Web App Parity Plan
 
-This audit compares the Firebase-backed web app in `website/app/` against the native iOS flow that matters for the web release: dashboard, job creation/detail/search, timesheets, yellow sheets, sharing, More/Profile/Settings/Find a Partner, and login.
+This audit compares the Firebase-backed web app in `website/app/` against the native iOS flow that matters for the web release: Dashboard, Timesheets, Yellow Sheet, Job Search, More, job creation/detail/search, and login.
 
 ## What was checked
 
@@ -28,7 +28,7 @@ This audit compares the Firebase-backed web app in `website/app/` against the na
 
 ### 2. Dashboard parity
 
-- Keep the current Monday-Friday picker, selected-day rollups, next-job card, timesheet hours, yellow sheet state, and partner card.
+- Keep the weekly picker, selected-day rollups, job sections, create-job action, and share action in Dashboard only.
 - Add a dedicated job detail drawer or route from dashboard cards so users can inspect/edit one job without relying only on inline status changes.
 - Add route/map affordances for addresses after map-provider integration is selected.
 
@@ -40,8 +40,8 @@ This audit compares the Firebase-backed web app in `website/app/` against the na
 
 ### 4. Timesheets and yellow sheets
 
-- Keep the current web editors for weekly timesheets and daily yellow sheets.
-- Replace text exports with browser PDF generation or a shared server-side PDF service that matches the native PDF output.
+- Keep the weekly timesheet editor and the weekly Yellow Sheet job summary aligned with the native app.
+- Replace text summary sharing with browser PDF generation or a shared server-side PDF service that matches the native PDF output.
 - Add profile shortcuts to past timesheets and past yellow sheets, matching the native Profile screen.
 
 ### 5. More tab scope
