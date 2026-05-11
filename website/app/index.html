@@ -133,7 +133,7 @@
           </section>
         </section>
 
-        <section class="view" id="timesheetsView" data-view="timesheets">
+        <section class="view" id="timesheetsView" data-view="timesheets" hidden>
           <div class="page-heading"><p class="eyebrow">Timesheets</p><h1>Weekly timesheet</h1><p>Log Gibson, Cable South, and total hours by day, attach job notes, save the week, and export a supervisor-ready summary.</p></div>
           <section class="workspace-card">
             <div class="timesheet-toolbar">
@@ -154,7 +154,7 @@
           <section class="workspace-card"><p class="eyebrow">History</p><h2>Past timesheets</h2><div class="compact-list" id="pastTimesheetsList"></div></section>
         </section>
 
-        <section class="view" id="yellowSheetsView" data-view="yellowSheets">
+        <section class="view" id="yellowSheetsView" data-view="yellowSheets" hidden>
           <div class="page-heading"><p class="eyebrow">Yellow Sheets</p><h1>Daily compliance sheet</h1><p>Capture safety checks, material usage, job notes, and technician signature for the selected date.</p></div>
           <section class="workspace-card yellow-form">
             <div class="form-grid three">
@@ -177,7 +177,7 @@
           <section class="workspace-card"><p class="eyebrow">History</p><h2>Past yellow sheets</h2><div class="compact-list" id="pastYellowSheetsList"></div></section>
         </section>
 
-        <section class="view" id="searchView" data-view="search">
+        <section class="view" id="searchView" data-view="search" hidden>
           <div class="page-heading"><p class="eyebrow">Job Search</p><h1>Job Search</h1><p>Look up any job across Cable South in seconds.</p></div>
           <section class="workspace-card search-workspace">
             <label class="search-box">Search jobs<input id="jobSearchInput" placeholder="Address, job #, status, or teammate" /></label>
@@ -186,12 +186,18 @@
           </section>
         </section>
 
-        <section class="view" id="moreView" data-view="more">
-          <div class="page-heading"><p class="eyebrow">More</p><h1>Profile, settings, and partner tools</h1><p>The required More sections are available here with Firebase-backed persistence.</p></div>
-          <section class="more-tabs" role="tablist" aria-label="More sections">
-            <button class="segment active" type="button" data-more-tab="profile">Profile</button>
-            <button class="segment" type="button" data-more-tab="settings">Settings</button>
-            <button class="segment" type="button" data-more-tab="partner">Find a partner</button>
+        <section class="view" id="moreView" data-view="more" hidden>
+          <div class="page-heading"><p class="eyebrow">More</p><h1>More</h1><p>Choose one of the same secondary sections that live under the iOS app's More tab.</p></div>
+          <section class="more-menu" aria-label="More sections">
+            <div class="more-menu-section">
+              <h2>Account</h2>
+              <button class="more-menu-item active" type="button" data-more-tab="profile"><span aria-hidden="true">👤</span><strong>Profile</strong></button>
+              <button class="more-menu-item" type="button" data-more-tab="settings"><span aria-hidden="true">⚙️</span><strong>Settings</strong></button>
+            </div>
+            <div class="more-menu-section">
+              <h2>Team</h2>
+              <button class="more-menu-item" type="button" data-more-tab="partner"><span aria-hidden="true">👥</span><strong>Find a Partner</strong></button>
+            </div>
           </section>
 
           <section class="workspace-card more-panel active" id="profilePanel" data-more-panel="profile">
@@ -240,7 +246,7 @@
       </main>
 
       <nav class="bottom-tab-bar" aria-label="Primary">
-        <button class="tab-button active" type="button" data-route="dashboard" aria-label="Dashboard" data-symbol="rectangle.grid.2x2">
+        <button class="tab-button active" type="button" data-route="dashboard" aria-label="Dashboard" aria-current="page" data-symbol="rectangle.grid.2x2">
           <span class="tab-symbol" aria-hidden="true">▦</span>
           <span class="tab-label">Dashboard</span>
         </button>
