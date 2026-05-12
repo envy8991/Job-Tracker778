@@ -1,13 +1,64 @@
+const nativeStatusOptions = ["Pending", "Needs Aerial", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick", "Custom"];
+statuses.splice(0, statuses.length, ...nativeStatusOptions);
+
 const parityBase = {
   encodeValue,
   hydrateUserForms,
   renderAll,
   jobCard,
+  shareJob,
 };
 
 encodeValue = function enhancedEncodeValue(value, key = "") {
   if (key === "claimedAt") return { timestampValue: toTimestamp(value) };
   return parityBase.encodeValue(value, key);
+};
+
+function normalizedPosition(user = currentUser) {
+  const position = String(user?.normalizedPosition || user?.position || "").trim();
+  return position.toLowerCase() === "ariel" ? "Aerial" : position;
+}
+
+function isCanUser(user = currentUser) {
+  return normalizedPosition(user).toLowerCase() === "can";
+}
+
+async function shareNativeLink(url, title = "Job Tracker shared job") {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text: url, url });
+      return "Shared with your device share sheet.";
+    } catch (error) {
+      if (error?.name === "AbortError") return "Share cancelled.";
+    }
+  }
+  await copyText(url, `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.txt`);
+  return "Share link copied. It expires in 7 days.";
+}
+
+shareJob = async function enhancedShareJob(id) {
+  const job = appState.jobs.find((item) => item.id === id);
+  if (!job) return;
+  try {
+    const token = randomToken();
+    const senderName = `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() || currentUser.email || currentUser.id;
+    const senderIsCan = isCanUser();
+    await setDoc("sharedJobs", token, {
+      v: 2,
+      createdAt: new Date().toISOString(),
+      expiresAt: addDays(toInputDate(new Date()), 7),
+      fromUserId: currentUser.id,
+      fromUserName: senderName,
+      address: job.address,
+      date: job.date,
+      status: job.status,
+      jobNumber: job.jobNumber || "",
+      assignment: senderIsCan ? job.assignments || "" : "",
+      senderIsCan,
+    });
+    const message = await shareNativeLink(`jobtracker://importJob?token=${token}`, `Job link ${job.jobNumber || token}`);
+    showToast(message);
+  } catch (error) { showToast(error.message); }
 };
 
 function hydrateStatusSelect(select, selectedStatus = "Pending") {
@@ -198,6 +249,12 @@ async function previewSharedJob(event) {
     title.textContent = `${payload.jobNumber || "No job #"} · ${payload.address}`;
     meta.textContent = `${payload.status || "Pending"} • ${dateLabel(sharedPayloadDate(payload))} • From ${payload.fromUserName || payload.fromUserId || "Unknown"}`;
     details.append(title, meta);
+    if (payload.senderIsCan && payload.assignment && !isCanUser()) {
+      const privacy = document.createElement("p");
+      privacy.className = "helper-text";
+      privacy.textContent = "Assignment is visible in the preview but will only import for CAN users, matching the iOS app privacy rule.";
+      details.append(privacy);
+    }
 
     const actions = document.createElement("div");
     actions.className = "job-actions";
@@ -222,10 +279,12 @@ async function importSharedJob(token, payload) {
     address: payload.address,
     date: sharedPayloadDate(payload),
     status: payload.status || "Pending",
-    assignments: payload.senderIsCan ? payload.assignment || "" : "",
-    type: payload.senderIsCan ? payload.assignment || "Shared" : "Shared",
-    notes: `Imported shared job${payload.fromUserName ? ` from ${payload.fromUserName}` : ""}.`,
-    participants: [currentUser.id, payload.fromUserId].filter(Boolean),
+    assignments: payload.senderIsCan && isCanUser() ? payload.assignment || "" : "",
+    type: payload.senderIsCan && isCanUser() ? payload.assignment || "Shared" : "Shared",
+    notes: "",
+    assignedTo: currentUser.id,
+    createdBy: currentUser.id,
+    participants: [currentUser.id],
   });
 
   await setDoc("jobs", job.id, job);
@@ -244,7 +303,12 @@ function hydrateShareTokenFromUrl() {
   const params = new URLSearchParams(window.location?.search || "");
   const hashParams = new URLSearchParams((window.location?.hash || "").replace(/^#?\??/, ""));
   const token = params.get("token") || hashParams.get("token");
-  if (token) $("#shareTokenInput").value = token;
+  const input = $("#shareTokenInput");
+  if (token && input) {
+    input.value = token;
+    navigate("more", { skipHash: true, skipScroll: true });
+    setMoreTab("sharing");
+  }
 }
 
 function renderProfileShortcuts() {

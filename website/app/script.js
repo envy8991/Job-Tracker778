@@ -3,7 +3,8 @@ const authBase = "https://identitytoolkit.googleapis.com/v1";
 const tokenBase = "https://securetoken.googleapis.com/v1/token";
 const firestoreBase = config.projectId ? `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents` : "";
 const sessionKey = "job-tracker-web-firebase-session";
-const statuses = ["Pending", "Aerial", "UG", "Nid", "Can", "Done", "Talk to Rick", "Custom"];
+const appDataCachePrefix = "job-tracker-web-app-data";
+const statuses = ["Pending", "Needs Aerial", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick", "Custom"];
 const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const shareTokenAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -11,7 +12,7 @@ const shareTokenAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz234
 let currentUser = null;
 let authSession = readSession();
 let selectedDate = workdayForToday();
-let appState = { jobs: [], users: [], timesheets: {}, yellowSheets: {}, partnerRequests: [] };
+let appState = { jobs: [], searchJobs: [], users: [], timesheets: {}, yellowSheets: {}, partnerRequests: [] };
 let currentMoreTab = "profile";
 let createAddressCount = 1;
 
@@ -104,6 +105,39 @@ function showSync(message = "All server changes synced.") {
   $("#syncText").textContent = message;
 }
 
+function appDataCacheKey(uid = currentUser?.id || authSession?.uid) {
+  return uid ? `${appDataCachePrefix}:${uid}` : appDataCachePrefix;
+}
+
+function cacheAppData() {
+  if (!currentUser) return;
+  try {
+    localStorage.setItem(appDataCacheKey(), JSON.stringify({ ...appState, cachedAt: new Date().toISOString() }));
+  } catch {
+    // Storage can be unavailable in private browsing; Firebase remains the source of truth.
+  }
+}
+
+function restoreCachedAppData() {
+  if (!currentUser) return false;
+  try {
+    const cached = JSON.parse(localStorage.getItem(appDataCacheKey()) || "null");
+    if (!cached) return false;
+    appState = {
+      jobs: cached.jobs || [],
+      searchJobs: cached.searchJobs || cached.jobs || [],
+      users: cached.users || [],
+      timesheets: cached.timesheets || {},
+      yellowSheets: cached.yellowSheets || {},
+      partnerRequests: cached.partnerRequests || [],
+    };
+    showSync(`Showing saved app data from ${compactDateLabel(cached.cachedAt)} while Firebase refreshes…`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function authRequest(path, payload) {
   if (!config.apiKey) throw new Error("Firebase config is missing. Update website/app/config.js before signing in.");
   const response = await fetch(`${authBase}/${path}?key=${config.apiKey}`, {
@@ -189,9 +223,75 @@ async function getDoc(collection, id) {
   catch (error) { if (error.message.toLowerCase().includes("not found")) return null; throw error; }
 }
 
-async function listDocs(collection) {
-  const body = await apiFetch(`${firestoreBase}/${collection}`);
-  return (body.documents || []).map(decodeDoc);
+async function listDocs(collection, options = {}) {
+  const docs = [];
+  let pageToken = "";
+  const pageSize = options.pageSize || 300;
+  do {
+    const params = new URLSearchParams({ pageSize: String(pageSize) });
+    if (pageToken) params.set("pageToken", pageToken);
+    const body = await apiFetch(`${firestoreBase}/${collection}?${params}`);
+    docs.push(...(body.documents || []).map(decodeDoc));
+    pageToken = body.nextPageToken || "";
+  } while (pageToken);
+  return docs;
+}
+
+async function safeListDocs(collection, options = {}) {
+  try {
+    return await listDocs(collection, options);
+  } catch (error) {
+    console.warn(`Could not load ${collection}:`, error.message);
+    return [];
+  }
+}
+
+async function queryDocs(collection, where) {
+  const body = {
+    structuredQuery: {
+      from: [{ collectionId: collection }],
+      where,
+    },
+  };
+  const rows = await apiFetch(`${firestoreBase}:runQuery`, { method: "POST", body: JSON.stringify(body) });
+  return (rows || []).map((row) => row.document).filter(Boolean).map(decodeDoc);
+}
+
+function fieldEquals(fieldPath, value) {
+  return { fieldFilter: { field: { fieldPath }, op: "EQUAL", value: encodeValue(value) } };
+}
+
+function fieldArrayContains(fieldPath, value) {
+  return { fieldFilter: { field: { fieldPath }, op: "ARRAY_CONTAINS", value: encodeValue(value) } };
+}
+
+function mergeDocs(...sources) {
+  const docs = new Map();
+  sources.flat().filter(Boolean).forEach((doc) => docs.set(doc.id, { ...(docs.get(doc.id) || {}), ...doc }));
+  return [...docs.values()];
+}
+
+async function loadVisibleJobs() {
+  try {
+    return await listDocs("jobs");
+  } catch (error) {
+    console.warn("Could not list every job; falling back to iOS participant/owner queries:", error.message);
+    const [participantJobs, createdJobs, assignedJobs] = await Promise.all([
+      safeQueryDocs("jobs", fieldArrayContains("participants", currentUser.id)),
+      safeQueryDocs("jobs", fieldEquals("createdBy", currentUser.id)),
+      safeQueryDocs("jobs", fieldEquals("assignedTo", currentUser.id)),
+    ]);
+    return mergeDocs(participantJobs, createdJobs, assignedJobs);
+  }
+}
+
+async function safeQueryDocs(collection, where) {
+  try {
+    return await queryDocs(collection, where);
+  } catch (error) {
+    console.warn(`Could not query ${collection}:`, error.message);
+    return [];
+  }
 }
 
 async function setDoc(collection, id, data) {
@@ -228,8 +328,9 @@ async function loadCurrentUser() {
 
 async function loadAppData() {
   showSync("Syncing with Firebase…");
-  const [jobs, users, timesheets, yellowSheets, partnerRequests] = await Promise.all([
-    listDocs("jobs"),
+  const [jobs, searchIndex, users, timesheets, yellowSheets, partnerRequests] = await Promise.all([
+    loadVisibleJobs(),
+    safeListDocs("jobsSearch"),
     listDocs("users"),
     listDocs("timesheets"),
     listDocs("yellowSheets"),
@@ -237,9 +338,11 @@ async function loadAppData() {
   ]);
   appState.users = users;
   appState.jobs = jobs.filter((job) => canSeeJob(job));
+  appState.searchJobs = mergeSearchEntries(jobs, searchIndex);
   appState.timesheets = Object.fromEntries(timesheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.weekStart, normalizeTimesheet(sheet)]));
   appState.yellowSheets = Object.fromEntries(yellowSheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.date || sheet.weekStart, normalizeYellowSheet(sheet)]));
   appState.partnerRequests = partnerRequests.filter((request) => request.fromUid === currentUser.id || request.toUid === currentUser.id);
+  cacheAppData();
   showSync();
 }
 
@@ -248,20 +351,48 @@ function canSeeJob(job) {
   return [job.createdBy, job.assignedTo].includes(currentUser.id) || (job.participants || []).includes(currentUser.id);
 }
 
+function mergeSearchEntries(...sources) {
+  const entries = new Map();
+  sources.flat().filter(Boolean).forEach((job) => {
+    const normalized = normalizeSearchEntry(job);
+    if (!normalized.id) return;
+    entries.set(normalized.id, { ...(entries.get(normalized.id) || {}), ...normalized });
+  });
+  return [...entries.values()];
+}
+
+function normalizeSearchEntry(job = {}) {
+  return {
+    id: job.id || "",
+    address: job.address || "",
+    date: job.date || selectedDate,
+    status: job.status || "Pending",
+    assignedTo: job.assignedTo || "",
+    createdBy: job.createdBy || "",
+    notes: job.notes || "",
+    jobNumber: job.jobNumber || "",
+    assignments: job.assignments || job.assignment || "",
+    materialsUsed: job.materialsUsed || "",
+    participants: job.participants || [],
+    nidFootage: job.nidFootage || "",
+    canFootage: job.canFootage || "",
+  };
+}
+
 function normalizeJob(job) {
   return {
     id: job.id || createId(),
     address: job.address,
     date: job.date,
     status: job.status,
-    assignedTo: job.assignedTo || currentUser.id,
+    assignedTo: job.assignedTo || (job.status === "Pending" ? "" : currentUser.id),
     createdBy: job.createdBy || currentUser.id,
     notes: job.notes || "",
     jobNumber: job.jobNumber || "",
     assignments: job.assignments || "",
     materialsUsed: job.materialsUsed || "",
     photos: job.photos || [],
-    participants: Array.from(new Set([...(job.participants || []), currentUser.id, job.assignedTo || currentUser.id].filter(Boolean))),
+    participants: Array.from(new Set([...(job.participants || []), currentUser.id, job.assignedTo].filter(Boolean))),
     latitude: job.latitude || null,
     longitude: job.longitude || null,
     hours: Number(job.hours || 0),
@@ -292,6 +423,7 @@ function showAuth() {
 async function enterApp() {
   showApp();
   hydrateUserForms();
+  if (restoreCachedAppData()) renderAll();
   await loadAppData();
   renderAll();
 }
@@ -376,7 +508,7 @@ async function resetPassword(event) {
 function logout() {
   clearSession();
   currentUser = null;
-  appState = { jobs: [], users: [], timesheets: {}, yellowSheets: {}, partnerRequests: [] };
+  appState = { jobs: [], searchJobs: [], users: [], timesheets: {}, yellowSheets: {}, partnerRequests: [] };
   showAuth();
   showToast("Signed out.");
 }
@@ -385,8 +517,14 @@ function selectedJobs() {
   return appState.jobs.filter((job) => job.date === selectedDate);
 }
 
-function isOpen(job) { return job.status !== "Done"; }
-function statusClass(status) { return status === "Done" ? "done" : status?.startsWith("Needs") || status === "Talk to Rick" ? "warning" : status === "In Progress" ? "danger" : ""; }
+function isOpen(job) { return String(job.status || "Pending").toLowerCase() === "pending"; }
+function statusClass(status) {
+  const normalized = String(status || "").toLowerCase();
+  if (normalized === "done") return "done";
+  if (normalized.startsWith("needs") || normalized === "talk to rick" || normalized === "custom") return "warning";
+  if (normalized === "pending") return "pending";
+  return "";
+}
 
 function renderWeekdayPicker() {
   const monday = mondayFor(selectedDate);
@@ -407,7 +545,7 @@ function renderWeekdayPicker() {
 function renderDashboard() {
   const jobs = selectedJobs();
   const pending = jobs.filter(isOpen);
-  const done = jobs.filter((job) => job.status === "Done");
+  const done = jobs.filter((job) => !isOpen(job));
   const completion = jobs.length === 0 ? 0 : Math.round((done.length / jobs.length) * 100);
   const nextJob = pending[0];
   const timesheet = getTimesheet(mondayFor(selectedDate));
@@ -477,6 +615,7 @@ async function updateJob(id, patch) {
   await setDoc("jobs", id, updated);
   await loadAppData();
   renderAll();
+  cacheAppData();
   showToast("Job saved to Firebase.");
 }
 
@@ -487,6 +626,7 @@ async function removeJob(id) {
   else await setDoc("jobs", id, normalizeJob({ ...job, participants: (job.participants || []).filter((uid) => uid !== currentUser.id) }));
   await loadAppData();
   renderAll();
+  cacheAppData();
   showToast("Job removed.");
 }
 
@@ -543,6 +683,8 @@ async function saveJobsFromCreateValues({ addresses, date, status, jobNumber, as
     address,
     date,
     status,
+    assignedTo: status === "Pending" ? "" : currentUser.id,
+    createdBy: currentUser.id,
     assignments: sanitizedAssignments,
     materialsUsed: materialsUsed.trim(),
     notes: notes.trim(),
@@ -831,7 +973,7 @@ function compareSearchJobs(a, b) {
 function buildQuickFilters() {
   const countBy = (valueFor) => {
     const counts = new Map();
-    appState.jobs.forEach((job) => {
+    searchSourceJobs().forEach((job) => {
       const value = String(valueFor(job) || "").trim();
       if (!value) return;
       const key = value.toLowerCase();
@@ -932,12 +1074,16 @@ function renderSearchResultCard(job, tokens) {
   return item;
 }
 
+function searchSourceJobs() {
+  return appState.searchJobs?.length ? appState.searchJobs : appState.jobs;
+}
+
 function renderSearch() {
   const input = $("#jobSearchInput");
   const results = $("#searchResults");
   const query = input.value.trim();
   const tokens = searchTokens(query);
-  const sortedJobs = [...appState.jobs].sort(compareSearchJobs);
+  const sortedJobs = [...searchSourceJobs()].sort(compareSearchJobs);
   const matches = tokens.length ? sortedJobs.filter((job) => {
     const haystack = searchHaystack(job);
     return tokens.every((token) => haystack.includes(token));
