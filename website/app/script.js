@@ -3,7 +3,8 @@ const authBase = "https://identitytoolkit.googleapis.com/v1";
 const tokenBase = "https://securetoken.googleapis.com/v1/token";
 const firestoreBase = config.projectId ? `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents` : "";
 const sessionKey = "job-tracker-web-firebase-session";
-const statuses = ["Pending", "Aerial", "UG", "Nid", "Can", "Done", "Talk to Rick", "Custom"];
+const appDataCachePrefix = "job-tracker-web-app-data";
+const statuses = ["Pending", "Needs Aerial", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick", "Custom"];
 const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const shareTokenAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -102,6 +103,38 @@ function setMessage(message) {
 
 function showSync(message = "All server changes synced.") {
   $("#syncText").textContent = message;
+}
+
+function appDataCacheKey(uid = currentUser?.id || authSession?.uid) {
+  return uid ? `${appDataCachePrefix}:${uid}` : appDataCachePrefix;
+}
+
+function cacheAppData() {
+  if (!currentUser) return;
+  try {
+    localStorage.setItem(appDataCacheKey(), JSON.stringify({ ...appState, cachedAt: new Date().toISOString() }));
+  } catch {
+    // Storage can be unavailable in private browsing; Firebase remains the source of truth.
+  }
+}
+
+function restoreCachedAppData() {
+  if (!currentUser) return false;
+  try {
+    const cached = JSON.parse(localStorage.getItem(appDataCacheKey()) || "null");
+    if (!cached) return false;
+    appState = {
+      jobs: cached.jobs || [],
+      users: cached.users || [],
+      timesheets: cached.timesheets || {},
+      yellowSheets: cached.yellowSheets || {},
+      partnerRequests: cached.partnerRequests || [],
+    };
+    showSync(`Showing saved app data from ${compactDateLabel(cached.cachedAt)} while Firebase refreshes…`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function authRequest(path, payload) {
@@ -240,6 +273,7 @@ async function loadAppData() {
   appState.timesheets = Object.fromEntries(timesheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.weekStart, normalizeTimesheet(sheet)]));
   appState.yellowSheets = Object.fromEntries(yellowSheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.date || sheet.weekStart, normalizeYellowSheet(sheet)]));
   appState.partnerRequests = partnerRequests.filter((request) => request.fromUid === currentUser.id || request.toUid === currentUser.id);
+  cacheAppData();
   showSync();
 }
 
@@ -292,6 +326,7 @@ function showAuth() {
 async function enterApp() {
   showApp();
   hydrateUserForms();
+  if (restoreCachedAppData()) renderAll();
   await loadAppData();
   renderAll();
 }
@@ -385,8 +420,14 @@ function selectedJobs() {
   return appState.jobs.filter((job) => job.date === selectedDate);
 }
 
-function isOpen(job) { return job.status !== "Done"; }
-function statusClass(status) { return status === "Done" ? "done" : status?.startsWith("Needs") || status === "Talk to Rick" ? "warning" : status === "In Progress" ? "danger" : ""; }
+function isOpen(job) { return String(job.status || "Pending").toLowerCase() === "pending"; }
+function statusClass(status) {
+  const normalized = String(status || "").toLowerCase();
+  if (normalized === "done") return "done";
+  if (normalized.startsWith("needs") || normalized === "talk to rick" || normalized === "custom") return "warning";
+  if (normalized === "pending") return "pending";
+  return "";
+}
 
 function renderWeekdayPicker() {
   const monday = mondayFor(selectedDate);
@@ -407,7 +448,7 @@ function renderWeekdayPicker() {
 function renderDashboard() {
   const jobs = selectedJobs();
   const pending = jobs.filter(isOpen);
-  const done = jobs.filter((job) => job.status === "Done");
+  const done = jobs.filter((job) => !isOpen(job));
   const completion = jobs.length === 0 ? 0 : Math.round((done.length / jobs.length) * 100);
   const nextJob = pending[0];
   const timesheet = getTimesheet(mondayFor(selectedDate));
@@ -477,6 +518,7 @@ async function updateJob(id, patch) {
   await setDoc("jobs", id, updated);
   await loadAppData();
   renderAll();
+  cacheAppData();
   showToast("Job saved to Firebase.");
 }
 
@@ -487,6 +529,7 @@ async function removeJob(id) {
   else await setDoc("jobs", id, normalizeJob({ ...job, participants: (job.participants || []).filter((uid) => uid !== currentUser.id) }));
   await loadAppData();
   renderAll();
+  cacheAppData();
   showToast("Job removed.");
 }
 
