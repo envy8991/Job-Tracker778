@@ -197,6 +197,7 @@
             <div class="more-menu-section">
               <h2>Team</h2>
               <button class="more-menu-item" type="button" data-more-tab="partner"><span aria-hidden="true">👥</span><strong>Find a Partner</strong></button>
+              <button class="more-menu-item" type="button" data-more-tab="sharing"><span aria-hidden="true">🔗</span><strong>Shared Jobs</strong></button>
             </div>
           </section>
 
@@ -241,6 +242,18 @@
               <button class="button primary" type="submit">Send request</button>
             </form>
             <div class="compact-list" id="partnerRequestsList"></div>
+          </section>
+
+          <section class="workspace-card more-panel" id="sharingPanel" data-more-panel="sharing">
+            <div class="section-heading">
+              <div><p class="eyebrow">Shared Jobs</p><h2>Import an iOS app job link</h2></div>
+            </div>
+            <p class="helper-text">Paste a <code>jobtracker://importJob?token=...</code> deep link or one-time token. The browser previews the same minimal payload that the iOS app imports.</p>
+            <form class="share-import-form" id="shareImportForm">
+              <label>Share link or token<input id="shareTokenInput" placeholder="jobtracker://importJob?token=..." autocomplete="off" /></label>
+              <button class="button primary" type="submit">Preview shared job</button>
+            </form>
+            <div class="compact-list share-import-preview" id="shareImportPreview" aria-live="polite"></div>
           </section>
         </section>
       </main>
@@ -368,5 +381,6 @@
     <script src="config.js"></script>
     <script src="script.js"></script>
     <script src="parity-enhancements.js"></script>
+    <script src="parity-data-search.js"></script>
   </body>
 </html>
