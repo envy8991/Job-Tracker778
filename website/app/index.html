@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A browser version of Job Tracker for dashboards, jobs, timesheets, yellow sheets, search, profile, settings, and partner finding."
+    />
+    <title>Job Tracker Web</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="authScreen" class="auth-screen">
+      <section class="auth-card">
+        <div class="auth-copy">
+          <span class="brand-mark">JT</span>
+          <p class="eyebrow">Fiber field operations</p>
+          <h1 id="authHeadline">Welcome Back</h1>
+          <p id="authLead">Sign in with the credentials you use across the Job Tracker apps.</p>
+        </div>
+
+        <div class="auth-panel">
+          <div class="segmented auth-segmented" role="tablist" aria-label="Authentication actions">
+            <button class="segment active" id="loginTab" type="button" data-auth-mode="login" aria-controls="loginForm" aria-selected="true">Sign In</button>
+            <button class="segment" id="signupTab" type="button" data-auth-mode="signup" aria-controls="signupForm" aria-selected="false">Sign Up</button>
+            <button class="segment" id="resetTab" type="button" data-auth-mode="reset" aria-controls="resetForm" aria-selected="false">Reset</button>
+          </div>
+
+          <form id="loginForm" class="auth-form" novalidate>
+            <label>Email Address<input id="loginEmail" type="email" autocomplete="email" required /></label>
+            <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+            <button class="button primary" type="submit">Sign In</button>
+            <button class="link-button" type="button" data-auth-mode="signup">Need an account? Create one</button>
+            <button class="link-button" type="button" data-auth-mode="reset">Forgot password?</button>
+          </form>
+
+          <form id="signupForm" class="auth-form hidden" novalidate>
+            <div class="form-grid two">
+              <label>First Name<input id="signupFirstName" autocomplete="given-name" required /></label>
+              <label>Last Name<input id="signupLastName" autocomplete="family-name" required /></label>
+            </div>
+            <label>Email Address<input id="signupEmail" type="email" autocomplete="email" required /></label>
+            <label>Password<input id="signupPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
+            <label class="position-picker">
+              Crew Position
+              <select id="signupPosition">
+                <option>Aerial</option>
+                <option>Underground</option>
+                <option>Nid</option>
+                <option>Can</option>
+              </select>
+            </label>
+            <button class="button primary" type="submit">Create Account</button>
+            <button class="link-button" type="button" data-auth-mode="login">Already have an account? Sign in</button>
+          </form>
+
+          <form id="resetForm" class="auth-form hidden" novalidate>
+            <label>Email Address<input id="resetEmail" type="email" autocomplete="email" required /></label>
+            <p class="helper-text">We'll send a secure link to reset your password.</p>
+            <button class="button primary" type="submit">Email Reset Link</button>
+            <button class="link-button" type="button" data-auth-mode="login">Back to sign in</button>
+          </form>
+
+          <p id="authMessage" class="form-message" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+    </div>
+
+    <div id="appShell" class="app-shell hidden">
+      <main class="content">
+        <section class="view active" id="dashboardView" data-view="dashboard">
+          <header class="hero">
+            <div class="hero-copy">
+              <p class="eyebrow">Dashboard</p>
+              <h1>Plan the day, route the next stop, and close the paperwork loop.</h1>
+              <p id="dashboardGreeting">
+                Your web dashboard mirrors the app's daily assignment workflow with weekday filters,
+                smart routing hints, sync status, quick job actions, and shareable summaries.
+              </p>
+              <div class="hero-actions">
+                <button class="button primary" id="openCreateJobButton" type="button" data-open-create-job>+ Create Job</button>
+                <button class="button secondary" id="shareDailySummaryButton" type="button">Share day summary</button>
+                <button class="button secondary" id="downloadDailySummaryButton" type="button">Download summary</button>
+              </div>
+            </div>
+            <section class="hero-panel" aria-label="Selected day summary">
+              <div>
+                <span class="metric-label">Completion</span>
+                <strong id="completionRate">0%</strong>
+              </div>
+              <div class="progress-track" aria-hidden="true"><span id="completionBar"></span></div>
+              <dl class="metric-grid">
+                <div><dt>Total</dt><dd id="totalCount">0</dd></div>
+                <div><dt>Pending</dt><dd id="pendingCount">0</dd></div>
+                <div><dt>Done</dt><dd id="doneCount">0</dd></div>
+              </dl>
+            </section>
+          </header>
+
+          <div class="weekday-picker" id="weekdayPicker" aria-label="Work week selector"></div>
+
+          <div class="sync-banner" id="syncBanner">
+            <span class="pulse"></span>
+            <span id="syncText">All local changes saved.</span>
+          </div>
+
+          <section class="section-grid four" aria-label="Dashboard rollups">
+            <article class="feature-card"><span class="icon">📍</span><h2 id="nextJobAddress">No next job</h2><p id="nextJobHint">Add jobs to get routing hints.</p></article>
+            <article class="feature-card"><span class="icon">⏱️</span><h2 id="dashboardHours">0 hrs</h2><p>Timesheet hours logged for the selected day.</p></article>
+            <article class="feature-card"><span class="icon">🟨</span><h2 id="yellowStatus">Not started</h2><p>Yellow sheet compliance status for the selected day.</p></article>
+            <article class="feature-card"><span class="icon">👥</span><h2 id="partnerStatus">No partner</h2><p>Current partner request or active crew pairing.</p></article>
+          </section>
+
+          <section class="workspace-card create-job-launcher">
+            <div class="section-heading">
+              <div><p class="eyebrow">Create job</p><h2>Daily job entry</h2></div>
+              <button class="button secondary" id="refreshJobsButton" type="button">Refresh jobs</button>
+            </div>
+            <p>Open the native-aligned Create Job panel to add addresses, date, status, assignments, materials, and notes.</p>
+            <button class="button primary" type="button" data-open-create-job>+ Create Job</button>
+          </section>
+
+          <section class="two-column">
+            <article class="workspace-card">
+              <div class="section-heading"><div><p class="eyebrow">Pending work</p><h2>Open jobs</h2></div></div>
+              <div class="job-list" id="pendingJobList" aria-live="polite"></div>
+            </article>
+            <article class="workspace-card">
+              <div class="section-heading"><div><p class="eyebrow">Completed</p><h2>Closed jobs</h2></div></div>
+              <div class="job-list" id="completedJobList" aria-live="polite"></div>
+            </article>
+          </section>
+        </section>
+
+        <section class="view" id="timesheetsView" data-view="timesheets" hidden>
+          <div class="page-heading"><p class="eyebrow">Timesheets</p><h1>Weekly timesheet</h1><p>Log Gibson, Cable South, and total hours by day, attach job notes, save the week, and export a supervisor-ready summary.</p></div>
+          <section class="workspace-card">
+            <div class="timesheet-toolbar">
+              <label>Week start<input id="timesheetWeekInput" type="date" /></label>
+              <label>Supervisor<input id="timesheetSupervisorInput" placeholder="Supervisor name" /></label>
+              <label>Partner<input id="timesheetPartnerInput" placeholder="Partner name" /></label>
+              <button class="button primary" id="saveTimesheetButton" type="button">Save timesheet</button>
+              <button class="button secondary" id="exportTimesheetButton" type="button">Export</button>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Day</th><th>Job / location notes</th><th>Gibson</th><th>Cable South</th><th>Other</th><th>Total</th></tr></thead>
+                <tbody id="timesheetRows"></tbody>
+              </table>
+            </div>
+            <div class="summary-strip"><strong id="timesheetTotal">0 total hours</strong><span id="timesheetSavedState">Not saved yet</span></div>
+          </section>
+          <section class="workspace-card"><p class="eyebrow">History</p><h2>Past timesheets</h2><div class="compact-list" id="pastTimesheetsList"></div></section>
+        </section>
+
+        <section class="view" id="yellowSheetsView" data-view="yellowSheets" hidden>
+          <div class="page-heading"><p class="eyebrow">Yellow Sheets</p><h1>Daily compliance sheet</h1><p>Capture safety checks, material usage, job notes, and technician signature for the selected date.</p></div>
+          <section class="workspace-card yellow-form">
+            <div class="form-grid three">
+              <label>Date<input id="yellowDateInput" type="date" /></label>
+              <label>Job reference<select id="yellowJobSelect"></select></label>
+              <label>Technician signature<input id="yellowSignatureInput" placeholder="Type full name" /></label>
+            </div>
+            <div class="checklist" id="yellowChecklist">
+              <label><input type="checkbox" data-yellow-check="ppe" /> PPE and safety setup complete</label>
+              <label><input type="checkbox" data-yellow-check="photos" /> Required job photos attached</label>
+              <label><input type="checkbox" data-yellow-check="materials" /> Materials and equipment documented</label>
+              <label><input type="checkbox" data-yellow-check="customer" /> Customer / site notes reviewed</label>
+            </div>
+            <div class="form-grid two">
+              <label>Material usage<textarea id="yellowMaterialsInput" rows="4" placeholder="Drops, connectors, enclosures, NIDs"></textarea></label>
+              <label>Daily notes<textarea id="yellowNotesInput" rows="4" placeholder="Safety notes, blockers, extra work"></textarea></label>
+            </div>
+            <div class="hero-actions"><button class="button primary" id="saveYellowSheetButton" type="button">Save yellow sheet</button><button class="button secondary" id="exportYellowSheetButton" type="button">Export</button></div>
+          </section>
+          <section class="workspace-card"><p class="eyebrow">History</p><h2>Past yellow sheets</h2><div class="compact-list" id="pastYellowSheetsList"></div></section>
+        </section>
+
+        <section class="view" id="searchView" data-view="search" hidden>
+          <div class="page-heading"><p class="eyebrow">Job Search</p><h1>Job Search</h1><p>Look up any job across Cable South in seconds.</p></div>
+          <section class="workspace-card search-workspace">
+            <label class="search-box">Search jobs<input id="jobSearchInput" placeholder="Address, job #, status, or teammate" /></label>
+            <div class="quick-filters" id="searchQuickFilters" aria-label="Quick filters"></div>
+            <div class="job-list search-results" id="searchResults"></div>
+          </section>
+        </section>
+
+        <section class="view" id="moreView" data-view="more" hidden>
+          <div class="page-heading"><p class="eyebrow">More</p><h1>More</h1><p>Choose one of the same secondary sections that live under the iOS app's More tab.</p></div>
+          <section class="more-menu" aria-label="More sections">
+            <div class="more-menu-section">
+              <h2>Account</h2>
+              <button class="more-menu-item active" type="button" data-more-tab="profile"><span aria-hidden="true">👤</span><strong>Profile</strong></button>
+              <button class="more-menu-item" type="button" data-more-tab="settings"><span aria-hidden="true">⚙️</span><strong>Settings</strong></button>
+            </div>
+            <div class="more-menu-section">
+              <h2>Team</h2>
+              <button class="more-menu-item" type="button" data-more-tab="partner"><span aria-hidden="true">👥</span><strong>Find a Partner</strong></button>
+              <button class="more-menu-item" type="button" data-more-tab="sharing"><span aria-hidden="true">🔗</span><strong>Shared Jobs</strong></button>
+            </div>
+          </section>
+
+          <section class="workspace-card more-panel active" id="profilePanel" data-more-panel="profile">
+            <div class="section-heading">
+              <div><p class="eyebrow">Profile</p><h2>Account details</h2></div>
+              <div class="detail-actions">
+                <button class="button secondary" id="saveProfileButton" type="button">Save profile</button>
+                <button class="button ghost" id="signOutButton" type="button">Sign out</button>
+              </div>
+            </div>
+            <div class="form-grid three">
+              <label>First name<input id="profileFirstName" /></label>
+              <label>Last name<input id="profileLastName" /></label>
+              <label>Position<select id="profilePosition"><option>Aerial</option><option>Underground</option><option>Nid</option><option>Can</option><option>Supervisor</option><option>Admin</option></select></label>
+              <label>Email<input id="profileEmail" type="email" disabled /></label>
+              <label>Phone<input id="profilePhone" placeholder="(555) 123-4567" /></label>
+              <label>Home yard<input id="profileYard" placeholder="North Yard" /></label>
+            </div>
+            <div class="profile-shortcuts" id="profileShortcuts" aria-label="Profile shortcuts"></div>
+          </section>
+
+          <section class="workspace-card more-panel" id="settingsPanel" data-more-panel="settings">
+            <div class="section-heading"><div><p class="eyebrow">Settings</p><h2>Routing, alerts, and appearance</h2></div><button class="button secondary" id="saveSettingsButton" type="button">Save settings</button></div>
+            <div class="settings-grid">
+              <label class="toggle-row"><span><strong>Smart routing</strong><small>Prioritize the next closest open job.</small></span><input id="smartRoutingInput" type="checkbox" /></label>
+              <label class="toggle-row"><span><strong>Arrival alerts</strong><small>Remind me when I arrive at a job.</small></span><input id="arrivalAlertsInput" type="checkbox" /></label>
+              <label>Optimize by<select id="routingOptimizeInput"><option>Distance</option><option>Schedule</option><option>Status priority</option></select></label>
+              <label>Address suggestions<select id="addressProviderInput"><option>Apple Maps</option><option>Google Places</option><option>Manual entry</option></select></label>
+              <label>Theme<select id="themeInput"><option>Dark</option><option>High contrast</option><option>Ocean</option></select></label>
+            </div>
+          </section>
+
+          <section class="workspace-card more-panel" id="partnerPanel" data-more-panel="partner">
+            <div class="section-heading"><div><p class="eyebrow">Find a partner</p><h2>Crew pairing requests</h2></div></div>
+            <form class="partner-form" id="partnerForm">
+              <label>Partner<select id="partnerUserInput" required></select></label>
+              <label>Needed for<select id="partnerNeedInput"><option>Aerial work</option><option>Underground pull</option><option>Splice assist</option><option>Late callback</option></select></label>
+              <label>Location<input id="partnerLocationInput" placeholder="Cabinet, address, or yard" required /></label>
+              <label>When<input id="partnerWhenInput" type="time" required /></label>
+              <label>Note<input id="partnerNoteInput" placeholder="What help is needed?" /></label>
+              <button class="button primary" type="submit">Send request</button>
+            </form>
+            <div class="compact-list" id="partnerRequestsList"></div>
+          </section>
+
+          <section class="workspace-card more-panel" id="sharingPanel" data-more-panel="sharing">
+            <div class="section-heading">
+              <div><p class="eyebrow">Shared Jobs</p><h2>Import an iOS app job link</h2></div>
+            </div>
+            <p class="helper-text">Paste a <code>jobtracker://importJob?token=...</code> deep link or one-time token. The browser previews the same minimal payload that the iOS app imports.</p>
+            <form class="share-import-form" id="shareImportForm">
+              <label>Share link or token<input id="shareTokenInput" placeholder="jobtracker://importJob?token=..." autocomplete="off" /></label>
+              <button class="button primary" type="submit">Preview shared job</button>
+            </form>
+            <div class="compact-list share-import-preview" id="shareImportPreview" aria-live="polite"></div>
+          </section>
+        </section>
+      </main>
+
+      <nav class="bottom-tab-bar" aria-label="Primary">
+        <button class="tab-button active" type="button" data-route="dashboard" aria-label="Dashboard" aria-current="page" data-symbol="rectangle.grid.2x2">
+          <span class="tab-symbol" aria-hidden="true">▦</span>
+          <span class="tab-label">Dashboard</span>
+        </button>
+        <button class="tab-button" type="button" data-route="timesheets" aria-label="Timesheets" data-symbol="clock">
+          <span class="tab-symbol" aria-hidden="true">◷</span>
+          <span class="tab-label">Timesheets</span>
+        </button>
+        <button class="tab-button" type="button" data-route="yellowSheets" aria-label="Yellow Sheet" data-symbol="doc.text">
+          <span class="tab-symbol" aria-hidden="true">▤</span>
+          <span class="tab-label">Yellow Sheet</span>
+        </button>
+        <button class="tab-button" type="button" data-route="search" aria-label="Job Search" data-symbol="magnifyingglass">
+          <span class="tab-symbol" aria-hidden="true">⌕</span>
+          <span class="tab-label">Job Search</span>
+        </button>
+        <button class="tab-button" type="button" data-route="more" aria-label="More" data-symbol="ellipsis.circle">
+          <span class="tab-symbol" aria-hidden="true">⋯</span>
+          <span class="tab-label">More</span>
+        </button>
+      </nav>
+    </div>
+
+
+    <section class="create-job-modal hidden" id="createJobModal" role="dialog" aria-modal="true" aria-labelledby="createJobTitle">
+      <div class="create-job-panel">
+        <form class="create-job-form" id="createJobForm">
+          <div class="create-job-topbar">
+            <button class="link-button" type="button" id="closeCreateJobButton">Close</button>
+            <h2 id="createJobTitle">Create Job</h2>
+            <button class="link-button" type="submit">Save</button>
+          </div>
+
+          <div class="create-job-content">
+            <section class="create-section-card" aria-labelledby="createAddressTitle">
+              <h3 id="createAddressTitle">Address</h3>
+              <div class="address-stack" id="createAddressList">
+                <label class="sr-only" for="createAddressInput0">Address</label>
+                <input id="createAddressInput0" name="address" placeholder="Enter address" autocomplete="street-address" required />
+              </div>
+              <button class="link-button add-address-button" id="addCreateAddressButton" type="button">+ Add Another Address</button>
+            </section>
+
+            <section class="create-section-card" aria-labelledby="createDateTitle">
+              <h3 id="createDateTitle">Date</h3>
+              <div class="date-picker-row">
+                <label>Select Date<input id="createDateInput" name="scheduledDate" type="date" required /></label>
+                <span class="date-chip" id="createDateChip">Selected date</span>
+              </div>
+            </section>
+
+            <section class="create-section-card status-card" aria-labelledby="createStatusTitle">
+              <h3 id="createStatusTitle">Status</h3>
+              <div class="segmented status-picker" role="radiogroup" aria-label="Job status">
+                <label class="segment"><input type="radio" name="status" value="Pending" checked />Pending</label>
+                <label class="segment"><input type="radio" name="status" value="Done" />Done</label>
+              </div>
+            </section>
+
+            <section class="create-section-card" aria-labelledby="createJobNumberTitle">
+              <h3 id="createJobNumberTitle">Job Number *</h3>
+              <label class="sr-only" for="createJobNumberInput">Job Number</label>
+              <input id="createJobNumberInput" name="jobNumber" placeholder="Required" autocomplete="off" required />
+            </section>
+
+            <section class="create-section-card" aria-labelledby="createAssignmentsTitle">
+              <h3 id="createAssignmentsTitle">Assignments</h3>
+              <label class="sr-only" for="createAssignmentsInput">Assignments</label>
+              <input id="createAssignmentsInput" name="assignments" inputmode="decimal" placeholder="e.g. 12.3.2" autocomplete="off" />
+              <p class="helper-text">Digits and dots only • examples: 12.3.2, 123.2.4</p>
+            </section>
+
+            <section class="create-section-card" aria-labelledby="createMaterialsTitle">
+              <h3 id="createMaterialsTitle">Materials Used</h3>
+              <label class="sr-only" for="createMaterialsInput">Materials Used</label>
+              <input id="createMaterialsInput" name="materialsUsed" placeholder="Enter materials info…" />
+            </section>
+
+            <section class="create-section-card" aria-labelledby="createNotesTitle">
+              <h3 id="createNotesTitle">Notes</h3>
+              <label class="sr-only" for="createNotesInput">Notes</label>
+              <textarea id="createNotesInput" name="notes" rows="5"></textarea>
+            </section>
+
+            <button class="button primary create-save-button" type="submit">✓ Save Job</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <dialog class="job-detail-dialog" id="jobDetailDialog" aria-labelledby="jobDetailTitle">
+      <form class="job-detail-panel" id="jobDetailForm" method="dialog">
+        <div class="section-heading">
+          <div><p class="eyebrow">Job Detail</p><h2 id="jobDetailTitle">Edit job</h2></div>
+          <button class="button ghost" id="closeJobDetailButton" type="button">Close</button>
+        </div>
+        <input id="detailJobId" type="hidden" />
+        <div class="form-grid two">
+          <label>Job #<input id="detailJobNumber" /></label>
+          <label>Scheduled date<input id="detailDate" type="date" /></label>
+          <label>Address<input id="detailAddress" /></label>
+          <label>Status<select id="detailStatus"></select></label>
+          <label>Assignment / type<input id="detailAssignments" /></label>
+          <label>Materials used<input id="detailMaterials" /></label>
+          <label>NID footage<input id="detailNidFootage" /></label>
+          <label>CAN footage<input id="detailCanFootage" /></label>
+        </div>
+        <label>Notes<textarea id="detailNotes" rows="4"></textarea></label>
+        <label>Participants<input id="detailParticipants" placeholder="Comma-separated user IDs" /></label>
+        <div class="detail-actions">
+          <button class="button primary" id="saveJobDetailButton" type="submit">Save detail</button>
+          <button class="button secondary" id="routeJobButton" type="button">Open route</button>
+          <button class="button secondary" id="shareJobDetailButton" type="button">Share</button>
+          <button class="button danger" id="removeJobDetailButton" type="button">Remove</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+    <script src="parity-enhancements.js"></script>
+    <script src="parity-data-search.js"></script>
+  </body>
+</html>

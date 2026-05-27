@@ -1,0 +1,659 @@
+import SwiftUI
+
+struct MainTabView: View {
+    var body: some View {
+        PrimaryTabContainer()
+            .environment(\.shellChromeHeight, 0)
+    }
+}
+
+// MARK: - Tab container
+
+private struct PrimaryTabContainer: View {
+    @EnvironmentObject private var navigation: AppNavigationViewModel
+    @EnvironmentObject private var jobsViewModel: JobsViewModel
+    @EnvironmentObject private var usersViewModel: UsersViewModel
+
+    private var selection: Binding<AppNavigationViewModel.PrimaryDestination> {
+        Binding(
+            get: { navigation.selectedPrimary },
+            set: { navigation.selectPrimary($0) }
+        )
+    }
+
+    var body: some View {
+        TabView(selection: selection) {
+            DashboardView()
+                .tag(AppNavigationViewModel.PrimaryDestination.dashboard)
+                .tabItem {
+                    Label(AppNavigationViewModel.PrimaryDestination.dashboard.title,
+                          systemImage: AppNavigationViewModel.PrimaryDestination.dashboard.systemImage)
+                }
+
+            WeeklyTimesheetView()
+                .tag(AppNavigationViewModel.PrimaryDestination.timesheets)
+                .tabItem {
+                    Label(AppNavigationViewModel.PrimaryDestination.timesheets.title,
+                          systemImage: AppNavigationViewModel.PrimaryDestination.timesheets.systemImage)
+                }
+
+            YellowSheetView()
+                .tag(AppNavigationViewModel.PrimaryDestination.yellowSheet)
+                .tabItem {
+                    Label(AppNavigationViewModel.PrimaryDestination.yellowSheet.title,
+                          systemImage: AppNavigationViewModel.PrimaryDestination.yellowSheet.systemImage)
+                }
+
+            JobSearchView(viewModel: JobSearchViewModel(jobsViewModel: jobsViewModel, usersViewModel: usersViewModel))
+                .tag(AppNavigationViewModel.PrimaryDestination.search)
+                .tabItem {
+                    Label(AppNavigationViewModel.PrimaryDestination.search.title,
+                          systemImage: AppNavigationViewModel.PrimaryDestination.search.systemImage)
+                }
+
+            MoreTabView()
+                .tag(AppNavigationViewModel.PrimaryDestination.more)
+                .tabItem {
+                    Label(AppNavigationViewModel.PrimaryDestination.more.title,
+                          systemImage: AppNavigationViewModel.PrimaryDestination.more.systemImage)
+                }
+        }
+        .jtNavigationBarStyle()
+    }
+}
+
+// MARK: - More navigation
+
+struct MoreTabView: View {
+    @EnvironmentObject private var navigation: AppNavigationViewModel
+
+    private var morePathBinding: Binding<[AppNavigationViewModel.Destination]> {
+        Binding(
+            get: { navigation.morePath },
+            set: { navigation.updateMorePath($0) }
+        )
+    }
+
+    var body: some View {
+        NavigationStack(path: morePathBinding) {
+            MoreMenuList()
+                .navigationTitle("More")
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationDestination(for: AppNavigationViewModel.Destination.self) { destination in
+                    MoreDestinationView(destination: destination)
+                }
+        }
+        .jtNavigationBarStyle()
+        .background(JTGradients.background(stops: 4).ignoresSafeArea())
+        .onAppear {
+            if !navigation.activeDestination.isMoreStackDestination {
+                navigation.navigate(to: .more)
+            }
+        }
+    }
+}
+
+private struct MoreMenuList: View {
+    @EnvironmentObject private var navigation: AppNavigationViewModel
+    @EnvironmentObject private var authViewModel: AuthViewModel
+
+    var body: some View {
+        List {
+            Section("Account") {
+                NavigationLink(value: AppNavigationViewModel.Destination.profile) {
+                    Label("Profile", systemImage: AppNavigationViewModel.Destination.profile.systemImage)
+                }
+                NavigationLink(value: AppNavigationViewModel.Destination.settings) {
+                    Label("Settings", systemImage: AppNavigationViewModel.Destination.settings.systemImage)
+                }
+            }
+
+            Section("Team") {
+                NavigationLink(value: AppNavigationViewModel.Destination.findPartner) {
+                    Label("Find a Partner", systemImage: AppNavigationViewModel.Destination.findPartner.systemImage)
+                }
+            }
+
+            Section("Jobs") {
+                NavigationLink(value: AppNavigationViewModel.Destination.recentCrewJobs) {
+                    Label(AppNavigationViewModel.Destination.recentCrewJobs.title,
+                          systemImage: AppNavigationViewModel.Destination.recentCrewJobs.systemImage)
+                }
+            }
+
+            Section("Resources") {
+                NavigationLink(value: AppNavigationViewModel.Destination.maps) {
+                    Label(AppNavigationViewModel.Destination.maps.title,
+                          systemImage: AppNavigationViewModel.Destination.maps.systemImage)
+                }
+            }
+
+            Section("Splice Assist") {
+                NavigationLink(value: AppNavigationViewModel.Destination.spliceAssist) {
+                    Label(AppNavigationViewModel.Destination.spliceAssist.title,
+                          systemImage: AppNavigationViewModel.Destination.spliceAssist.systemImage)
+                }
+            }
+
+            if authViewModel.isSupervisorFlag {
+                Section("Supervisor") {
+                    NavigationLink(value: AppNavigationViewModel.Destination.supervisor) {
+                        Label("Supervisor", systemImage: AppNavigationViewModel.Destination.supervisor.systemImage)
+                    }
+                }
+            }
+
+            if authViewModel.isAdminFlag {
+                Section("Admin") {
+                    NavigationLink(value: AppNavigationViewModel.Destination.admin) {
+                        Label("Admin", systemImage: AppNavigationViewModel.Destination.admin.systemImage)
+                    }
+                }
+            }
+
+            Section("Support") {
+                NavigationLink(value: AppNavigationViewModel.Destination.helpCenter) {
+                    Label("Help Center", systemImage: AppNavigationViewModel.Destination.helpCenter.systemImage)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(
+            JTGradients.background(stops: 4)
+                .ignoresSafeArea()
+        )
+        .listStyle(.insetGrouped)
+    }
+}
+
+private struct MoreDestinationView: View {
+    let destination: AppNavigationViewModel.Destination
+
+    @EnvironmentObject private var jobsViewModel: JobsViewModel
+    @EnvironmentObject private var usersViewModel: UsersViewModel
+
+    @ViewBuilder
+    var body: some View {
+        switch destination {
+        case .profile:
+            ProfileView()
+        case .search:
+            JobSearchView(viewModel: JobSearchViewModel(jobsViewModel: jobsViewModel, usersViewModel: usersViewModel))
+        case .maps:
+            MapsView()
+        case .findPartner:
+            FindPartnerView()
+        case .supervisor:
+            SupervisorDashboardView()
+        case .admin:
+            AdminPanelView()
+        case .settings:
+            SettingsView()
+        case .helpCenter:
+            HelpCenterView()
+        case .recentCrewJobs:
+            RecentCrewJobsView()
+        case .spliceAssist:
+            SpliceAssistView()
+        case .more:
+            MoreMenuList()
+        default:
+            EmptyView()
+        }
+    }
+}
+
+// MARK: - Placeholder screens
+
+struct AdminPanelView: View {
+    @EnvironmentObject private var authViewModel: AuthViewModel
+    @EnvironmentObject private var usersViewModel: UsersViewModel
+    @StateObject private var viewModel = AdminPanelViewModel()
+    @StateObject private var updateViewModel = AdminUpdateViewModel()
+    @State private var pendingToggle: PendingToggle?
+    @State private var showingBackfillConfirmation = false
+    @State private var pendingUpdateAction: PendingUpdateAction?
+    @State private var showingLogs = false
+
+    var body: some View {
+        List {
+            updatesSection
+            rosterSection
+            maintenanceSection
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(
+            JTGradients.background(stops: 4)
+                .ignoresSafeArea()
+        )
+        .navigationTitle("Admin")
+        .alert(item: $viewModel.alert) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: Text(alert.message),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+        .confirmationDialog(
+            "Confirm role change",
+            isPresented: Binding(
+                get: { pendingToggle != nil },
+                set: { newValue in
+                    if !newValue {
+                        pendingToggle = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let pending = pendingToggle {
+                Button(role: .destructive) {
+                    finalizePendingToggle(pending)
+                } label: {
+                    switch pending.flag {
+                    case .admin:
+                        Text("Remove admin for \(pending.user.firstName)")
+                    case .supervisor:
+                        Text("Remove supervisor for \(pending.user.firstName)")
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                pendingToggle = nil
+            }
+        } message: {
+            Text("This updates Firebase immediately and may change the user's access right away.")
+        }
+        .confirmationDialog(
+            "Run participants backfill?",
+            isPresented: $showingBackfillConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Run Backfill", role: .destructive) {
+                showingBackfillConfirmation = false
+                viewModel.runParticipantsBackfill()
+            }
+            Button("Cancel", role: .cancel) {
+                showingBackfillConfirmation = false
+            }
+        } message: {
+            Text("Merges legacy job creators and assignees into each job's participants array. Only run when you understand the impact.")
+        }
+        .confirmationDialog(
+            pendingUpdateAction == .apply ? "Apply update?" : "Rollback to previous version?",
+            isPresented: Binding(
+                get: { pendingUpdateAction != nil },
+                set: { newValue in
+                    if !newValue { pendingUpdateAction = nil }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let action = pendingUpdateAction {
+                switch action {
+                case .apply:
+                    Button("Apply Update", role: .destructive) {
+                        updateViewModel.applyUpdate()
+                        pendingUpdateAction = nil
+                    }
+                case .rollback:
+                    Button("Rollback", role: .destructive) {
+                        updateViewModel.rollbackUpdate()
+                        pendingUpdateAction = nil
+                    }
+                }
+            }
+
+            Button("Cancel", role: .cancel) {
+                pendingUpdateAction = nil
+            }
+        } message: {
+            if pendingUpdateAction == .apply {
+                Text("Applies the downloaded build while in maintenance mode. Services may restart during the process.")
+            } else {
+                Text("Restores the last stable build. Use only if the new update is failing health checks.")
+            }
+        }
+        .sheet(isPresented: $showingLogs) {
+            NavigationStack {
+                AdminUpdateLogsView(logs: updateViewModel.logs)
+            }
+        }
+        .onAppear {
+            viewModel.attach(usersViewModel: usersViewModel)
+            viewModel.refreshRosterSnapshot()
+            let authVM = authViewModel
+            viewModel.onUserFlagsUpdated = { uid in
+                if authVM.currentUser?.id == uid {
+                    authVM.refreshCurrentUser()
+                }
+            }
+            authViewModel.refreshCurrentUser()
+        }
+    }
+
+    @ViewBuilder
+    private var updatesSection: some View {
+        Section("App Updates") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label("Current version", systemImage: "info.circle")
+                    Spacer()
+                    Text(updateViewModel.currentVersion)
+                        .font(.subheadline.monospaced())
+                }
+
+                if let available = updateViewModel.availableVersion {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Update available", systemImage: "arrow.down.circle")
+                            .font(.subheadline)
+                        Text("Version \(available)")
+                            .font(.subheadline.weight(.semibold))
+                        if !updateViewModel.changelog.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Changelog")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                ForEach(updateViewModel.changelog, id: \.self) { item in
+                                    HStack(alignment: .top, spacing: 6) {
+                                        Image(systemName: "checkmark.seal")
+                                            .font(.caption2)
+                                        Text(item)
+                                            .font(.footnote)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("No pending updates", systemImage: "checkmark.seal")
+                            .font(.subheadline)
+                        if let lastCheck = updateViewModel.lastCheckDate {
+                            Text("Last checked at \(lastCheck.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Package status")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(updateViewModel.verificationStatus.message)
+                        .font(.footnote)
+                        .foregroundStyle(updateViewModel.verificationStatus.isVerified ? .green : .primary)
+                }
+
+                Toggle(isOn: $updateViewModel.maintenanceModeEnabled) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Maintenance mode")
+                        Text("Required to apply or rollback updates.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let progress = updateViewModel.progress {
+                    if let fraction = progress.fractionComplete {
+                        ProgressView(value: fraction) {
+                            Text(progress.title)
+                                .font(.subheadline)
+                        } currentValueLabel: {
+                            Text(String(format: "%.0f%%", fraction * 100))
+                                .font(.caption.monospacedDigit())
+                        }
+                        Text(progress.message)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ProgressView(progress.title)
+                        Text(progress.message)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let error = updateViewModel.errorReason {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .onTapGesture { updateViewModel.resetError() }
+                }
+
+                VStack(spacing: 8) {
+                    Button {
+                        updateViewModel.checkForUpdates()
+                    } label: {
+                        Label("Check for Updates", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(updateViewModel.isBusy)
+
+                    Button {
+                        updateViewModel.downloadUpdate()
+                    } label: {
+                        Label("Download Update", systemImage: "tray.and.arrow.down")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(updateViewModel.isBusy || !updateViewModel.hasAvailableUpdate)
+
+                    Button {
+                        updateViewModel.verifyDownload()
+                    } label: {
+                        Label("Verify Package", systemImage: "checkmark.shield")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(updateViewModel.isBusy || !updateViewModel.hasDownloadedUpdate)
+
+                    Button(role: .destructive) {
+                        pendingUpdateAction = .apply
+                    } label: {
+                        Label("Apply Update", systemImage: "hammer")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(updateViewModel.isBusy || !updateViewModel.canApplyUpdate)
+
+                    Button {
+                        pendingUpdateAction = .rollback
+                    } label: {
+                        Label("Rollback", systemImage: "arrow.uturn.backward")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(updateViewModel.isBusy)
+
+                    Button {
+                        showingLogs = true
+                    } label: {
+                        Label("View Logs", systemImage: "doc.text.magnifyingglass")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder
+    private var rosterSection: some View {
+        Section("Roster") {
+            if viewModel.roster.isEmpty {
+                Text("No teammates found.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(viewModel.roster) { user in
+                    VStack(alignment: .leading, spacing: 12) {
+                        header(for: user)
+                        Toggle(isOn: Binding(
+                            get: { user.isAdmin },
+                            set: { newValue in requestAdminChange(for: user, newValue: newValue) }
+                        )) {
+                            Label("Admin", systemImage: "person.crop.badge.shield")
+                                .font(.subheadline)
+                        }
+                        .disabled(viewModel.isMutating(userID: user.id))
+
+                        Toggle(isOn: Binding(
+                            get: { user.isSupervisor },
+                            set: { newValue in requestSupervisorChange(for: user, newValue: newValue) }
+                        )) {
+                            Label("Supervisor", systemImage: "person.2.badge.gearshape")
+                                .font(.subheadline)
+                        }
+                        .disabled(viewModel.isMutating(userID: user.id))
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var maintenanceSection: some View {
+        Section("Maintenance") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Backfill job participants")
+                    .font(.headline)
+                Text("Ensure every job document contains a participants array by merging legacy creators and assignees.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                if viewModel.maintenanceStatus.isRunning, let progress = viewModel.maintenanceStatus.progress {
+                    if let fraction = progress.fractionComplete {
+                        ProgressView(value: fraction) {
+                            Text(progress.message)
+                                .font(.subheadline)
+                        } currentValueLabel: {
+                            Text("\(progress.processed)/\(progress.total)")
+                                .font(.caption.monospacedDigit())
+                        }
+                    } else {
+                        ProgressView(progress.message)
+                    }
+                }
+
+                if let lastCount = viewModel.maintenanceStatus.lastRunCount, !viewModel.maintenanceStatus.isRunning {
+                    Text("Last run updated \(lastCount) job\(lastCount == 1 ? "" : "s").")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let error = viewModel.maintenanceStatus.lastErrorMessage {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+
+                Button(role: .destructive) {
+                    showingBackfillConfirmation = true
+                } label: {
+                    Label("Run Backfill", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .disabled(viewModel.maintenanceStatus.isRunning)
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func header(for user: AppUser) -> some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(user.firstName) \(user.lastName)")
+                    .font(.headline)
+                Text(user.email)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if !user.position.isEmpty {
+                    Text(user.position)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            if viewModel.isMutating(userID: user.id) {
+                ProgressView()
+            } else if authViewModel.currentUser?.id == user.id {
+                Label("You", systemImage: "person.fill")
+                    .font(.caption)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.accentColor.opacity(0.15), in: Capsule())
+            }
+        }
+    }
+
+    private func requestAdminChange(for user: AppUser, newValue: Bool) {
+        guard !viewModel.isMutating(userID: user.id) else { return }
+        if newValue {
+            viewModel.setAdmin(true, for: user)
+        } else {
+            pendingToggle = PendingToggle(user: user, flag: .admin, newValue: false)
+        }
+    }
+
+    private func requestSupervisorChange(for user: AppUser, newValue: Bool) {
+        guard !viewModel.isMutating(userID: user.id) else { return }
+        if newValue {
+            viewModel.setSupervisor(true, for: user)
+        } else {
+            pendingToggle = PendingToggle(user: user, flag: .supervisor, newValue: false)
+        }
+    }
+
+    private func finalizePendingToggle(_ pending: PendingToggle) {
+        switch pending.flag {
+        case .admin:
+            viewModel.setAdmin(pending.newValue, for: pending.user)
+        case .supervisor:
+            viewModel.setSupervisor(pending.newValue, for: pending.user)
+        }
+        pendingToggle = nil
+    }
+
+    private struct PendingToggle: Identifiable {
+        enum Flag {
+            case admin
+            case supervisor
+        }
+
+        let id = UUID()
+        let user: AppUser
+        let flag: Flag
+        let newValue: Bool
+    }
+
+    private enum PendingUpdateAction {
+        case apply
+        case rollback
+    }
+}
+
+struct AdminUpdateLogsView: View {
+    let logs: [String]
+
+    var body: some View {
+        List {
+            if logs.isEmpty {
+                Text("No update activity yet.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(logs, id: \.self) { line in
+                    Text(line)
+                        .font(.caption.monospaced())
+                        .padding(.vertical, 2)
+                }
+            }
+        }
+        .navigationTitle("Update Logs")
+    }
+}
