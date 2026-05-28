@@ -534,29 +534,39 @@ extension JobDetailView {
         }
     }
     private var jobPhotoSlotsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            jobPhotoSlotRow(title: "House Picture", urlString: job.housePhotoURL, image: housePhotoImage, slot: .house)
-            jobPhotoSlotRow(title: "NID Picture", urlString: job.nidPhotoURL, image: nidPhotoImage, slot: .nid)
-            jobPhotoSlotRow(title: "CAN Picture", urlString: job.canPhotoURL, image: canPhotoImage, slot: .can)
+        VStack(alignment: .leading, spacing: 14) {
+            jobPhotoSlotCard(title: "House Picture", urlString: job.housePhotoURL, image: housePhotoImage, slot: .house)
+            jobPhotoSlotCard(title: "NID Picture", urlString: job.nidPhotoURL, image: nidPhotoImage, slot: .nid)
+            jobPhotoSlotCard(title: "CAN Picture", urlString: job.canPhotoURL, image: canPhotoImage, slot: .can)
 
             if !job.photos.isEmpty {
-                Divider()
-                Text("Other Job Photos")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                legacyPhotosSection
+            }
+        }
+        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+    }
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(job.photos, id: \.self) { urlString in
-                            legacyPhotoThumbnail(urlString: urlString)
-                        }
+    private func jobPhotoSlotCard(title: String, urlString: String?, image: UIImage?, slot: JobPhotoSlot) -> some View {
+        jobPhotoSlotRow(title: title, urlString: urlString, image: image, slot: slot)
+            .glassCard()
+    }
+
+    private var legacyPhotosSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Other Job Photos")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(job.photos, id: \.self) { urlString in
+                        legacyPhotoThumbnail(urlString: urlString)
                     }
-                    .padding(.vertical, 4)
                 }
+                .padding(.vertical, 4)
             }
         }
         .glassCard()
-        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
     }
 
     private func jobPhotoSlotRow(title: String, urlString: String?, image: UIImage?, slot: JobPhotoSlot) -> some View {
@@ -615,6 +625,7 @@ extension JobDetailView {
                 showImagePicker = true
             }
             .font(.subheadline)
+            .buttonStyle(.borderless)
         }
     }
 
