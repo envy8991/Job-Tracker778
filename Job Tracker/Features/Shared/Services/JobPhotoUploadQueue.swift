@@ -75,7 +75,13 @@ final class JobPhotoUploadQueue: ObservableObject {
 
     deinit {
         retryTask?.cancel()
-        endBackgroundTaskIfNeeded()
+
+        let taskID = backgroundTaskID
+        if taskID != .invalid {
+            Task { @MainActor in
+                UIApplication.shared.endBackgroundTask(taskID)
+            }
+        }
     }
 
     func enqueue(_ photos: [(slot: JobPhotoSlot, image: UIImage)], for jobID: String) {
