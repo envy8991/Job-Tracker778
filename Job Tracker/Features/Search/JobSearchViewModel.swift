@@ -287,6 +287,7 @@ final class JobSearchViewModel: ObservableObject {
     private nonisolated static func snippet(for entry: JobSearchIndexEntry, tokens: [String]) -> Result.DetailSnippet? {
         let candidates: [(String, String?)] = [
             ("Portal ID", entry.portalID),
+            ("Location Number", entry.locationNumber),
             ("Notes", entry.notes),
             ("Materials", entry.materialsUsed),
             ("Assignments", entry.assignments),
@@ -321,6 +322,9 @@ final class JobSearchViewModel: ObservableObject {
             haystackParts.append(normalized)
         }
         if let normalized = normalizedNonEmpty(job.portalID) {
+            haystackParts.append(normalized)
+        }
+        if let normalized = normalizedNonEmpty(job.locationNumber) {
             haystackParts.append(normalized)
         }
         if let normalized = normalizedNonEmpty(job.status) {
