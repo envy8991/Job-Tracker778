@@ -36,8 +36,8 @@ private struct PendingJobPhotoUpload: Identifiable, Codable, Equatable {
 ///
 /// Firestore queues document writes offline, but Firebase Storage does not provide the
 /// same durable offline write queue. This service gives photo uploads the same user
-/// experience as job saves by keeping local image files and retrying uploads while the
-/// app is running.
+/// experience as job saves by keeping local image files, requesting iOS background
+/// execution time for active uploads, and retrying unfinished uploads when the app runs again.
 @MainActor
 final class JobPhotoUploadQueue: ObservableObject {
     static let shared = JobPhotoUploadQueue()
@@ -54,6 +54,7 @@ final class JobPhotoUploadQueue: ObservableObject {
     private var items: [PendingJobPhotoUpload] = []
     private var activeUploadID: String?
     private var retryTask: Task<Void, Never>?
+    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
     private var cycleTotalCount: Int = 0
     private var cycleDoneCount: Int = 0
 
@@ -72,9 +73,6 @@ final class JobPhotoUploadQueue: ObservableObject {
         processQueue()
     }
 
-    deinit {
-        retryTask?.cancel()
-    }
 
     func enqueue(_ photos: [(slot: JobPhotoSlot, image: UIImage)], for jobID: String) {
         guard !photos.isEmpty else { return }
@@ -108,6 +106,7 @@ final class JobPhotoUploadQueue: ObservableObject {
 
         guard !addedItems.isEmpty else { return }
         items.append(contentsOf: addedItems)
+        ensureBackgroundTaskIfNeeded()
         cycleTotalCount += addedItems.count
         pendingCount = items.count
         saveManifest()
@@ -132,6 +131,7 @@ final class JobPhotoUploadQueue: ObservableObject {
             return
         }
 
+        ensureBackgroundTaskIfNeeded()
         activeUploadID = next.id
         inFlightCount = 1
         publishSyncState()
@@ -187,6 +187,7 @@ final class JobPhotoUploadQueue: ObservableObject {
         pendingCount = items.count
         saveManifest()
         publishSyncState()
+        ensureBackgroundTaskIfNeeded()
         scheduleRetry(after: retryDelay(forAttempts: (items.first { $0.id == item.id }?.attempts ?? item.attempts + 1)))
     }
 
@@ -196,16 +197,21 @@ final class JobPhotoUploadQueue: ObservableObject {
     }
 
     private func finish(_ item: PendingJobPhotoUpload, removingLocalFile: Bool) {
-        guard activeUploadID == item.id else { return }
+        guard activeUploadID == nil || activeUploadID == item.id else { return }
 
-        activeUploadID = nil
-        inFlightCount = 0
+        if activeUploadID == item.id {
+            activeUploadID = nil
+            inFlightCount = 0
+        }
 
-        if let index = items.firstIndex(where: { $0.id == item.id }) {
-            let removed = items.remove(at: index)
-            if removingLocalFile {
-                try? fileManager.removeItem(at: queueDirectory.appendingPathComponent(removed.fileName))
-            }
+        guard let index = items.firstIndex(where: { $0.id == item.id }) else {
+            endBackgroundTaskIfIdle()
+            return
+        }
+
+        let removed = items.remove(at: index)
+        if removingLocalFile {
+            try? fileManager.removeItem(at: queueDirectory.appendingPathComponent(removed.fileName))
         }
 
         cycleDoneCount += 1
@@ -242,6 +248,40 @@ final class JobPhotoUploadQueue: ObservableObject {
         cycleDoneCount = 0
         completedCount = 0
         pendingCount = 0
+        endBackgroundTaskIfIdle()
+    }
+
+    private func ensureBackgroundTaskIfNeeded() {
+        guard backgroundTaskID == .invalid, !items.isEmpty else { return }
+
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "JobPhotoUploadQueue") { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.handleBackgroundTaskExpired()
+            }
+        }
+    }
+
+    private func handleBackgroundTaskExpired() {
+        retryTask?.cancel()
+        retryTask = nil
+        activeUploadID = nil
+        inFlightCount = 0
+        pendingCount = items.count
+        saveManifest()
+        publishSyncState()
+        endBackgroundTaskIfNeeded()
+    }
+
+    private func endBackgroundTaskIfIdle() {
+        guard activeUploadID == nil, items.isEmpty else { return }
+        endBackgroundTaskIfNeeded()
+    }
+
+    private func endBackgroundTaskIfNeeded() {
+        guard backgroundTaskID != .invalid else { return }
+        let taskID = backgroundTaskID
+        backgroundTaskID = .invalid
+        UIApplication.shared.endBackgroundTask(taskID)
     }
 
     private func loadManifest() {
