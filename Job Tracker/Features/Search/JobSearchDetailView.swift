@@ -113,8 +113,9 @@ struct JobSearchDetailView: View {
                         DetailTextCard(title: "Notes", systemImage: "note.text", text: notesText)
                     }
 
-                    if !job.photos.isEmpty {
-                        PhotosSection(photos: job.photos)
+                    let photoURLStrings = orderedPhotoURLStrings(for: job)
+                    if !photoURLStrings.isEmpty {
+                        PhotosSection(photos: photoURLStrings)
                     }
                 }
                 .padding(.horizontal, JTSpacing.lg)
