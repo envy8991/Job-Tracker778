@@ -51,6 +51,13 @@ final class DashboardViewModel: ObservableObject {
     @Published var syncDone: Int = 0
     @Published var syncInFlight: Int = 0
     @Published var wavePhase: CGFloat = 0
+
+    private var jobSyncTotal: Int = 0
+    private var jobSyncDone: Int = 0
+    private var jobSyncInFlight: Int = 0
+    private var photoSyncTotal: Int = 0
+    private var photoSyncDone: Int = 0
+    private var photoSyncInFlight: Int = 0
     @Published var nearestJobID: String?
     @Published var selectedJob: Job?
 
@@ -428,16 +435,33 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func handleSyncStateChange(total: Int, done: Int, inFlight: Int) {
-        syncTotal = max(total, 0)
-        syncDone = max(min(done, total), 0)
-        syncInFlight = max(inFlight, 0)
+        jobSyncTotal = max(total, 0)
+        jobSyncDone = max(min(done, total), 0)
+        jobSyncInFlight = max(inFlight, 0)
+        updateCombinedSyncState()
+    }
+
+    func handlePhotoUploadSyncStateChange(total: Int, done: Int, inFlight: Int) {
+        photoSyncTotal = max(total, 0)
+        photoSyncDone = max(min(done, total), 0)
+        photoSyncInFlight = max(inFlight, 0)
+        updateCombinedSyncState()
+    }
+
+    private func updateCombinedSyncState() {
+        syncTotal = jobSyncTotal + photoSyncTotal
+        syncDone = jobSyncDone + photoSyncDone
+        syncInFlight = jobSyncInFlight + photoSyncInFlight
+
         withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
             showSyncBanner = (syncTotal > 0) && (syncDone < syncTotal)
         }
         if syncTotal > 0 && syncDone >= syncTotal {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                guard let self else { return }
+                guard self.syncTotal > 0, self.syncDone >= self.syncTotal else { return }
                 withAnimation(.easeInOut(duration: 0.25)) {
-                    self?.showSyncBanner = false
+                    self.showSyncBanner = false
                 }
             }
         }

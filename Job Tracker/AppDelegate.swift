@@ -30,6 +30,17 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         return true
     }
 
+
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        Task { @MainActor in
+            JobPhotoUploadQueue.shared.setBackgroundSessionCompletionHandler(completionHandler, for: identifier)
+        }
+    }
+
     func applicationWillResignActive(_ application: UIApplication) { }
     func applicationWillEnterForeground(_ application: UIApplication) { }
 

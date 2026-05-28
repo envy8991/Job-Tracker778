@@ -771,12 +771,16 @@ class FirebaseService {
             completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid image"])))
             return
         }
+        uploadImageData(data, for: jobID, completion: completion)
+    }
+
+    func uploadImageData(_ data: Data, for jobID: String, completion: @escaping (Result<String, Error>) -> Void) {
         let fileName = UUID().uuidString + ".jpg"
         let ref = storage.reference().child("jobPhotos/\(jobID)/\(fileName)")
-        
+
         let metadata = StorageMetadata()
         metadata.contentType = "image/jpeg"
-        
+
         ref.putData(data, metadata: metadata) { _, error in
             if let error = error {
                 completion(.failure(error))

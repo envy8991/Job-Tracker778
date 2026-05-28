@@ -113,12 +113,6 @@ private let jobPlacementChoices = ["OH", "UG"]
     // State for delete confirmation alert.
     @State private var showDeleteConfirmation = false
 
-    private enum JobPhotoSlot {
-        case house
-        case nid
-        case can
-    }
-
     // Locale-aware decimal separator used by the keyboard toolbar
     private var decimalSeparator: String { Locale.current.decimalSeparator ?? "." }
 
@@ -944,17 +938,22 @@ extension JobDetailView {
             job.latitude  = coord?.latitude
             job.longitude = coord?.longitude
 
-            uploadPendingPhotosThenSave()
+            enqueuePendingPhotosIfNeeded()
+            finalizeJobSave()
         }
     }
 
-    private func uploadPendingPhotosThenSave() {
-        savingProgress = 0.30
-        savingStatus = "Uploading job photos"
+    private func enqueuePendingPhotosIfNeeded() {
+        let pending: [(slot: JobPhotoSlot, image: UIImage)] = [
+            housePhotoImage.map { (.house, $0) },
+            nidPhotoImage.map { (.nid, $0) },
+            canPhotoImage.map { (.can, $0) }
+        ].compactMap { $0 }
 
-        uploadDedicatedPhotoImages {
-            finalizeJobSave()
-        }
+        guard !pending.isEmpty else { return }
+        savingProgress = 0.42
+        savingStatus = "Queueing job photos"
+        JobPhotoUploadQueue.shared.enqueue(pending, for: job.id)
     }
 
     private func finalizeJobSave() {
@@ -968,52 +967,6 @@ extension JobDetailView {
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
             dismiss()
-        }
-    }
-
-    private func uploadDedicatedPhotoImages(completion: @escaping () -> Void) {
-        let pending: [(JobPhotoSlot, UIImage)] = [
-            housePhotoImage.map { (.house, $0) },
-            nidPhotoImage.map { (.nid, $0) },
-            canPhotoImage.map { (.can, $0) }
-        ].compactMap { $0 }
-
-        guard !pending.isEmpty else {
-            completion()
-            return
-        }
-
-        let group = DispatchGroup()
-        var completed = 0
-
-        for (slot, image) in pending {
-            group.enter()
-            FirebaseService.shared.uploadImage(image, for: job.id) { result in
-                defer {
-                    completed += 1
-                    savingProgress = 0.30 + (0.15 * Double(completed) / Double(pending.count))
-                    savingStatus = "Uploading job photos (\(completed)/\(pending.count))"
-                    group.leave()
-                }
-
-                switch result {
-                case .success(let url):
-                    switch slot {
-                    case .house:
-                        job.housePhotoURL = url
-                    case .nid:
-                        job.nidPhotoURL = url
-                    case .can:
-                        job.canPhotoURL = url
-                    }
-                case .failure(let error):
-                    print("Upload error:", error.localizedDescription)
-                }
-            }
-        }
-
-        group.notify(queue: .main) {
-            completion()
         }
     }
 
