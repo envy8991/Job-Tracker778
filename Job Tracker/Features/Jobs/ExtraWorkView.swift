@@ -58,15 +58,30 @@ struct ExtraWorkView: View {
             .navigationTitle("Extra Work")
             .jtNavigationBarStyle()
             .sheet(item: $selectedJob) { job in
-                if let index = jobsViewModel.jobs.firstIndex(where: { $0.id == job.id }) {
-                    JobDetailView(job: $jobsViewModel.jobs[index])
+                if let jobBinding = binding(for: job) {
+                    JobDetailView(job: jobBinding)
                 } else {
                     Text("Job not found.")
                 }
             }
         }
     }
-    
+
+    private func binding(for selectedJob: Job) -> Binding<Job>? {
+        let jobID = selectedJob.id
+        guard jobsViewModel.jobs.contains(where: { $0.id == jobID }) else { return nil }
+
+        return Binding(
+            get: {
+                jobsViewModel.jobs.first(where: { $0.id == jobID }) ?? selectedJob
+            },
+            set: { updatedJob in
+                guard let index = jobsViewModel.jobs.firstIndex(where: { $0.id == jobID }) else { return }
+                jobsViewModel.jobs[index] = updatedJob
+            }
+        )
+    }
+
     private func unclaimedJobs(status: String) -> [Job] {
         jobsViewModel.jobs.filter { job in
             job.status == status && job.assignedTo == nil

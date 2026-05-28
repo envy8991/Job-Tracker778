@@ -100,10 +100,6 @@ private let jobPlacementChoices = ["OH", "UG"]
     @State private var housePhotoImage: UIImage?
     @State private var nidPhotoImage: UIImage?
     @State private var canPhotoImage: UIImage?
-    @State private var newImages: [UIImage] = []
-    @State private var isPhotoSelectionMode = false
-    @State private var selectedPhotoURLs: Set<String> = []
-    @State private var showDeletePhotosConfirmation = false
 
     // Full-screen viewer state
     @State private var fullScreenImageURL: URL? = nil
@@ -120,7 +116,6 @@ private let jobPlacementChoices = ["OH", "UG"]
         case house
         case nid
         case can
-        case general
     }
 
     // Locale-aware decimal separator used by the keyboard toolbar
@@ -312,8 +307,6 @@ private let jobPlacementChoices = ["OH", "UG"]
                     }
 
                     Section(header: Text("Job Photos")) { jobPhotoSlotsSection }
-                    Section(header: existingPhotosHeader) { existingPhotosSection }
-                    Section(header: Text("New Photos"))      { newPhotosSection }
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)   // keep gradient visible
@@ -372,8 +365,8 @@ private let jobPlacementChoices = ["OH", "UG"]
                             nidPhotoImage = newImage
                         case .can:
                             canPhotoImage = newImage
-                        case .general, .none:
-                            newImages.append(newImage)
+                        case .none:
+                            break
                         }
                     }
                 ))
@@ -388,14 +381,6 @@ private let jobPlacementChoices = ["OH", "UG"]
                 Button("Cancel", role: .cancel) { }
             } message: {
                 Text("Are you sure you want to delete this job? This action cannot be undone.")
-            }
-            .alert("Delete Selected Photos", isPresented: $showDeletePhotosConfirmation) {
-                Button("Delete", role: .destructive) {
-                    deleteSelectedPhotos()
-                }
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                Text("Remove \(selectedPhotoURLs.count) photo(s) from this job?")
             }
             // Full-screen photo viewer
             .fullScreenCover(item: Binding(
@@ -548,34 +533,27 @@ extension JobDetailView {
             .shadow(color: Color.black.opacity(0.25), radius: 20, x: 0, y: 12)
         }
     }
-    private var existingPhotosHeader: some View {
-        HStack {
-            Text("Existing Photos")
-            Spacer()
-            if isPhotoSelectionMode {
-                if !selectedPhotoURLs.isEmpty {
-                    Button("Delete (\(selectedPhotoURLs.count))") {
-                        showDeletePhotosConfirmation = true
-                    }
-                    .foregroundColor(.red)
-                }
-                Button("Cancel") {
-                    isPhotoSelectionMode = false
-                    selectedPhotoURLs.removeAll()
-                }
-            } else if !job.photos.isEmpty {
-                Button("Select") {
-                    isPhotoSelectionMode = true
-                }
-            }
-        }
-    }
-
     private var jobPhotoSlotsSection: some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             jobPhotoSlotRow(title: "House Picture", urlString: job.housePhotoURL, image: housePhotoImage, slot: .house)
             jobPhotoSlotRow(title: "NID Picture", urlString: job.nidPhotoURL, image: nidPhotoImage, slot: .nid)
             jobPhotoSlotRow(title: "CAN Picture", urlString: job.canPhotoURL, image: canPhotoImage, slot: .can)
+
+            if !job.photos.isEmpty {
+                Divider()
+                Text("Other Job Photos")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(job.photos, id: \.self) { urlString in
+                            legacyPhotoThumbnail(urlString: urlString)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
         }
         .glassCard()
         .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
@@ -638,6 +616,37 @@ extension JobDetailView {
             }
             .font(.subheadline)
         }
+    }
+
+
+    private func legacyPhotoThumbnail(urlString: String) -> some View {
+        Button {
+            if let url = URL(string: urlString) { fullScreenImageURL = url }
+        } label: {
+            AsyncImage(url: URL(string: urlString)) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            .frame(width: 72, height: 72)
+            .clipped()
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // Ariel Materials Section (for Ariel position)
@@ -762,136 +771,6 @@ extension JobDetailView {
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3)))
         }
         .padding(.vertical, 2)
-        .glassCard()
-        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-    }
-
-    // Existing Photos Section.
-    private var existingPhotosSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if job.photos.isEmpty {
-                Text("No existing photos")
-                    .foregroundColor(.secondary)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(job.photos, id: \.self) { urlString in
-                            let isSelected = selectedPhotoURLs.contains(urlString)
-                            Button {
-                                if isPhotoSelectionMode {
-                                    if isSelected {
-                                        selectedPhotoURLs.remove(urlString)
-                                    } else {
-                                        selectedPhotoURLs.insert(urlString)
-                                    }
-                                } else {
-                                    if let url = URL(string: urlString) { fullScreenImageURL = url }
-                                }
-                            } label: {
-                                ZStack(alignment: .topTrailing) {
-                                    // Thumbnail
-                                    if let url = URL(string: urlString) {
-                                        AsyncImage(url: url) { phase in
-                                            switch phase {
-                                            case .empty:
-                                                ProgressView()
-                                                    .frame(width: 100, height: 100)
-                                                    .clipped()
-                                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                                                    )
-                                            case .success(let image):
-                                                image
-                                                    .resizable()
-                                                    .scaledToFill()
-                                                    .frame(width: 100, height: 100)
-                                                    .clipped()
-                                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                                                    )
-                                            case .failure:
-                                                Color.red.frame(width: 100, height: 100)
-                                                    .clipped()
-                                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                                                    )
-                                            @unknown default:
-                                                EmptyView()
-                                            }
-                                        }
-                                    } else {
-                                        Color.gray.frame(width: 100, height: 100)
-                                            .clipped()
-                                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                                            )
-                                    }
-                                    // Selection chrome
-                                    if isPhotoSelectionMode {
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .stroke(isSelected ? Color.blue : Color.white, lineWidth: isSelected ? 3 : 1)
-                                            .frame(width: 100, height: 100)
-                                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                                            )
-                                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                            .imageScale(.large)
-                                            .padding(6)
-                                            .foregroundColor(isSelected ? .blue : .white)
-                                    }
-                                }
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-        }
-        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-    }
-
-    // New Photos Section.
-    private var newPhotosSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if newImages.isEmpty {
-                Text("No new photos added")
-                    .foregroundColor(.secondary)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack {
-                        ForEach(newImages, id: \.self) { uiImage in
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 100, height: 100)
-                                .clipped()
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                                )
-                        }
-                    }
-                }
-            }
-            Button("Add Photo") {
-                activePhotoSlot = .general
-                showImagePicker = true
-            }
-            .font(.subheadline)
-            .foregroundColor(.blue)
-        }
         .glassCard()
         .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
     }
@@ -1037,23 +916,8 @@ extension JobDetailView {
         savingProgress = 0.30
         savingStatus = "Uploading job photos"
 
-        uploadDedicatedPhotoImages { 
-            if !newImages.isEmpty {
-                savingProgress = 0.45
-                savingStatus = "Uploading photos (0/\(newImages.count))"
-                uploadAllNewImages(onEach: { done, total in
-                    let base: Double = 0.45
-                    let span: Double = 0.40
-                    let fraction = total > 0 ? Double(done) / Double(total) : 1.0
-                    savingProgress = min(base + span * fraction, 0.85)
-                    savingStatus = "Uploading photos (\(done)/\(total))"
-                }, completion: { urls in
-                    job.photos.append(contentsOf: urls)
-                    finalizeJobSave()
-                })
-            } else {
-                finalizeJobSave()
-            }
+        uploadDedicatedPhotoImages {
+            finalizeJobSave()
         }
     }
 
@@ -1105,8 +969,6 @@ extension JobDetailView {
                         job.nidPhotoURL = url
                     case .can:
                         job.canPhotoURL = url
-                    case .general:
-                        break
                     }
                 case .failure(let error):
                     print("Upload error:", error.localizedDescription)
@@ -1116,35 +978,6 @@ extension JobDetailView {
 
         group.notify(queue: .main) {
             completion()
-        }
-    }
-
-    private func uploadAllNewImages(onEach: ((Int, Int) -> Void)? = nil,
-                                    completion: @escaping ([String]) -> Void) {
-        let group = DispatchGroup()
-        var uploadedURLs: [String] = []
-        let total = newImages.count
-        var completed = 0
-
-        for uiImage in newImages {
-            group.enter()
-            FirebaseService.shared.uploadImage(uiImage, for: job.id) { result in
-                defer {
-                    completed += 1
-                    onEach?(completed, total)
-                    group.leave()
-                }
-                switch result {
-                case .success(let url):
-                    uploadedURLs.append(url)
-                case .failure(let error):
-                    print("Upload error:", error.localizedDescription)
-                }
-            }
-        }
-
-        group.notify(queue: .main) {
-            completion(uploadedURLs)
         }
     }
 
@@ -1239,17 +1072,6 @@ extension JobDetailView {
         // Allow 1 to 3 groups of digits separated by single dots, e.g., 54, 54.1, 1.2.3
         let pattern = "^[0-9]+(?:\\.[0-9]+){0,2}$"
         return s.range(of: pattern, options: .regularExpression) != nil
-    }
-    private func deleteSelectedPhotos() {
-        guard !selectedPhotoURLs.isEmpty else { return }
-        // Remove the selected URLs from the job model
-        let toDelete = selectedPhotoURLs
-        job.photos.removeAll { toDelete.contains($0) }
-        // Persist change
-        jobsViewModel.updateJob(job)
-        // Reset selection state
-        selectedPhotoURLs.removeAll()
-        isPhotoSelectionMode = false
     }
 }
 
