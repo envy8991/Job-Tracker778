@@ -21,6 +21,7 @@ struct Job: Identifiable, Codable {
     // New optional properties for footages:
     var nidFootage: String?
     var canFootage: String?
+    var jobPlacement: String?       // "OH" or "UG"
     
     // Default initializer updated to include new fields.
     init(
@@ -39,6 +40,7 @@ struct Job: Identifiable, Codable {
         hours: Double = 0.0,
         nidFootage: String? = nil,
         canFootage: String? = nil,
+        jobPlacement: String? = nil,
         latitude: Double? = nil,
         longitude: Double? = nil
     ) {
@@ -57,6 +59,7 @@ struct Job: Identifiable, Codable {
         self.hours = hours
         self.nidFootage = nidFootage
         self.canFootage = canFootage
+        self.jobPlacement = jobPlacement
         self.latitude = latitude
         self.longitude = longitude
     }
@@ -104,6 +107,7 @@ protocol JobSearchMatchable {
     var materialsUsed: String? { get }
     var nidFootage: String? { get }
     var canFootage: String? { get }
+    var jobPlacement: String? { get }
 }
 
 extension Job: JobSearchMatchable {}
@@ -120,6 +124,7 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
     var materialsUsed: String?
     var nidFootage: String?
     var canFootage: String?
+    var jobPlacement: String?
 
     init(
         id: String,
@@ -132,7 +137,8 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
         assignments: String? = nil,
         materialsUsed: String? = nil,
         nidFootage: String? = nil,
-        canFootage: String? = nil
+        canFootage: String? = nil,
+        jobPlacement: String? = nil
     ) {
         self.id = id
         self.address = address
@@ -145,6 +151,7 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
         self.materialsUsed = materialsUsed
         self.nidFootage = nidFootage
         self.canFootage = canFootage
+        self.jobPlacement = jobPlacement
     }
 
     init(job: Job) {
@@ -159,7 +166,8 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
             assignments: job.assignments,
             materialsUsed: job.materialsUsed,
             nidFootage: job.nidFootage,
-            canFootage: job.canFootage
+            canFootage: job.canFootage,
+            jobPlacement: job.jobPlacement
         )
     }
 
@@ -178,13 +186,15 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
             participants: nil,
             hours: 0.0,
             nidFootage: nidFootage,
-            canFootage: canFootage
+            canFootage: canFootage,
+            jobPlacement: jobPlacement
         )
         job.notes = notes
         job.assignments = assignments
         job.materialsUsed = materialsUsed
         job.nidFootage = nidFootage
         job.canFootage = canFootage
+        job.jobPlacement = jobPlacement
         job.jobNumber = jobNumber
         job.createdBy = createdBy
         return job

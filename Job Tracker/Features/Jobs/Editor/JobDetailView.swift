@@ -63,6 +63,7 @@ struct JobDetailView: View {
 
     // Fiber type selection (all users)
     @State private var fiberType: String = ""
+    @State private var jobPlacement: String = ""
 
     // Assignments dotted code (only for Can Splicers in UI)
     @State private var assignmentsText = ""
@@ -88,6 +89,7 @@ struct JobDetailView: View {
     let arielMaterials = ["None", "Weatherhead", "Rams Head"]
     let nidMaterials: [String] = [] // NID uses toggles/steppers instead of fixed list
 private let fiberChoices = ["Flat", "Round", "Mainline"]
+private let jobPlacementChoices = ["OH", "UG"]
 
     @State private var searchCompleter = SearchCompleterDelegate()
 
@@ -218,6 +220,32 @@ private let fiberChoices = ["Flat", "Round", "Mainline"]
                             ForEach(fiberChoices, id: \.self) { Text($0) }
                         }
                         .pickerStyle(.segmented)
+                        .glassCard()
+                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                    }
+
+                    Section(header: Text("OH / UG")) {
+                        HStack(spacing: 12) {
+                            ForEach(jobPlacementChoices, id: \.self) { choice in
+                                Button {
+                                    jobPlacement = choice
+                                } label: {
+                                    Text(choice)
+                                        .font(.headline)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .fill(jobPlacement == choice ? JTColors.accent.opacity(0.25) : Color.clear)
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .stroke(jobPlacement == choice ? JTColors.accent : Color.secondary.opacity(0.35), lineWidth: 1)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                         .glassCard()
                         .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                     }
@@ -398,6 +426,7 @@ private let fiberChoices = ["Flat", "Round", "Mainline"]
                 selectedMaterialNid   = nidMaterials.first ?? ""
                 canFootage       = job.canFootage ?? ""
                 nidFootage       = job.nidFootage ?? ""
+                jobPlacement     = job.jobPlacement ?? ""
                 assignmentsText  = job.assignments ?? ""
                 searchCompleter.onUpdate = { addressSuggestions = $0 }
                 searchCompleter.onFail   = { print("SearchCompleter error:", $0.localizedDescription) }
@@ -802,6 +831,7 @@ extension JobDetailView {
         job.status    = finalStatus
         job.notes     = editedNotes.isEmpty ? nil : editedNotes
         job.jobNumber = editedJobNumber.isEmpty ? nil : editedJobNumber
+        job.jobPlacement = normalizedPlacement(jobPlacement)
 
         // Assignments (validate & sanitize) — use strict sanitizer on save
         let sanitizedAssign = sanitizeAssignment(assignmentsText)
@@ -1005,6 +1035,11 @@ extension JobDetailView {
         }
 
         return cleaned
+    }
+
+    private func normalizedPlacement(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        return jobPlacementChoices.contains(trimmed) ? trimmed : nil
     }
 
     // MARK: - Assignment Helpers

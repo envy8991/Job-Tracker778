@@ -483,10 +483,21 @@ final class DashboardViewModel: ObservableObject {
     private func canRoleShareText(for job: Job) -> String {
         let line1 = houseNumberAndStreet(from: job.address).trimmingCharacters(in: .whitespacesAndNewlines)
         let line2 = (job.assignments ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let line3 = "Can-\((job.canFootage ?? "").trimmingCharacters(in: .whitespacesAndNewlines))’F"
-        let line4 = "Nid-\((job.nidFootage ?? "").trimmingCharacters(in: .whitespacesAndNewlines))’"
-        let line5 = fiberType(from: job.materialsUsed)
+        let line3 = "Can-\((job.canFootage ?? "").trimmingCharacters(in: .whitespacesAndNewlines))’"
+        let line4 = "Nid-\((job.nidFootage ?? "").trimmingCharacters(in: .whitespacesAndNewlines))’\(fiberSuffix(from: job.materialsUsed))"
+        let line5 = (job.jobPlacement ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         return [line1, line2, line3, line4, line5].joined(separator: "\n")
+    }
+
+    private func fiberSuffix(from materials: String?) -> String {
+        switch fiberType(from: materials).lowercased() {
+        case "flat":
+            return "F"
+        case "round":
+            return "R"
+        default:
+            return ""
+        }
     }
 
     private func fiberType(from materials: String?) -> String {
