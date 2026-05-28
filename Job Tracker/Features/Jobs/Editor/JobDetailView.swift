@@ -97,7 +97,9 @@ private let jobPlacementChoices = ["OH", "UG"]
 
     // Photos
     @State private var showImagePicker = false
+    @State private var showPhotoSourceDialog = false
     @State private var activePhotoSlot: JobPhotoSlot?
+    @State private var selectedPhotoSource: UIImagePickerController.SourceType = .photoLibrary
     @State private var housePhotoImage: UIImage?
     @State private var nidPhotoImage: UIImage?
     @State private var canPhotoImage: UIImage?
@@ -368,25 +370,50 @@ private let jobPlacementChoices = ["OH", "UG"]
                 }
             }
             // Image picker
+            .confirmationDialog(
+                "Add Photo",
+                isPresented: $showPhotoSourceDialog,
+                titleVisibility: .visible
+            ) {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button("Take Photo") {
+                        selectedPhotoSource = .camera
+                        showImagePicker = true
+                    }
+                }
+                Button("Choose from Photos") {
+                    selectedPhotoSource = .photoLibrary
+                    showImagePicker = true
+                }
+                Button("Cancel", role: .cancel) {
+                    activePhotoSlot = nil
+                }
+            } message: {
+                Text("Choose whether to use the camera now or pick an existing picture.")
+            }
             .sheet(isPresented: $showImagePicker, onDismiss: {
                 activePhotoSlot = nil
+                selectedPhotoSource = .photoLibrary
             }) {
-                ImagePicker(image: Binding(
-                    get: { nil },
-                    set: { newImage in
-                        guard let newImage else { return }
-                        switch activePhotoSlot {
-                        case .house:
-                            housePhotoImage = newImage
-                        case .nid:
-                            nidPhotoImage = newImage
-                        case .can:
-                            canPhotoImage = newImage
-                        case .none:
-                            break
+                ImagePicker(
+                    image: Binding(
+                        get: { nil },
+                        set: { newImage in
+                            guard let newImage else { return }
+                            switch activePhotoSlot {
+                            case .house:
+                                housePhotoImage = newImage
+                            case .nid:
+                                nidPhotoImage = newImage
+                            case .can:
+                                canPhotoImage = newImage
+                            case .none:
+                                break
+                            }
                         }
-                    }
-                ))
+                    ),
+                    sourceType: selectedPhotoSource
+                )
             }
             // Delete confirmation
             .alert("Delete Job", isPresented: $showDeleteConfirmation) {
@@ -640,7 +667,7 @@ extension JobDetailView {
 
             Button(image != nil || urlString?.isEmpty == false ? "Replace" : "Add") {
                 activePhotoSlot = slot
-                showImagePicker = true
+                showPhotoSourceDialog = true
             }
             .font(.subheadline)
             .buttonStyle(.borderless)
