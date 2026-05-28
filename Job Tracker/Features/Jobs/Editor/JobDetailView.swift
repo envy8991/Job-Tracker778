@@ -47,6 +47,7 @@ struct JobDetailView: View {
     @State private var editedNotes = ""
     @State private var editedJobNumber = ""
     @State private var editedPortalID = ""
+    @State private var editedLocationNumber = ""
     @State private var selectedMaterialAriel = "None"
     @State private var selectedMaterialNid = ""
     @State private var preformCount = 0
@@ -126,6 +127,11 @@ private let jobPlacementChoices = ["OH", "UG"]
         return !trimmed.isEmpty && Job.normalizedPortalID(from: trimmed) == nil
     }
 
+    private var isLocationNumberInvalid: Bool {
+        let trimmed = editedLocationNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && Job.normalizedLocationNumber(from: trimmed) == nil
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -170,6 +176,22 @@ private let jobPlacementChoices = ["OH", "UG"]
                             .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                         if isPortalIDInvalid {
                             Text("Enter a numeric Portal ID or paste a Gibson portal edit link.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 8, trailing: 12))
+                        }
+                        TextField("Location Number", text: $editedLocationNumber)
+                            .keyboardType(.numberPad)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
+                            .glassCard()
+                            .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                        Text("Use this when there is no Portal ID. Enter the location number or paste a Gibson consumer search link.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 4, trailing: 12))
+                        if isLocationNumberInvalid {
+                            Text("Enter a numeric location number or paste a Gibson consumer search link.")
                                 .font(.caption)
                                 .foregroundColor(.red)
                                 .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 8, trailing: 12))
@@ -325,6 +347,7 @@ private let jobPlacementChoices = ["OH", "UG"]
                                  && !assignmentsText.isEmpty
                                  && !isValidAssignment(assignmentsText))
                                 || isPortalIDInvalid
+                                || isLocationNumberInvalid
                                 || showSavingPopup
                             )
                     }
@@ -451,6 +474,7 @@ private let jobPlacementChoices = ["OH", "UG"]
                 editedNotes      = job.notes ?? ""
                 editedJobNumber  = job.jobNumber ?? ""
                 editedPortalID   = job.portalID ?? ""
+                editedLocationNumber = job.locationNumber ?? ""
                 selectedMaterialAriel = "None"
                 selectedMaterialNid   = nidMaterials.first ?? ""
                 canFootage       = job.canFootage ?? ""
@@ -837,6 +861,7 @@ extension JobDetailView {
         job.notes     = editedNotes.isEmpty ? nil : editedNotes
         job.jobNumber = editedJobNumber.isEmpty ? nil : editedJobNumber
         job.portalID = Job.normalizedPortalID(from: editedPortalID)
+        job.locationNumber = Job.normalizedLocationNumber(from: editedLocationNumber)
         job.jobPlacement = normalizedPlacement(jobPlacement)
 
         // Assignments (validate & sanitize) — use strict sanitizer on save

@@ -141,8 +141,8 @@ struct JobCard: View {
         }
         .contextMenu {
             Button("Directions", systemImage: "map.fill", action: onMapTap)
-            if job.portalURL != nil {
-                Button("Open Portal", systemImage: "safari", action: openPortal)
+            if job.gibsonPortalURL != nil {
+                Button(job.portalURL == nil ? "Open Location" : "Open Portal", systemImage: "safari", action: openPortal)
             }
             Button("Share", systemImage: "square.and.arrow.up", action: onShare)
             Button("Delete", role: .destructive, action: onDelete)
@@ -200,6 +200,12 @@ struct JobCard: View {
                 Spacer()
             }
 
+            if let portalID = job.portalID?.trimmedNonEmpty {
+                KeyValueRow(key: "Portal ID:", value: portalID)
+            }
+            if let locationNumber = job.locationNumber?.trimmedNonEmpty {
+                KeyValueRow(key: "Location Number:", value: locationNumber)
+            }
             if let assignments = job.assignments?.trimmedNonEmpty {
                 KeyValueRow(key: "Assignment:", value: assignments)
             }
@@ -269,9 +275,9 @@ struct JobCard: View {
 
             Spacer()
 
-            if job.portalURL != nil {
+            if job.gibsonPortalURL != nil {
                 Button(action: openPortal) {
-                    Label("Open Portal", systemImage: "safari")
+                    Label(job.portalURL == nil ? "Open Location" : "Open Portal", systemImage: "safari")
                         .font(JTTypography.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(JTColors.textPrimary)
@@ -279,7 +285,7 @@ struct JobCard: View {
                         .padding(.vertical, JTSpacing.xs)
                         .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
                 }
-                .accessibilityLabel("Open Gibson portal")
+                .accessibilityLabel(job.portalURL == nil ? "Open Gibson location search" : "Open Gibson portal")
             }
 
             Button(action: onMapTap) {
@@ -315,7 +321,7 @@ struct JobCard: View {
     }
 
     private func openPortal() {
-        guard let url = job.portalURL else { return }
+        guard let url = job.gibsonPortalURL else { return }
         openURL(url)
     }
 

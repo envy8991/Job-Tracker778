@@ -43,6 +43,7 @@ final class JobSearchMatcherTests: XCTestCase {
             createdBy: "user-1",
             notes: "   Needs Ladder   ",
             jobNumber: nil,
+            locationNumber: "833167",
             assignments: "  42.7.1  ",
             materialsUsed: "  Fiber Cable  ",
             nidFootage: "  150FT  ",
@@ -51,6 +52,7 @@ final class JobSearchMatcherTests: XCTestCase {
 
         XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "ladder", creator: creator))
         XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "fiber", creator: creator))
+        XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "833167", creator: creator))
         XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "42.7.1", creator: creator))
         XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "150ft", creator: creator))
         XCTAssertTrue(JobSearchMatcher.matches(job: jobWithOptionals, query: "200 ft", creator: creator))
@@ -60,5 +62,38 @@ final class JobSearchMatcherTests: XCTestCase {
         let entry = JobSearchIndexEntry(job: sampleJob)
         XCTAssertTrue(JobSearchMatcher.matches(job: entry, query: "main", creator: creator))
         XCTAssertTrue(JobSearchMatcher.matches(job: entry, query: "completed", creator: creator))
+    }
+
+    func testNormalizesLocationNumberFromConsumerSearchLink() {
+        let link = "https://portal.gibsonemc.com/consumers/search/?q=491320&models=consumers.consumer"
+        let job = Job(
+            id: "job-location-link",
+            address: "789 Pine Street",
+            date: Date(timeIntervalSince1970: 1_700_200_000),
+            status: "Pending",
+            locationNumber: link
+        )
+
+        XCTAssertEqual(job.locationNumber, "491320")
+        XCTAssertEqual(
+            job.locationSearchURL?.absoluteString,
+            "https://portal.gibsonemc.com/consumers/search/?q=491320&models=consumers.consumer"
+        )
+    }
+
+    func testGibsonPortalURLFallsBackToLocationSearchWhenPortalIDIsMissing() {
+        let job = Job(
+            id: "job-location-only",
+            address: "789 Pine Street",
+            date: Date(timeIntervalSince1970: 1_700_200_000),
+            status: "Pending",
+            locationNumber: "833167"
+        )
+
+        XCTAssertNil(job.portalURL)
+        XCTAssertEqual(
+            job.gibsonPortalURL?.absoluteString,
+            "https://portal.gibsonemc.com/consumers/search/?q=833167&models=consumers.consumer"
+        )
     }
 }

@@ -70,6 +70,10 @@ struct JobSearchDetailView: View {
             items.append(.init(title: "Portal ID", value: portalID, systemImage: "safari"))
         }
 
+        if let locationNumber = displayValue(job.locationNumber) {
+            items.append(.init(title: "Location Number", value: locationNumber, systemImage: "mappin.and.ellipse"))
+        }
+
         if let assignments = displayValue(job.assignments) {
             items.append(.init(title: "Assignment", value: assignments, systemImage: "list.number"))
         }
@@ -225,8 +229,8 @@ struct JobSearchDetailView: View {
                 openInMaps(job: job)
             }
 
-            if job.portalURL != nil {
-                QuickActionButton(title: "Open Portal", systemImage: "safari") {
+            if job.gibsonPortalURL != nil {
+                QuickActionButton(title: job.portalURL == nil ? "Open Location" : "Open Portal", systemImage: "safari") {
                     openPortal(job: job)
                 }
             }
@@ -239,7 +243,7 @@ struct JobSearchDetailView: View {
     }
 
     private func openPortal(job: Job) {
-        guard let url = job.portalURL else { return }
+        guard let url = job.gibsonPortalURL else { return }
         UIApplication.shared.open(url)
     }
 
