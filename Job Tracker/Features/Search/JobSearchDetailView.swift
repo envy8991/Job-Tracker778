@@ -254,15 +254,23 @@ struct JobSearchDetailView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         if normalizedRole == "can" {
+            isGeneratingShareLink = true
             let shareText = canRoleShareText(for: job)
             let trimmedText = shareText.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedText.isEmpty else {
                 let message = "We couldn’t create the CAN share format for this job."
                 alertState = AlertState(kind: .share, message: message)
+                isGeneratingShareLink = false
                 return
             }
-            shareItems = [trimmedText]
-            showShareSheet = true
+            Task {
+                let photoItems = await shareablePhotoImages(from: orderedPhotoURLStrings(for: job))
+                await MainActor.run {
+                    shareItems = [trimmedText] + photoItems
+                    isGeneratingShareLink = false
+                    showShareSheet = true
+                }
+            }
             return
         }
 
@@ -270,9 +278,10 @@ struct JobSearchDetailView: View {
 
         Task {
             do {
+                let photoItems = await shareablePhotoImages(from: orderedPhotoURLStrings(for: job))
                 let url = try await SharedJobService.shared.publishShareLink(job: job)
                 await MainActor.run {
-                    shareItems = [url]
+                    shareItems = [url] + photoItems
                     isGeneratingShareLink = false
                     showShareSheet = true
                 }
@@ -285,6 +294,35 @@ struct JobSearchDetailView: View {
                 }
             }
         }
+    }
+
+    private func shareablePhotoImages(from photoURLStrings: [String], limit: Int = 8) async -> [UIImage] {
+        var images: [UIImage] = []
+        for urlString in photoURLStrings.prefix(limit) {
+            guard let url = URL(string: urlString) else { continue }
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let image = UIImage(data: data) {
+                    images.append(image)
+                }
+            } catch {
+                continue
+            }
+        }
+        return images
+    }
+
+    private func orderedPhotoURLStrings(for job: Job) -> [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+
+        for urlString in [job.housePhotoURL, job.nidPhotoURL, job.canPhotoURL].compactMap({ $0 }) + job.photos {
+            let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { continue }
+            ordered.append(trimmed)
+        }
+
+        return ordered
     }
 
     private func canRoleShareText(for job: Job) -> String {

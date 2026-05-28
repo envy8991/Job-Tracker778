@@ -12,6 +12,9 @@ struct Job: Identifiable, Codable {
     var assignments: String?        // e.g. "12.3.2" or "123.2.4" – free-form dotted assignment code
     var materialsUsed: String?      // e.g. "Preforms, Weatherhead, Rams Head, 1 Nid Box and 1 Jumper", etc.
     var photos: [String]            // Array of image URLs
+    var housePhotoURL: String?
+    var nidPhotoURL: String?
+    var canPhotoURL: String?
     var participants: [String]?     // userIDs who can see this job (visibility list)
     // Geographic coordinates (optional; filled when geocoded or user-entered)
     var latitude: Double?
@@ -36,6 +39,9 @@ struct Job: Identifiable, Codable {
         assignments: String? = nil,
         materialsUsed: String? = nil,
         photos: [String] = [],
+        housePhotoURL: String? = nil,
+        nidPhotoURL: String? = nil,
+        canPhotoURL: String? = nil,
         participants: [String]? = nil,
         hours: Double = 0.0,
         nidFootage: String? = nil,
@@ -55,6 +61,9 @@ struct Job: Identifiable, Codable {
         self.assignments = assignments
         self.materialsUsed = materialsUsed
         self.photos = photos
+        self.housePhotoURL = housePhotoURL
+        self.nidPhotoURL = nidPhotoURL
+        self.canPhotoURL = canPhotoURL
         self.participants = participants
         self.hours = hours
         self.nidFootage = nidFootage

@@ -228,6 +228,10 @@ final class DashboardViewModel: ObservableObject {
 
     func share(job: Job, userRole: String?) async {
         guard !isGeneratingShareLink else { return }
+        isGeneratingShareLink = true
+        defer { isGeneratingShareLink = false }
+
+        let photoItems = await shareablePhotoImages(from: orderedPhotoURLStrings(for: job))
         let normalizedRole = userRole?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if normalizedRole == "can" {
             let canShareText = canRoleShareText(for: job)
@@ -235,17 +239,14 @@ final class DashboardViewModel: ObservableObject {
                 presentShareError(message: "Couldn't create share text for this job.")
                 return
             }
-            jobShareItems = [canShareText]
+            jobShareItems = [canShareText] + photoItems
             showSystemShareForJob = true
             return
         }
 
-        isGeneratingShareLink = true
-        defer { isGeneratingShareLink = false }
-
         do {
             let url = try await SharedJobService.shared.publishShareLink(job: job)
-            jobShareItems = [url]
+            jobShareItems = [url] + photoItems
             showSystemShareForJob = true
         } catch {
             presentShareError(message: "Couldn't create link: \(error.localizedDescription)")
@@ -340,6 +341,35 @@ final class DashboardViewModel: ObservableObject {
             }
         }
         return out
+    }
+
+    private func shareablePhotoImages(from photoURLStrings: [String], limit: Int = 8) async -> [UIImage] {
+        var images: [UIImage] = []
+        for urlString in photoURLStrings.prefix(limit) {
+            guard let url = URL(string: urlString) else { continue }
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let image = UIImage(data: data) {
+                    images.append(image)
+                }
+            } catch {
+                continue
+            }
+        }
+        return images
+    }
+
+    private func orderedPhotoURLStrings(for job: Job) -> [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+
+        for urlString in [job.housePhotoURL, job.nidPhotoURL, job.canPhotoURL].compactMap({ $0 }) + job.photos {
+            let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { continue }
+            ordered.append(trimmed)
+        }
+
+        return ordered
     }
 
     func presentDatePicker() {

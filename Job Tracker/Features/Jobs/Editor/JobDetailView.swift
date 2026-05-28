@@ -95,6 +95,10 @@ private let jobPlacementChoices = ["OH", "UG"]
 
     // Photos
     @State private var showImagePicker = false
+    @State private var activePhotoSlot: JobPhotoSlot?
+    @State private var housePhotoImage: UIImage?
+    @State private var nidPhotoImage: UIImage?
+    @State private var canPhotoImage: UIImage?
     @State private var newImages: [UIImage] = []
     @State private var isPhotoSelectionMode = false
     @State private var selectedPhotoURLs: Set<String> = []
@@ -110,6 +114,13 @@ private let jobPlacementChoices = ["OH", "UG"]
 
     // State for delete confirmation alert.
     @State private var showDeleteConfirmation = false
+
+    private enum JobPhotoSlot {
+        case house
+        case nid
+        case can
+        case general
+    }
 
     // Locale-aware decimal separator used by the keyboard toolbar
     private var decimalSeparator: String { Locale.current.decimalSeparator ?? "." }
@@ -282,6 +293,7 @@ private let jobPlacementChoices = ["OH", "UG"]
                         .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                     }
 
+                    Section(header: Text("Job Photos")) { jobPhotoSlotsSection }
                     Section(header: existingPhotosHeader) { existingPhotosSection }
                     Section(header: Text("New Photos"))      { newPhotosSection }
                 }
@@ -327,11 +339,23 @@ private let jobPlacementChoices = ["OH", "UG"]
                 }
             }
             // Image picker
-            .sheet(isPresented: $showImagePicker) {
+            .sheet(isPresented: $showImagePicker, onDismiss: {
+                activePhotoSlot = nil
+            }) {
                 ImagePicker(image: Binding(
                     get: { nil },
                     set: { newImage in
-                        if let newImage = newImage { newImages.append(newImage) }
+                        guard let newImage else { return }
+                        switch activePhotoSlot {
+                        case .house:
+                            housePhotoImage = newImage
+                        case .nid:
+                            nidPhotoImage = newImage
+                        case .can:
+                            canPhotoImage = newImage
+                        case .general, .none:
+                            newImages.append(newImage)
+                        }
                     }
                 ))
             }
@@ -526,6 +550,76 @@ extension JobDetailView {
             }
         }
     }
+
+    private var jobPhotoSlotsSection: some View {
+        VStack(spacing: 12) {
+            jobPhotoSlotRow(title: "House Picture", urlString: job.housePhotoURL, image: housePhotoImage, slot: .house)
+            jobPhotoSlotRow(title: "NID Picture", urlString: job.nidPhotoURL, image: nidPhotoImage, slot: .nid)
+            jobPhotoSlotRow(title: "CAN Picture", urlString: job.canPhotoURL, image: canPhotoImage, slot: .can)
+        }
+        .glassCard()
+        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+    }
+
+    private func jobPhotoSlotRow(title: String, urlString: String?, image: UIImage?, slot: JobPhotoSlot) -> some View {
+        HStack(spacing: 12) {
+            Group {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else if let urlString, let url = URL(string: urlString) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            Image(systemName: "photo")
+                                .foregroundStyle(.secondary)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                } else {
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 72, height: 72)
+            .clipped()
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+            )
+            .onTapGesture {
+                if image == nil, let urlString, let url = URL(string: urlString) {
+                    fullScreenImageURL = url
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(image != nil || urlString?.isEmpty == false ? "Ready" : "Not added")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button(image != nil || urlString?.isEmpty == false ? "Replace" : "Add") {
+                activePhotoSlot = slot
+                showImagePicker = true
+            }
+            .font(.subheadline)
+        }
+    }
+
     // Ariel Materials Section (for Ariel position)
     private var arielMaterialsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -772,6 +866,7 @@ extension JobDetailView {
                 }
             }
             Button("Add Photo") {
+                activePhotoSlot = .general
                 showImagePicker = true
             }
             .font(.subheadline)
@@ -913,43 +1008,93 @@ extension JobDetailView {
             job.latitude  = coord?.latitude
             job.longitude = coord?.longitude
 
-            // 3) Upload new photos, then save
+            uploadPendingPhotosThenSave()
+        }
+    }
+
+    private func uploadPendingPhotosThenSave() {
+        savingProgress = 0.30
+        savingStatus = "Uploading job photos"
+
+        uploadDedicatedPhotoImages { 
             if !newImages.isEmpty {
-                savingProgress = 0.35
+                savingProgress = 0.45
                 savingStatus = "Uploading photos (0/\(newImages.count))"
                 uploadAllNewImages(onEach: { done, total in
-                    let base: Double = 0.35
-                    let span: Double = 0.50    // will progress up to 0.85
+                    let base: Double = 0.45
+                    let span: Double = 0.40
                     let fraction = total > 0 ? Double(done) / Double(total) : 1.0
                     savingProgress = min(base + span * fraction, 0.85)
                     savingStatus = "Uploading photos (\(done)/\(total))"
                 }, completion: { urls in
                     job.photos.append(contentsOf: urls)
-                    savingProgress = 0.9
-                    savingStatus = "Finalizing"
-                    jobsViewModel.updateJob(job)
-                    savingProgress = 1.0
-                    savingStatus = "Saved"
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        showSavingPopup = false
-                        let generator = UINotificationFeedbackGenerator()
-                        generator.notificationOccurred(.success)
-                        dismiss()
-                    }
+                    finalizeJobSave()
                 })
             } else {
-                savingProgress = 0.6
-                savingStatus = "Finalizing"
-                jobsViewModel.updateJob(job)
-                savingProgress = 1.0
-                savingStatus = "Saved"
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    showSavingPopup = false
-                        let generator = UINotificationFeedbackGenerator()
-                        generator.notificationOccurred(.success)
-                        dismiss()
+                finalizeJobSave()
+            }
+        }
+    }
+
+    private func finalizeJobSave() {
+        savingProgress = 0.9
+        savingStatus = "Finalizing"
+        jobsViewModel.updateJob(job)
+        savingProgress = 1.0
+        savingStatus = "Saved"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            showSavingPopup = false
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            dismiss()
+        }
+    }
+
+    private func uploadDedicatedPhotoImages(completion: @escaping () -> Void) {
+        let pending: [(JobPhotoSlot, UIImage)] = [
+            housePhotoImage.map { (.house, $0) },
+            nidPhotoImage.map { (.nid, $0) },
+            canPhotoImage.map { (.can, $0) }
+        ].compactMap { $0 }
+
+        guard !pending.isEmpty else {
+            completion()
+            return
+        }
+
+        let group = DispatchGroup()
+        var completed = 0
+
+        for (slot, image) in pending {
+            group.enter()
+            FirebaseService.shared.uploadImage(image, for: job.id) { result in
+                defer {
+                    completed += 1
+                    savingProgress = 0.30 + (0.15 * Double(completed) / Double(pending.count))
+                    savingStatus = "Uploading job photos (\(completed)/\(pending.count))"
+                    group.leave()
+                }
+
+                switch result {
+                case .success(let url):
+                    switch slot {
+                    case .house:
+                        job.housePhotoURL = url
+                    case .nid:
+                        job.nidPhotoURL = url
+                    case .can:
+                        job.canPhotoURL = url
+                    case .general:
+                        break
+                    }
+                case .failure(let error):
+                    print("Upload error:", error.localizedDescription)
                 }
             }
+        }
+
+        group.notify(queue: .main) {
+            completion()
         }
     }
 
