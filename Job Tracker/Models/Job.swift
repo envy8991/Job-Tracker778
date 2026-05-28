@@ -9,6 +9,7 @@ struct Job: Identifiable, Codable {
     var createdBy: String?          // userID of whoever created the job
     var notes: String?              // Additional text notes
     var jobNumber: String?          // A job number for timesheet or reference
+    var portalID: String?           // Gibson portal edit ID used to deep-link into the external portal
     var assignments: String?        // e.g. "12.3.2" or "123.2.4" – free-form dotted assignment code
     var materialsUsed: String?      // e.g. "Preforms, Weatherhead, Rams Head, 1 Nid Box and 1 Jumper", etc.
     var photos: [String]            // Array of image URLs
@@ -36,6 +37,7 @@ struct Job: Identifiable, Codable {
         createdBy: String? = nil,
         notes: String = "",
         jobNumber: String? = nil,
+        portalID: String? = nil,
         assignments: String? = nil,
         materialsUsed: String? = nil,
         photos: [String] = [],
@@ -58,6 +60,7 @@ struct Job: Identifiable, Codable {
         self.createdBy = createdBy
         self.notes = notes
         self.jobNumber = jobNumber
+        self.portalID = Self.normalizedPortalID(from: portalID)
         self.assignments = assignments
         self.materialsUsed = materialsUsed
         self.photos = photos
@@ -102,12 +105,45 @@ extension Job {
     }
 }
 
+// MARK: - Gibson portal support
+
+extension Job {
+    static let portalBaseURLString = "https://portal.gibsonemc.com/edit"
+
+    /// Accepts either a plain portal ID (for example, "97087") or a full Gibson portal URL
+    /// and returns the numeric edit ID that should be stored on the job.
+    static func normalizedPortalID(from rawValue: String?) -> String? {
+        guard let rawValue else { return nil }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let url = URL(string: trimmed),
+           let editIndex = url.pathComponents.firstIndex(of: "edit"),
+           url.pathComponents.indices.contains(editIndex + 1) {
+            let candidate = url.pathComponents[editIndex + 1]
+            return candidate.allSatisfy(\.isNumber) ? candidate : nil
+        }
+
+        return trimmed.allSatisfy(\.isNumber) ? trimmed : nil
+    }
+
+    var normalizedPortalID: String? {
+        Self.normalizedPortalID(from: portalID)
+    }
+
+    var portalURL: URL? {
+        guard let normalizedPortalID else { return nil }
+        return URL(string: "\(Self.portalBaseURLString)/\(normalizedPortalID)")
+    }
+}
+
 // MARK: - Search index support
 
 protocol JobSearchMatchable {
     var id: String { get }
     var address: String { get }
     var jobNumber: String? { get }
+    var portalID: String? { get }
     var status: String { get }
     var createdBy: String? { get }
     var date: Date { get }
@@ -125,6 +161,7 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
     var id: String
     var address: String
     var jobNumber: String?
+    var portalID: String?
     var status: String
     var createdBy: String?
     var date: Date
@@ -139,6 +176,7 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
         id: String,
         address: String,
         jobNumber: String? = nil,
+        portalID: String? = nil,
         status: String,
         createdBy: String? = nil,
         date: Date,
@@ -152,6 +190,7 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
         self.id = id
         self.address = address
         self.jobNumber = jobNumber
+        self.portalID = Job.normalizedPortalID(from: portalID)
         self.status = status
         self.createdBy = createdBy
         self.date = date
@@ -168,6 +207,7 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
             id: job.id,
             address: job.address,
             jobNumber: job.jobNumber,
+            portalID: job.portalID,
             status: job.status,
             createdBy: job.createdBy,
             date: job.date,
@@ -189,6 +229,7 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
             createdBy: createdBy,
             notes: notes ?? "",
             jobNumber: jobNumber,
+            portalID: portalID,
             assignments: assignments,
             materialsUsed: materialsUsed,
             photos: [],
@@ -205,6 +246,7 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
         job.canFootage = canFootage
         job.jobPlacement = jobPlacement
         job.jobNumber = jobNumber
+        job.portalID = Job.normalizedPortalID(from: portalID)
         job.createdBy = createdBy
         return job
     }

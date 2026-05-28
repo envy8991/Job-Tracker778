@@ -613,6 +613,7 @@ struct SupervisorCreateJobView: View {
     @State private var notes = ""
     @State private var materialsUsed = ""
     @State private var jobNumber = ""
+    @State private var portalID = ""
     @State private var assignmentsText: String = ""
     @State private var selectedUserID: String? = nil
     @State private var showUserPicker = false
@@ -627,6 +628,11 @@ struct SupervisorCreateJobView: View {
     @State private var showAlert = false
 
     // No statusOptions needed; status always Pending
+
+    private var isPortalIDInvalid: Bool {
+        let trimmed = portalID.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && Job.normalizedPortalID(from: trimmed) == nil
+    }
 
     private var selectedUserName: String {
         guard let id = selectedUserID, let u = usersViewModel.user(id: id) else { return "Unassigned" }
@@ -753,6 +759,21 @@ struct SupervisorCreateJobView: View {
                         TextField("Required", text: $jobNumber)
                     }
 
+                    Section(header: Text("Portal ID")) {
+                        TextField("Optional, e.g. 97087", text: $portalID)
+                            .keyboardType(.numberPad)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
+                        Text("Enter the Gibson portal edit ID, or paste the full portal link and the app will store the ID.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        if isPortalIDInvalid {
+                            Text("Enter a numeric Portal ID or paste a Gibson portal edit link.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+
                     Section(header: Text("Materials Used")) {
                         TextField("Enter materials info…", text: $materialsUsed)
                     }
@@ -772,7 +793,7 @@ struct SupervisorCreateJobView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") { saveJob() }
-                        .disabled(jobNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(jobNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isPortalIDInvalid)
                 }
             }
             .sheet(isPresented: $showUserPicker) {
@@ -821,6 +842,7 @@ struct SupervisorCreateJobView: View {
                 createdBy: supervisorID,
                 notes: notes,
                 jobNumber: jobNumber.isEmpty ? nil : jobNumber,
+                portalID: Job.normalizedPortalID(from: portalID),
                 assignments: assignmentsText.isEmpty ? nil : assignmentsText,
                 materialsUsed: materialsUsed,
                 latitude: coord?.latitude,

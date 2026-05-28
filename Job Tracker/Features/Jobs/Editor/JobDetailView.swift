@@ -46,6 +46,7 @@ struct JobDetailView: View {
     @State private var customStatusText = ""
     @State private var editedNotes = ""
     @State private var editedJobNumber = ""
+    @State private var editedPortalID = ""
     @State private var selectedMaterialAriel = "None"
     @State private var selectedMaterialNid = ""
     @State private var preformCount = 0
@@ -125,6 +126,11 @@ private let jobPlacementChoices = ["OH", "UG"]
     // Locale-aware decimal separator used by the keyboard toolbar
     private var decimalSeparator: String { Locale.current.decimalSeparator ?? "." }
 
+    private var isPortalIDInvalid: Bool {
+        let trimmed = editedPortalID.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && Job.normalizedPortalID(from: trimmed) == nil
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -161,6 +167,18 @@ private let jobPlacementChoices = ["OH", "UG"]
                         TextField("Job #", text: $editedJobNumber)
                             .glassCard()
                             .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                        TextField("Portal ID", text: $editedPortalID)
+                            .keyboardType(.numberPad)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
+                            .glassCard()
+                            .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                        if isPortalIDInvalid {
+                            Text("Enter a numeric Portal ID or paste a Gibson portal edit link.")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .listRowInsets(EdgeInsets(top: 0, leading: 12, bottom: 8, trailing: 12))
+                        }
                         Picker("Status", selection: $editedStatus) {
                             ForEach(statusOptions, id: \.self) { Text($0) }
                         }
@@ -313,6 +331,7 @@ private let jobPlacementChoices = ["OH", "UG"]
                                 (authViewModel.currentUser?.position == "Can"
                                  && !assignmentsText.isEmpty
                                  && !isValidAssignment(assignmentsText))
+                                || isPortalIDInvalid
                                 || showSavingPopup
                             )
                     }
@@ -446,6 +465,7 @@ private let jobPlacementChoices = ["OH", "UG"]
                 }
                 editedNotes      = job.notes ?? ""
                 editedJobNumber  = job.jobNumber ?? ""
+                editedPortalID   = job.portalID ?? ""
                 selectedMaterialAriel = "None"
                 selectedMaterialNid   = nidMaterials.first ?? ""
                 canFootage       = job.canFootage ?? ""
@@ -926,6 +946,7 @@ extension JobDetailView {
         job.status    = finalStatus
         job.notes     = editedNotes.isEmpty ? nil : editedNotes
         job.jobNumber = editedJobNumber.isEmpty ? nil : editedJobNumber
+        job.portalID = Job.normalizedPortalID(from: editedPortalID)
         job.jobPlacement = normalizedPlacement(jobPlacement)
 
         // Assignments (validate & sanitize) — use strict sanitizer on save
