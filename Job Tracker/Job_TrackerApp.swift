@@ -79,6 +79,7 @@ struct JobTrackerApp: App {
                             // Ensure the watch has the latest on first appearance
                             PhoneWatchSyncManager.shared.pushSnapshotToWatch()
                             arrivalAlertManager.updateJobs(jobsViewModel.jobs)
+                            JobPhotoUploadQueue.shared.retryPendingUploads()
                         }
                         .onReceive(jobsViewModel.$jobs) { jobs in
                             PhoneWatchSyncManager.shared.pushSnapshotToWatch()
@@ -187,6 +188,7 @@ struct JobTrackerApp: App {
                 switch phase {
                 case .active:
                     locationService.startStandardUpdates()
+                    JobPhotoUploadQueue.shared.retryPendingUploads()
                 case .background:
                     locationService.startSignificantChangeUpdates()
                 default:
