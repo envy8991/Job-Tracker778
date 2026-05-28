@@ -195,6 +195,7 @@ struct DashboardView: View {
             .onAppear {
                 viewModel.configureIfNeeded(jobsViewModel: jobsViewModel)
                 viewModel.updateNearestJob(with: jobsViewModel.jobs, currentLocation: locationService.current)
+                JobPhotoUploadQueue.shared.publishCurrentSyncState()
             }
             .onReceive(locationService.$current) { location in
                 viewModel.updateNearestJob(with: jobsViewModel.jobs, currentLocation: location)
@@ -222,6 +223,13 @@ struct DashboardView: View {
                 let done = (info["uploaded"] as? Int) ?? (info["done"] as? Int) ?? 0
                 let inFlight = (info["inFlight"] as? Int) ?? 0
                 viewModel.handleSyncStateChange(total: total, done: done, inFlight: inFlight)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .jobPhotoUploadsSyncStateDidChange)) { note in
+                let info = note.userInfo ?? [:]
+                let total = (info["total"] as? Int) ?? 0
+                let done = (info["uploaded"] as? Int) ?? (info["done"] as? Int) ?? 0
+                let inFlight = (info["inFlight"] as? Int) ?? 0
+                viewModel.handlePhotoUploadSyncStateChange(total: total, done: done, inFlight: inFlight)
             }
             .onChange(of: viewModel.showSyncBanner) { visible in
                 if visible {
