@@ -176,6 +176,8 @@ struct CreateJobView: View {
     @State private var notes = ""
     @State private var materialsUsed = ""
     @State private var jobNumber = ""
+    @State private var portalID = ""
+    @State private var locationNumber = ""
     @State private var customStatusText = ""
     @State private var assignmentsText: String = ""
     @FocusState private var isAssignmentsFocused: Bool
@@ -261,6 +263,52 @@ struct CreateJobView: View {
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                                         .stroke(Color.gray.opacity(0.15), lineWidth: 1)
                                 )
+                        }
+
+                        // Portal ID
+                        SectionCard(title: "Portal ID") {
+                            VStack(alignment: .leading, spacing: 6) {
+                                TextField("Optional, e.g. 97087", text: $portalID)
+                                    .keyboardType(.numberPad)
+                                    .textInputAutocapitalization(.never)
+                                    .disableAutocorrection(true)
+                                    .padding(12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .fill(Color(.systemBackground).opacity(0.9))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                                    )
+
+                                Text("Enter the Gibson portal edit ID, or paste the full portal link and the app will store the ID.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        // Location Number
+                        SectionCard(title: "Location Number") {
+                            VStack(alignment: .leading, spacing: 6) {
+                                TextField("Optional, e.g. 833167", text: $locationNumber)
+                                    .keyboardType(.numberPad)
+                                    .textInputAutocapitalization(.never)
+                                    .disableAutocorrection(true)
+                                    .padding(12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .fill(Color(.systemBackground).opacity(0.9))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                                    )
+
+                                Text("Use this when you do not have a Portal ID. You can enter the location number or paste a Gibson consumer search link.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
 
                         // Assignments (role-based)
@@ -414,6 +462,18 @@ struct CreateJobView: View {
             return
         }
 
+        if !portalID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           Job.normalizedPortalID(from: portalID) == nil {
+            alertMessage = "Please enter a valid numeric Portal ID or paste a Gibson portal edit link."
+            return
+        }
+
+        if !locationNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           Job.normalizedLocationNumber(from: locationNumber) == nil {
+            alertMessage = "Please enter a valid numeric Location Number or paste a Gibson consumer search link."
+            return
+        }
+
         saveJobs(addressesToSave: trimmedAddresses)
     }
 
@@ -428,6 +488,8 @@ struct CreateJobView: View {
 
         let sanitizedAssign = sanitizeAssignment(assignmentsText)
         let assignmentsValue = sanitizedAssign.isEmpty || !isValidAssignment(sanitizedAssign) ? nil : sanitizedAssign
+        let portalIDValue = Job.normalizedPortalID(from: portalID)
+        let locationNumberValue = Job.normalizedLocationNumber(from: locationNumber)
 
         let geocoder = CLGeocoder()
 
@@ -449,6 +511,8 @@ struct CreateJobView: View {
                     createdBy: userID,
                     notes: notes,
                     jobNumber: jobNumber.isEmpty ? nil : jobNumber,
+                    portalID: portalIDValue,
+                    locationNumber: locationNumberValue,
                     assignments: assignmentsValue,
                     materialsUsed: materialsUsed,
                     latitude: coord?.latitude,

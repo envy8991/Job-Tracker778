@@ -84,6 +84,8 @@ private struct DashboardJobSectionHeader: View {
 }
 
 struct JobCard: View {
+    @Environment(\.openURL) private var openURL
+
     let job: Job
     let isHere: Bool
     let statusOptions: [String]
@@ -139,6 +141,9 @@ struct JobCard: View {
         }
         .contextMenu {
             Button("Directions", systemImage: "map.fill", action: onMapTap)
+            if job.portalDestinationURL != nil {
+                Button("Open Portal", systemImage: "safari", action: openPortal)
+            }
             Button("Share", systemImage: "square.and.arrow.up", action: onShare)
             Button("Delete", role: .destructive, action: onDelete)
         }
@@ -264,6 +269,19 @@ struct JobCard: View {
 
             Spacer()
 
+            if job.portalDestinationURL != nil {
+                Button(action: openPortal) {
+                    Label("Open Portal", systemImage: "safari")
+                        .font(JTTypography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(JTColors.textPrimary)
+                        .padding(.horizontal, JTSpacing.sm)
+                        .padding(.vertical, JTSpacing.xs)
+                        .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
+                }
+                .accessibilityLabel("Open Gibson portal")
+            }
+
             Button(action: onMapTap) {
                 Image(systemName: "map")
                     .imageScale(.medium)
@@ -294,6 +312,11 @@ struct JobCard: View {
                     .jtGlassBackground(shape: Circle(), strokeColor: JTColors.glassSoftStroke)
             }
         }
+    }
+
+    private func openPortal() {
+        guard let url = job.portalDestinationURL else { return }
+        openURL(url)
     }
 
     private func statusBackground(for status: String) -> Color {
@@ -349,6 +372,7 @@ private struct DashboardJobSectionsPreviewContainer: View {
             date: today,
             status: "Pending",
             notes: "Call ahead",
+            portalID: "97087",
             assignments: "12.3.2",
             materialsUsed: "Coax, Splitter"
         )
@@ -358,6 +382,7 @@ private struct DashboardJobSectionsPreviewContainer: View {
             date: today,
             status: "Done",
             notes: "Customer not home",
+            locationNumber: "833167",
             hours: 2
         )
         sections = DashboardViewModel.JobSections(

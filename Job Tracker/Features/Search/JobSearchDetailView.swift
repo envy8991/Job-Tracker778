@@ -66,6 +66,14 @@ struct JobSearchDetailView: View {
             items.append(.init(title: "Assigned to", value: assigned, systemImage: "person.crop.circle"))
         }
 
+        if let portalID = displayValue(job.portalID) {
+            items.append(.init(title: "Portal ID", value: portalID, systemImage: "safari"))
+        }
+
+        if let locationNumber = displayValue(job.locationNumber) {
+            items.append(.init(title: "Location Number", value: locationNumber, systemImage: "location"))
+        }
+
         if let assignments = displayValue(job.assignments) {
             items.append(.init(title: "Assignment", value: assignments, systemImage: "list.number"))
         }
@@ -220,11 +228,22 @@ struct JobSearchDetailView: View {
                 openInMaps(job: job)
             }
 
+            if job.portalDestinationURL != nil {
+                QuickActionButton(title: "Open Portal", systemImage: "safari") {
+                    openPortal(job: job)
+                }
+            }
+
             QuickActionButton(title: "Share", systemImage: "square.and.arrow.up", isLoading: isGeneratingShareLink) {
                 share(job: job)
             }
             .disabled(isGeneratingShareLink)
         }
+    }
+
+    private func openPortal(job: Job) {
+        guard let url = job.portalDestinationURL else { return }
+        UIApplication.shared.open(url)
     }
 
     private func openInMaps(job: Job) {
