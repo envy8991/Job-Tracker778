@@ -142,7 +142,7 @@ struct JobCard: View {
         .contextMenu {
             Button("Directions", systemImage: "map.fill", action: onMapTap)
             if job.gibsonPortalURL != nil {
-                Button(job.portalURL == nil ? "Open Location" : "Open Portal", systemImage: "safari", action: openPortal)
+                Button("Open Portal", systemImage: "safari", action: openPortal)
             }
             Button("Share", systemImage: "square.and.arrow.up", action: onShare)
             Button("Delete", role: .destructive, action: onDelete)
@@ -277,7 +277,7 @@ struct JobCard: View {
 
             if job.gibsonPortalURL != nil {
                 Button(action: openPortal) {
-                    Label(job.portalURL == nil ? "Open Location" : "Open Portal", systemImage: "safari")
+                    Label("Open Portal", systemImage: "safari")
                         .font(JTTypography.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(JTColors.textPrimary)
@@ -285,7 +285,7 @@ struct JobCard: View {
                         .padding(.vertical, JTSpacing.xs)
                         .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
                 }
-                .accessibilityLabel(job.portalURL == nil ? "Open Gibson location search" : "Open Gibson portal")
+                .accessibilityLabel("Open Gibson portal")
             }
 
             Button(action: onMapTap) {
