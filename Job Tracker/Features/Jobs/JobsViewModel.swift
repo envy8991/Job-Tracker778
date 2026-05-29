@@ -325,11 +325,27 @@ class JobsViewModel: ObservableObject {
                         print("updateJob: merge setData error: \(writeErr)")
                         return
                     }
+                    var patch: [String: Any] = [:]
+
+                    // The Firestore Codable encoder omits nil optionals. Because this update uses
+                    // merge: true, omitted identifier fields would leave stale portal/location
+                    // numbers on the server after a user clears or replaces one of them.
+                    if job.portalID == nil {
+                        patch["portalID"] = FieldValue.delete()
+                    }
+                    if job.locationNumber == nil {
+                        patch["locationNumber"] = FieldValue.delete()
+                    }
+
                     // 3) Re-assert participants if they existed (protects against encoder omitting/clearing them)
                     if !preservedParticipants.isEmpty {
-                        ref.updateData(["participants": preservedParticipants]) { patchErr in
+                        patch["participants"] = preservedParticipants
+                    }
+
+                    if !patch.isEmpty {
+                        ref.updateData(patch) { patchErr in
                             if let patchErr = patchErr {
-                                print("updateJob: failed to preserve participants: \(patchErr)")
+                                print("updateJob: failed to patch merged fields: \(patchErr)")
                             }
                         }
                     }
