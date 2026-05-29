@@ -5,21 +5,27 @@
 //  Created by Quinton  Thompson  on 1/30/25.
 //
 
-
 import SwiftUI
 import Combine
+import FirebaseFirestore
 
 class AuthViewModel: ObservableObject {
-@Published var currentUser: AppUser? = nil
-@Published var isSignedIn: Bool = false
+    @Published var currentUser: AppUser? = nil
+    @Published var isSignedIn: Bool = false
     @Published var isAdminFlag: Bool = false
     @Published var isSupervisorFlag: Bool = false
 
-private var cancellables = Set<AnyCancellable>()
+    private var cancellables = Set<AnyCancellable>()
+    private var currentUserListener: ListenerRegistration?
+    private var observedCurrentUserID: String?
 
-init() {
-    checkAuthState()
-}
+    init() {
+        checkAuthState()
+    }
+
+    deinit {
+        stopCurrentUserListener()
+    }
 
     private func applyUser(_ user: AppUser?) {
         self.currentUser = user
@@ -28,77 +34,73 @@ init() {
         self.isSupervisorFlag = (user?.isSupervisor == true)
     }
 
-func checkAuthState() {
-    if let _ = FirebaseService.shared.currentUserID() {
+    func checkAuthState() {
+        if FirebaseService.shared.currentUserID() != nil {
+            startCurrentUserListener()
+        } else {
+            stopCurrentUserListener()
+            DispatchQueue.main.async { self.applyUser(nil) }
+        }
+    }
+
+    func signUp(firstName: String, lastName: String, position: String, email: String, password: String, completion: @escaping (Error?) -> Void) {
+        FirebaseService.shared.signUpUser(firstName: firstName, lastName: lastName, position: position, email: email, password: password) { [weak self] result in
+            switch result {
+            case .success(let user):
+                DispatchQueue.main.async {
+                    self?.applyUser(user)
+                    self?.startCurrentUserListener()
+                }
+                completion(nil)
+            case .failure(let error):
+                completion(error)
+            }
+        }
+    }
+
+    func signIn(email: String, password: String, completion: @escaping (Error?) -> Void) {
+        FirebaseService.shared.signInUser(email: email, password: password) { [weak self] result in
+            switch result {
+            case .success(_):
+                FirebaseService.shared.fetchCurrentUser { userResult in
+                    switch userResult {
+                    case .success(let user):
+                        DispatchQueue.main.async {
+                            self?.applyUser(user)
+                            self?.startCurrentUserListener()
+                            completion(nil)
+                        }
+                    case .failure(let error):
+                        completion(error)
+                    }
+                }
+            case .failure(let error):
+                completion(error)
+            }
+        }
+    }
+
+    func sendPasswordReset(email: String, completion: @escaping (Error?) -> Void) {
+        FirebaseService.shared.sendPasswordReset(to: email) { error in
+            DispatchQueue.main.async {
+                completion(error)
+            }
+        }
+    }
+
+    func refreshCurrentUser(completion: ((Error?) -> Void)? = nil) {
         FirebaseService.shared.fetchCurrentUser { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let user):
                     self?.applyUser(user)
-                case .failure:
-                    self?.applyUser(nil)
-                }
-            }
-        }
-    } else {
-        DispatchQueue.main.async { self.applyUser(nil) }
-    }
-}
-
-func signUp(firstName: String, lastName: String, position: String, email: String, password: String, completion: @escaping (Error?) -> Void) {
-    FirebaseService.shared.signUpUser(firstName: firstName, lastName: lastName, position: position, email: email, password: password) { [weak self] result in
-        switch result {
-        case .success(let user):
-            DispatchQueue.main.async { self?.applyUser(user) }
-            completion(nil)
-        case .failure(let error):
-            completion(error)
-        }
-    }
-}
-
-func signIn(email: String, password: String, completion: @escaping (Error?) -> Void) {
-    FirebaseService.shared.signInUser(email: email, password: password) { [weak self] result in
-        switch result {
-        case .success(_):
-            FirebaseService.shared.fetchCurrentUser { userResult in
-                switch userResult {
-                case .success(let user):
-                    DispatchQueue.main.async {
-                        self?.applyUser(user)
-                        completion(nil)
-                    }
+                    completion?(nil)
                 case .failure(let error):
-                    completion(error)
+                    completion?(error)
                 }
             }
-        case .failure(let error):
-            completion(error)
         }
     }
-}
-
-func sendPasswordReset(email: String, completion: @escaping (Error?) -> Void) {
-    FirebaseService.shared.sendPasswordReset(to: email) { error in
-        DispatchQueue.main.async {
-            completion(error)
-        }
-    }
-}
-
-func refreshCurrentUser(completion: ((Error?) -> Void)? = nil) {
-    FirebaseService.shared.fetchCurrentUser { [weak self] result in
-        DispatchQueue.main.async {
-            switch result {
-            case .success(let user):
-                self?.applyUser(user)
-                completion?(nil)
-            case .failure(let error):
-                completion?(error)
-            }
-        }
-    }
-}
 
     /// Deletes only the user's account (Auth and, optionally, their `/users/{uid}` profile),
     /// while preserving all job documents. This keeps historical job records intact.
@@ -112,6 +114,7 @@ func refreshCurrentUser(completion: ((Error?) -> Void)? = nil) {
             DispatchQueue.main.async {
                 switch result {
                 case .success:
+                    self?.stopCurrentUserListener()
                     self?.applyUser(nil)
                     completion(.success(()))
                 case .failure(let error):
@@ -121,14 +124,46 @@ func refreshCurrentUser(completion: ((Error?) -> Void)? = nil) {
         }
     }
 
-func signOut() {
-    do {
-        try FirebaseService.shared.signOutUser()
-        applyUser(nil)
-    } catch {
-        print("Sign-out error: \(error)")
+    func signOut() {
+        do {
+            stopCurrentUserListener()
+            try FirebaseService.shared.signOutUser()
+            applyUser(nil)
+        } catch {
+            print("Sign-out error: \(error)")
+        }
     }
-}
+
+    private func startCurrentUserListener() {
+        guard let uid = FirebaseService.shared.currentUserID() else {
+            stopCurrentUserListener()
+            applyUser(nil)
+            return
+        }
+
+        if observedCurrentUserID == uid, currentUserListener != nil { return }
+
+        stopCurrentUserListener()
+        observedCurrentUserID = uid
+        currentUserListener = FirebaseService.shared.listenCurrentUser { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                switch result {
+                case .success(let user):
+                    self.applyUser(user)
+                case .failure(let error):
+                    print("Current user listener error: \(error.localizedDescription)")
+                    self.applyUser(nil)
+                }
+            }
+        }
+    }
+
+    private func stopCurrentUserListener() {
+        currentUserListener?.remove()
+        currentUserListener = nil
+        observedCurrentUserID = nil
+    }
 
     var isAdmin: Bool { isAdminFlag }
     var isSupervisor: Bool { isSupervisorFlag }

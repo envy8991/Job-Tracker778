@@ -5,7 +5,7 @@ final class RecentCrewJobsViewModel: ObservableObject {
     enum CrewRoleFilter: String, CaseIterable, Identifiable {
         case all = "All"
         case underground = "Underground"
-        case aerial = "Aerial"
+        case oh = "OH"
         case can = "CAN"
         case nid = "NID"
 
@@ -94,7 +94,7 @@ final class RecentCrewJobsViewModel: ObservableObject {
         switch filter {
         case .all:
             filtered = jobs
-        case .underground, .aerial, .can, .nid:
+        case .underground, .oh, .can, .nid:
             filtered = jobs.filter { $0.matches(filter) }
         }
 
@@ -357,9 +357,13 @@ extension RecentCrewJob {
             return normalized
         }
         if let firstCandidate = documentRoleCandidates.first {
-            return firstCandidate
+            return CrewPosition.positionDisplayName(from: firstCandidate)
         }
         return normalizedSubmitterFallbackRole ?? submitterFallbackRole
+    }
+
+    var displayStatus: String {
+        CrewPosition.statusDisplayName(from: status)
     }
 
     fileprivate var hasDocumentCrewRole: Bool {
@@ -379,8 +383,8 @@ extension RecentCrewJob {
         if lower.contains("underground") || lower == "ug" || lower.contains("ug crew") || lower.contains("u/g") {
             return RecentCrewJobsViewModel.CrewRoleFilter.underground.rawValue
         }
-        if lower.contains("aerial") || lower.contains("ariel") {
-            return RecentCrewJobsViewModel.CrewRoleFilter.aerial.rawValue
+        if CrewPosition.matches(trimmed, .oh) {
+            return RecentCrewJobsViewModel.CrewRoleFilter.oh.rawValue
         }
         if lower.contains("can") {
             return RecentCrewJobsViewModel.CrewRoleFilter.can.rawValue

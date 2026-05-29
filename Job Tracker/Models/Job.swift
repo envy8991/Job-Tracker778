@@ -4,7 +4,7 @@ struct Job: Identifiable, Codable {
     var id: String                  // Firestore doc ID or UUID
     var address: String             // Full physical job address
     var date: Date                  // Date for scheduling/tracking
-    var status: String              // e.g. "Pending", "Needs Ariel", "Done", etc.
+    var status: String              // e.g. "Pending", "Needs OH", "Done", etc.
     var assignedTo: String?         // userID of whoever currently owns the job (nil = unclaimed)
     var createdBy: String?          // userID of whoever created the job
     var notes: String?              // Additional text notes
@@ -197,7 +197,10 @@ protocol JobSearchMatchable {
     var jobPlacement: String? { get }
 }
 
-extension Job: JobSearchMatchable {}
+extension Job: JobSearchMatchable {
+    var displayStatus: String { CrewPosition.statusDisplayName(from: status) }
+}
+
 
 struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearchMatchable {
     var id: String

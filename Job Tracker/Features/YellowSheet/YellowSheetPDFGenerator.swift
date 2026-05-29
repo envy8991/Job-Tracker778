@@ -51,7 +51,7 @@ class YellowSheetPDFGenerator {
                 var lines: [String] = []
                 lines.append("Address: \(job.address)")
                 lines.append("Job Number: \(job.jobNumber ?? "N/A")")
-                lines.append("Status: \(job.status)")
+                lines.append("Status: \(job.displayStatus)")
                 
                 if let nid = job.nidFootage, !nid.isEmpty {
                     lines.append("NID Footage: \(nid)")

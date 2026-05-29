@@ -240,7 +240,7 @@ private struct RecentCrewJobRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: JTSpacing.sm) {
             HStack(alignment: .firstTextBaseline) {
-                Text(job.status)
+                Text(job.displayStatus)
                     .font(JTTypography.subheadline.weight(.semibold))
                     .foregroundStyle(JTColors.textPrimary)
                 Spacer()
@@ -370,7 +370,7 @@ private struct RecentCrewJobDetailSheet: View {
                     .multilineTextAlignment(.leading)
 
                 HStack(spacing: JTSpacing.xs) {
-                    CrewJobChip(text: job.status, tint: statusTint(for: job.status))
+                    CrewJobChip(text: job.displayStatus, tint: statusTint(for: job.status))
                     CrewJobChip(text: job.formattedDate, tint: JTColors.info)
                     if let role = job.displayCrewRole {
                         CrewJobChip(text: role, tint: JTColors.accent)
@@ -442,7 +442,7 @@ private struct RecentCrewJobDetailSheet: View {
         }
 
         items.append(DetailItem(icon: "calendar", title: "Date", value: job.formattedDate))
-        items.append(DetailItem(icon: "flag.fill", title: "Status", value: job.status))
+        items.append(DetailItem(icon: "flag.fill", title: "Status", value: job.displayStatus))
 
         if let crewName = Self.displayName(for: job.crewName, usersViewModel: usersViewModel) {
             items.append(DetailItem(icon: "person.2", title: "Crew Name", value: crewName))

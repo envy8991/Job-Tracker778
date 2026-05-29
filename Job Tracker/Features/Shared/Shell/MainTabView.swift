@@ -13,6 +13,7 @@ private struct PrimaryTabContainer: View {
     @EnvironmentObject private var navigation: AppNavigationViewModel
     @EnvironmentObject private var jobsViewModel: JobsViewModel
     @EnvironmentObject private var usersViewModel: UsersViewModel
+    @EnvironmentObject private var authViewModel: AuthViewModel
 
     private var selection: Binding<AppNavigationViewModel.PrimaryDestination> {
         Binding(
@@ -23,12 +24,18 @@ private struct PrimaryTabContainer: View {
 
     var body: some View {
         TabView(selection: selection) {
-            DashboardView()
-                .tag(AppNavigationViewModel.PrimaryDestination.dashboard)
-                .tabItem {
-                    Label(AppNavigationViewModel.PrimaryDestination.dashboard.title,
-                          systemImage: AppNavigationViewModel.PrimaryDestination.dashboard.systemImage)
+            Group {
+                if authViewModel.isSupervisorFlag {
+                    SupervisorHomeDashboardView()
+                } else {
+                    DashboardView()
                 }
+            }
+            .tag(AppNavigationViewModel.PrimaryDestination.dashboard)
+            .tabItem {
+                Label(AppNavigationViewModel.PrimaryDestination.dashboard.title,
+                      systemImage: AppNavigationViewModel.PrimaryDestination.dashboard.systemImage)
+            }
 
             WeeklyTimesheetView()
                 .tag(AppNavigationViewModel.PrimaryDestination.timesheets)
@@ -135,14 +142,6 @@ private struct MoreMenuList: View {
                 }
             }
 
-            if authViewModel.isSupervisorFlag {
-                Section("Supervisor") {
-                    NavigationLink(value: AppNavigationViewModel.Destination.supervisor) {
-                        Label("Supervisor", systemImage: AppNavigationViewModel.Destination.supervisor.systemImage)
-                    }
-                }
-            }
-
             if authViewModel.isAdminFlag {
                 Section("Admin") {
                     NavigationLink(value: AppNavigationViewModel.Destination.admin) {
@@ -184,7 +183,7 @@ private struct MoreDestinationView: View {
         case .findPartner:
             FindPartnerView()
         case .supervisor:
-            SupervisorDashboardView()
+            SupervisorHomeDashboardView()
         case .admin:
             AdminPanelView()
         case .settings:

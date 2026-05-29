@@ -1,6 +1,6 @@
 // Web-only parity layer kept separate from parity-enhancements.js to avoid merge conflicts
 // with the shared baseline file while preserving iOS data/search/sharing behavior.
-const nativeStatusOptions = ["Pending", "Needs Aerial", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick", "Custom"];
+const nativeStatusOptions = ["Pending", "Needs OH", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick", "Custom"];
 statuses.splice(0, statuses.length, ...nativeStatusOptions);
 
 appState.searchJobs = appState.searchJobs || [];
@@ -174,7 +174,7 @@ normalizeJob = function enhancedNormalizeJob(job) {
     id: job.id || createId(),
     address: job.address,
     date: job.date,
-    status: job.status,
+    status: typeof normalizeCrewStatus === "function" ? normalizeCrewStatus(job.status) : job.status,
     assignedTo: job.assignedTo || (job.status === "Pending" ? "" : currentUser.id),
     createdBy: job.createdBy || currentUser.id,
     notes: job.notes || "",
@@ -281,7 +281,7 @@ renderSearch = function enhancedRenderSearch() {
 
 function normalizedPosition(user = currentUser) {
   const position = String(user?.normalizedPosition || user?.position || "").trim();
-  return position.toLowerCase() === "ariel" ? "Aerial" : position;
+  return ["oh", "overhead", "aerial", "ariel", "arial"].includes(position.toLowerCase()) ? "OH" : position;
 }
 
 function isCanUser(user = currentUser) {
@@ -316,7 +316,7 @@ shareJob = async function enhancedShareJob(id) {
       fromUserName: senderName,
       address: job.address,
       date: job.date,
-      status: job.status,
+      status: typeof normalizeCrewStatus === "function" ? normalizeCrewStatus(job.status) : job.status,
       jobNumber: job.jobNumber || "",
       assignment: senderIsCan ? job.assignments || "" : "",
       senderIsCan,

@@ -48,7 +48,7 @@ struct JobDetailView: View {
     @State private var editedJobNumber = ""
     @State private var editedPortalID = ""
     @State private var editedLocationNumber = ""
-    @State private var selectedMaterialAriel = "None"
+    @State private var selectedMaterialOH = "None"
     @State private var selectedMaterialNid = ""
     @State private var preformCount = 0
     @State private var jHooksCount = 0
@@ -56,8 +56,8 @@ struct JobDetailView: View {
     @State private var nidFootage = ""
 
     // Materials refinements per role
-    @State private var uGuardCount = 0                 // Aerial & Can: 0–5 U-Guard pieces
-    @State private var storageBracket = false          // Aerial: toggle
+    @State private var uGuardCount = 0                 // OH & Can: 0–5 U-Guard pieces
+    @State private var storageBracket = false          // OH: toggle
     @State private var nidBoxUsed = false              // Nid: 1 box (toggle)
     @State private var jumpersCount = 0                // Nid: 0–4 jumpers
     @State private var canMaterialsText = ""           // Can Splicers: free text
@@ -80,7 +80,7 @@ struct JobDetailView: View {
 
     let statusOptions = [
         "Pending",
-        "Needs Aerial",
+        "Needs OH",
         "Needs Underground",
         "Needs Nid",
         "Needs Can",
@@ -88,7 +88,7 @@ struct JobDetailView: View {
         "Talk to Rick",   // fixed option
         "Custom"          // allows manual entry
     ]
-    let arielMaterials = ["None", "Weatherhead", "Rams Head"]
+    let ohMaterials = ["None", "Weatherhead", "Rams Head"]
     let nidMaterials: [String] = [] // NID uses toggles/steppers instead of fixed list
 private let fiberChoices = ["Flat", "Round", "Mainline"]
 private let jobPlacementChoices = ["OH", "UG"]
@@ -294,22 +294,23 @@ private let jobPlacementChoices = ["OH", "UG"]
 
                     // MARK: Materials (Separate Section by Role)
                     if let rawPosition = authViewModel.currentUser?.position {
-                        // Normalize legacy "Ariel" → "Aerial" for display
-                        let positionDisplay = (rawPosition.caseInsensitiveCompare("Ariel") == .orderedSame) ? "Aerial" : rawPosition
+                        let positionDisplay = CrewPosition.positionDisplayName(from: rawPosition)
 
                         Section(header: Text("Materials — \(positionDisplay)")) {
-                            switch rawPosition {
-                            case "Ariel", "Aerial":
-                                arielMaterialsSection
-                            case "Nid":
-                                nidMaterialsSection
-                            case "Can":
-                                canMaterialsSection
-                            case "Underground":
-                                undergroundMaterialsSection
-                            default:
-                                Text("No materials for this role.")
-                                    .foregroundColor(.secondary)
+                            if CrewPosition.matches(rawPosition, .oh) {
+                                ohMaterialsSection
+                            } else {
+                                switch rawPosition {
+                                case "Nid":
+                                    nidMaterialsSection
+                                case "Can":
+                                    canMaterialsSection
+                                case "Underground":
+                                    undergroundMaterialsSection
+                                default:
+                                    Text("No materials for this role.")
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
                     }
@@ -487,16 +488,17 @@ private let jobPlacementChoices = ["OH", "UG"]
                     disableSuggestions = false
                 }
                 // Initialize editable fields
-                editedStatus     = job.status
-                if !statusOptions.contains(job.status) {
-                    customStatusText = job.status
+                let displayStatus = CrewPosition.statusDisplayName(from: job.status)
+                editedStatus = displayStatus
+                if !statusOptions.contains(displayStatus) {
+                    customStatusText = displayStatus
                     editedStatus = "Custom"
                 }
                 editedNotes      = job.notes ?? ""
                 editedJobNumber  = job.jobNumber ?? ""
                 editedPortalID   = job.portalID ?? ""
                 editedLocationNumber = job.locationNumber ?? ""
-                selectedMaterialAriel = "None"
+                selectedMaterialOH = "None"
                 selectedMaterialNid   = nidMaterials.first ?? ""
                 canFootage       = job.canFootage ?? ""
                 nidFootage       = job.nidFootage ?? ""
@@ -514,20 +516,22 @@ private let jobPlacementChoices = ["OH", "UG"]
                 // Restore previously saved materials into role-specific UI
                 if let position = authViewModel.currentUser?.position,
                    let materials = job.materialsUsed, !materials.isEmpty {
-                    switch position {
-                    case "Ariel":
+                    if CrewPosition.matches(position, .oh) {
                         preformCount = 0
                         jHooksCount = 0
-                        parseAerialMaterials(from: materials)
-                    case "Nid":
-                        parseNidMaterials(from: materials)
-                    case "Can":
-                        canMaterialsText = sanitizeCanMaterialsTokens(from: materials).joined(separator: ", ")
-                        if let n = captureInt(after: "u-guard:", in: materials.lowercased()) { uGuardCount = n }
-                    case "Underground":
-                        undergroundMaterialsText = materials
-                    default:
-                        break
+                        parseOHMaterials(from: materials)
+                    } else {
+                        switch position {
+                        case "Nid":
+                            parseNidMaterials(from: materials)
+                        case "Can":
+                            canMaterialsText = sanitizeCanMaterialsTokens(from: materials).joined(separator: ", ")
+                            if let n = captureInt(after: "u-guard:", in: materials.lowercased()) { uGuardCount = n }
+                        case "Underground":
+                            undergroundMaterialsText = materials
+                        default:
+                            break
+                        }
                     }
                 }
 
@@ -705,13 +709,13 @@ extension JobDetailView {
         .buttonStyle(.plain)
     }
 
-    // Ariel Materials Section (for Ariel position)
-    private var arielMaterialsSection: some View {
+    // OH Materials Section
+    private var ohMaterialsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Head type
             LabeledContent("Head Type") {
-                Picker("", selection: $selectedMaterialAriel) {
-                    ForEach(arielMaterials, id: \.self) { Text($0) }
+                Picker("", selection: $selectedMaterialOH) {
+                    ForEach(ohMaterials, id: \.self) { Text($0) }
                 }
                 .labelsHidden()
                 .pickerStyle(MenuPickerStyle())
@@ -875,9 +879,10 @@ extension JobDetailView {
         savingStatus = "Saving address"
 
         // 1) Update basic fields in memory
-        let finalStatus = editedStatus == "Custom"
+        let baseStatus = editedStatus == "Custom"
             ? customStatusText.trimmingCharacters(in: .whitespacesAndNewlines)
             : editedStatus
+        let finalStatus = CrewPosition.normalizedStatusForSaving(baseStatus)
         job.status    = finalStatus
         job.notes     = editedNotes.isEmpty ? nil : editedNotes
         job.jobNumber = editedJobNumber.isEmpty ? nil : editedJobNumber
@@ -893,12 +898,11 @@ extension JobDetailView {
         savingProgress = 0.12
         savingStatus = "Saving job number"
         if let position = authViewModel.currentUser?.position {
-            switch position {
-            case "Ariel":
+            if CrewPosition.matches(position, .oh) {
                 var parts: [String] = []
                 if !fiberType.isEmpty { parts.append("Fiber: \(fiberType)") }
-                if !selectedMaterialAriel.isEmpty && selectedMaterialAriel != "None" {
-                    parts.append(selectedMaterialAriel) // Weatherhead or Rams Head
+                if !selectedMaterialOH.isEmpty && selectedMaterialOH != "None" {
+                    parts.append(selectedMaterialOH) // Weatherhead or Rams Head
                 }
                 if preformCount > 0 { parts.append("Preforms: \(preformCount)") }
                 if jHooksCount > 0 { parts.append("J Hooks: \(jHooksCount)") }
@@ -907,51 +911,53 @@ extension JobDetailView {
                 job.materialsUsed = parts.isEmpty ? nil : parts.joined(separator: ", ")
                 job.canFootage = canFootage.isEmpty ? nil : canFootage
                 job.nidFootage = nidFootage.isEmpty ? nil : nidFootage
+            } else {
+                switch position {
+                case "Nid":
+                    var parts: [String] = []
+                    if !fiberType.isEmpty { parts.append("Fiber: \(fiberType)") }
+                    if nidBoxUsed { parts.append("1 NID Box") }
+                    if jumpersCount > 0 { parts.append("Jumpers: \(jumpersCount)") }
+                    job.materialsUsed = parts.isEmpty ? nil : parts.joined(separator: ", ")
+                    job.canFootage = nil
+                    job.nidFootage = nil
 
-            case "Nid":
-                var parts: [String] = []
-                if !fiberType.isEmpty { parts.append("Fiber: \(fiberType)") }
-                if nidBoxUsed { parts.append("1 NID Box") }
-                if jumpersCount > 0 { parts.append("Jumpers: \(jumpersCount)") }
-                job.materialsUsed = parts.isEmpty ? nil : parts.joined(separator: ", ")
-                job.canFootage = nil
-                job.nidFootage = nil
+                case "Can":
+                    var parts: [String] = []
+                    var seenTokens = Set<String>()
+                    func appendUnique(_ token: String) {
+                        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { return }
+                        let key = trimmed.lowercased()
+                        guard !seenTokens.contains(key) else { return }
+                        seenTokens.insert(key)
+                        parts.append(trimmed)
+                    }
 
-            case "Can":
-                var parts: [String] = []
-                var seenTokens = Set<String>()
-                func appendUnique(_ token: String) {
-                    let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { return }
-                    let key = trimmed.lowercased()
-                    guard !seenTokens.contains(key) else { return }
-                    seenTokens.insert(key)
-                    parts.append(trimmed)
+                    if !fiberType.isEmpty { appendUnique("Fiber: \(fiberType)") }
+                    let customTokens = sanitizeCanMaterialsTokens(from: canMaterialsText)
+                    customTokens.forEach { appendUnique($0) }
+                    if uGuardCount > 0 { appendUnique("U-Guard: \(uGuardCount)") }
+                    job.materialsUsed = parts.isEmpty ? nil : parts.joined(separator: ", ")
+                    job.canFootage = canFootage.isEmpty ? nil : canFootage
+                    job.nidFootage = nidFootage.isEmpty ? nil : nidFootage
+
+                case "Underground":
+                    let text = undergroundMaterialsText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let prefix = fiberType.isEmpty ? nil : "Fiber: \(fiberType)"
+                    if let prefix = prefix, !text.isEmpty {
+                        job.materialsUsed = "\(prefix), \(text)"
+                    } else if let prefix = prefix {
+                        job.materialsUsed = prefix
+                    } else {
+                        job.materialsUsed = text.isEmpty ? nil : text
+                    }
+                    job.canFootage = canFootage.isEmpty ? nil : canFootage
+                    job.nidFootage = nidFootage.isEmpty ? nil : nidFootage
+
+                default:
+                    if !fiberType.isEmpty { job.materialsUsed = "Fiber: \(fiberType)" }
                 }
-
-                if !fiberType.isEmpty { appendUnique("Fiber: \(fiberType)") }
-                let customTokens = sanitizeCanMaterialsTokens(from: canMaterialsText)
-                customTokens.forEach { appendUnique($0) }
-                if uGuardCount > 0 { appendUnique("U-Guard: \(uGuardCount)") }
-                job.materialsUsed = parts.isEmpty ? nil : parts.joined(separator: ", ")
-                job.canFootage = canFootage.isEmpty ? nil : canFootage
-                job.nidFootage = nidFootage.isEmpty ? nil : nidFootage
-
-            case "Underground":
-                let text = undergroundMaterialsText.trimmingCharacters(in: .whitespacesAndNewlines)
-                let prefix = fiberType.isEmpty ? nil : "Fiber: \(fiberType)"
-                if let prefix = prefix, !text.isEmpty {
-                    job.materialsUsed = "\(prefix), \(text)"
-                } else if let prefix = prefix {
-                    job.materialsUsed = prefix
-                } else {
-                    job.materialsUsed = text.isEmpty ? nil : text
-                }
-                job.canFootage = canFootage.isEmpty ? nil : canFootage
-                job.nidFootage = nidFootage.isEmpty ? nil : nidFootage
-
-            default:
-                if !fiberType.isEmpty { job.materialsUsed = "Fiber: \(fiberType)" }
             }
         }
 
@@ -998,19 +1004,19 @@ extension JobDetailView {
     }
 
     // MARK: - Materials Parsing Helpers
-    /// Parse an Aerial materials string we previously saved to restore UI state.
-    private func parseAerialMaterials(from text: String) {
+    /// Parse an OH materials string we previously saved to restore UI state.
+    private func parseOHMaterials(from text: String) {
         // Expected tokens like: "Weatherhead" or "Rams Head", "Preforms: N", "J Hooks: N", "U-Guard: N", "Storage Bracket"
-        selectedMaterialAriel = "None"
+        selectedMaterialOH = "None"
         let lower = text.lowercased()
         if lower.contains("weatherhead") {
-            selectedMaterialAriel = "Weatherhead"
+            selectedMaterialOH = "Weatherhead"
         } else if lower.contains("rams head") {
-            selectedMaterialAriel = "Rams Head"
+            selectedMaterialOH = "Rams Head"
         } else {
             // Legacy data may explicitly store "None" as a token
             let tokens = lower.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            if tokens.contains("none") { selectedMaterialAriel = "None" }
+            if tokens.contains("none") { selectedMaterialOH = "None" }
         }
 
         if let n = captureInt(after: "preforms:", in: lower) { preformCount = n }

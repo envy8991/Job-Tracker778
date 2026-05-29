@@ -12,7 +12,7 @@ This audit compares the Firebase-backed web app in `website/app/` against the na
 
 1. Match the native auth flow more closely by using three segmented actions: Sign In, Sign Up, and Reset.
 2. Replace the login-only password reset button with a dedicated Reset form, matching the app copy and validation path.
-3. Align signup positions with the native crew position picker: Aerial, Underground, Nid, and Can.
+3. Align signup positions with the native crew position picker: OH, Underground, Nid, and Can.
 4. Add client-side validation before Firebase requests so blank/short values fail with clear messages instead of awkward browser or API errors.
 5. Guard against missing Firebase config before building Firestore URLs and fix the missing-config message to point at `website/app/config.js`.
 6. Correct the More page copy to say Firebase-backed persistence instead of local persistence.

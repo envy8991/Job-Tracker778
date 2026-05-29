@@ -77,7 +77,7 @@ final class DashboardViewModel: ObservableObject {
 
     let statusOptions: [String] = [
         "Pending",
-        "Needs Aerial",
+        "Needs OH",
         "Needs Underground",
         "Needs Nid",
         "Needs Can",
@@ -308,7 +308,7 @@ final class DashboardViewModel: ObservableObject {
         let header = "\(shareSubject):"
         let lines = completedJobs.map { job in
             let address = houseNumberAndStreet(from: job.address)
-            var entry = "\(address) – \(job.status)"
+            var entry = "\(address) – \(job.displayStatus)"
             if let noteText = job.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !noteText.isEmpty {
                 entry += " (Notes: \(noteText))"
             }
