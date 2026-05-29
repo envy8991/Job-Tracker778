@@ -38,7 +38,7 @@ struct SetNearestJobAssignmentIntent: AppIntent {
     var assignment: String
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Set current job assignment to \(SetNearestJobAssignmentIntent.$assignment)")
+        Summary("Set current job assignment to \(.$assignment)")
     }
 
     func perform() async throws -> some ProvidesDialog {
@@ -79,7 +79,7 @@ struct SetNearestJobFootageIntent: AppIntent {
     var nidFootage: String
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Add CAN \(SetNearestJobFootageIntent.$canFootage) and NID \(SetNearestJobFootageIntent.$nidFootage) footage")
+        Summary("Add CAN \(.$canFootage) and NID \(.$nidFootage) footage")
     }
 
     func perform() async throws -> some ProvidesDialog {
