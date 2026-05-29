@@ -24,6 +24,7 @@ struct SupervisorHomeDashboardView: View {
             }
             .navigationTitle("Supervisor Dashboard")
             .navigationBarTitleDisplayMode(.inline)
+            .jtNavigationBarStyle()
             .onAppear { viewModel.start(for: selectedDate) }
             .onChange(of: selectedDate) { newDate in viewModel.start(for: newDate) }
             .onDisappear { viewModel.stop() }
@@ -43,10 +44,20 @@ struct SupervisorHomeDashboardView: View {
 
     private var datePickerCard: some View {
         GlassCard {
-            DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
-                .datePickerStyle(.compact)
-                .font(JTTypography.body)
-                .padding(JTSpacing.lg)
+            HStack(spacing: JTSpacing.md) {
+                Image(systemName: "calendar")
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.accent)
+                    .frame(width: 32, height: 32)
+                    .background(JTColors.glassHighlight, in: Circle())
+
+                DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .font(JTTypography.body)
+                    .foregroundStyle(JTColors.textPrimary)
+                    .tint(JTColors.accent)
+            }
+            .padding(JTSpacing.lg)
         }
     }
 
@@ -146,7 +157,7 @@ private struct SupervisorPositionCard: View {
             VStack(alignment: .leading, spacing: JTSpacing.md) {
                 HStack {
                     Text(position.displayName)
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .font(JTTypography.title3)
                         .foregroundStyle(JTColors.textPrimary)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -173,27 +184,40 @@ private struct SupervisorPositionUsersView: View {
     let jobs: [Job]
 
     var body: some View {
-        List {
-            if users.isEmpty {
-                Text("No users found for \(position.displayName).")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(users) { user in
-                    NavigationLink {
-                        SupervisorUserJobsView(user: user, date: date, jobs: jobsForUser(user))
-                    } label: {
-                        HStack {
-                            Text(displayName(for: user))
-                            Spacer()
-                            Text("\(jobsForUser(user).count)")
-                                .foregroundStyle(.secondary)
+        ZStack {
+            JTGradients.background
+                .ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: JTSpacing.md) {
+                    if users.isEmpty {
+                        GlassCard {
+                            Text("No users found for \(position.displayName).")
+                                .font(JTTypography.body)
+                                .foregroundStyle(JTColors.textSecondary)
+                                .padding(JTSpacing.lg)
+                                .frame(maxWidth: .infinity)
+                        }
+                    } else {
+                        ForEach(users) { user in
+                            NavigationLink {
+                                SupervisorUserJobsView(user: user, date: date, jobs: jobsForUser(user))
+                            } label: {
+                                SupervisorUserRow(
+                                    name: displayName(for: user),
+                                    jobCount: jobsForUser(user).count
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
+                .padding(JTSpacing.lg)
             }
         }
         .navigationTitle(position.displayName)
         .navigationBarTitleDisplayMode(.inline)
+        .jtNavigationBarStyle()
     }
 
     private func jobsForUser(_ user: AppUser) -> [Job] {
@@ -210,24 +234,76 @@ private struct SupervisorPositionUsersView: View {
     }
 }
 
+private struct SupervisorUserRow: View {
+    let name: String
+    let jobCount: Int
+
+    var body: some View {
+        GlassCard {
+            HStack(spacing: JTSpacing.md) {
+                Image(systemName: "person.fill")
+                    .font(JTTypography.captionEmphasized)
+                    .foregroundStyle(JTColors.accent)
+                    .frame(width: 30, height: 30)
+                    .background(JTColors.glassHighlight, in: Circle())
+
+                Text(name)
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.textPrimary)
+
+                Spacer()
+
+                Text("\(jobCount)")
+                    .font(JTTypography.captionEmphasized)
+                    .foregroundStyle(JTColors.textPrimary)
+                    .padding(.horizontal, JTSpacing.md)
+                    .padding(.vertical, JTSpacing.sm)
+                    .background(JTColors.glassHighlight, in: Capsule(style: .continuous))
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(JTColors.textSecondary)
+            }
+            .padding(JTSpacing.lg)
+        }
+    }
+}
+
 private struct SupervisorUserJobsView: View {
     let user: AppUser
     let date: Date
     let jobs: [Job]
 
     var body: some View {
-        List {
-            if jobs.isEmpty {
-                Text("No jobs for this date.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(jobs) { job in
-                    SupervisorUserJobInfoCard(job: job)
+        ZStack {
+            JTGradients.background
+                .ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: JTSpacing.md) {
+                    if jobs.isEmpty {
+                        GlassCard {
+                            Text("No jobs for this date.")
+                                .font(JTTypography.body)
+                                .foregroundStyle(JTColors.textSecondary)
+                                .padding(JTSpacing.lg)
+                                .frame(maxWidth: .infinity)
+                        }
+                    } else {
+                        ForEach(jobs) { job in
+                            GlassCard {
+                                SupervisorUserJobInfoCard(job: job)
+                                    .padding(JTSpacing.lg)
+                            }
+                        }
+                    }
                 }
+                .padding(JTSpacing.lg)
             }
         }
         .navigationTitle(displayName)
         .navigationBarTitleDisplayMode(.inline)
+        .jtNavigationBarStyle()
     }
 
     private var displayName: String {
@@ -264,7 +340,6 @@ private struct SupervisorUserJobInfoCard: View {
 
             detailRows
         }
-        .padding(.vertical, JTSpacing.sm)
     }
 
     @ViewBuilder
