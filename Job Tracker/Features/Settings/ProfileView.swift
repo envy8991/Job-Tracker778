@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseCore
 
 struct ProfileView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
@@ -8,6 +9,7 @@ struct ProfileView: View {
     @State private var hasRequestedHistory = false
     @State private var isTimesheetLoading = false
     @State private var isYellowSheetLoading = false
+    @State private var showingDiagnostics = false
 
     private let gridColumns = [GridItem(.adaptive(minimum: 160), spacing: JTSpacing.lg)]
 
@@ -57,6 +59,12 @@ struct ProfileView: View {
             if isYellowSheetLoading {
                 isYellowSheetLoading = false
             }
+        }
+        .sheet(isPresented: $showingDiagnostics) {
+            ProfileDiagnosticsView(user: authViewModel.currentUser,
+                                   authUID: FirebaseService.shared.currentUserID(),
+                                   isAdminFlag: authViewModel.isAdminFlag,
+                                   isSupervisorFlag: authViewModel.isSupervisorFlag)
         }
     }
 }
@@ -302,6 +310,16 @@ private extension ProfileView {
                     .font(JTTypography.caption)
                     .foregroundStyle(JTColors.textSecondary)
 
+                Button {
+                    showingDiagnostics = true
+                } label: {
+                    Label("Show Diagnostics", systemImage: "stethoscope")
+                        .font(JTTypography.button)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(JTColors.info)
+
                 JTPrimaryButton("Sign Out", systemImage: "rectangle.portrait.and.arrow.right") {
                     authViewModel.signOut()
                 }
@@ -484,4 +502,89 @@ private struct QuickActionLink<Destination: View>: View {
         }
         .buttonStyle(.plain)
     }
+}
+
+private struct ProfileDiagnosticsView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let user: AppUser?
+    let authUID: String?
+    let isAdminFlag: Bool
+    let isSupervisorFlag: Bool
+
+    private var projectID: String {
+        FirebaseApp.app()?.options.projectID ?? "Unavailable"
+    }
+
+    private var bundleID: String {
+        Bundle.main.bundleIdentifier ?? "Unavailable"
+    }
+
+    private var uidMatchText: String {
+        guard let authUID, let userID = user?.id else { return "Unable to compare" }
+        return authUID == userID ? "Yes" : "No"
+    }
+
+    var body: some View {
+        NavigationView {
+            List {
+                Section("Firebase") {
+                    diagnosticRow(title: "Project ID", value: projectID)
+                    diagnosticRow(title: "Auth UID", value: authUID ?? "Not signed in")
+                    diagnosticRow(title: "User doc ID", value: user?.id ?? "No current user")
+                    diagnosticRow(title: "Auth UID matches user doc", value: uidMatchText)
+                }
+
+                Section("Loaded role flags") {
+                    diagnosticRow(title: "AuthViewModel isAdminFlag", value: isAdminFlag.yesNoText)
+                    diagnosticRow(title: "AuthViewModel isSupervisorFlag", value: isSupervisorFlag.yesNoText)
+                    diagnosticRow(title: "currentUser.isAdmin", value: user?.isAdmin.yesNoText ?? "No current user")
+                    diagnosticRow(title: "currentUser.isSupervisor", value: user?.isSupervisor.yesNoText ?? "No current user")
+                }
+
+                Section("Loaded profile") {
+                    diagnosticRow(title: "Email", value: user?.email ?? "No current user")
+                    diagnosticRow(title: "Name", value: loadedName)
+                    diagnosticRow(title: "Position", value: user?.position ?? "No current user")
+                    diagnosticRow(title: "Normalized position", value: user?.normalizedPosition ?? "No current user")
+                }
+
+                Section("App") {
+                    diagnosticRow(title: "Bundle ID", value: bundleID)
+                }
+            }
+            .textSelection(.enabled)
+            .navigationTitle("Profile Diagnostics")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private var loadedName: String {
+        guard let user else { return "No current user" }
+        let name = [user.firstName, user.lastName]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return name.isEmpty ? "Not set" : name
+    }
+
+    private func diagnosticRow(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.body.monospaced())
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+private extension Bool {
+    var yesNoText: String { self ? "true" : "false" }
 }
