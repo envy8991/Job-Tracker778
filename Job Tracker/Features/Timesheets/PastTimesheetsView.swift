@@ -3,43 +3,27 @@ import SwiftUI
 struct PastTimesheetsView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var timesheetListVM = UserTimesheetsViewModel()
-    
+
     var body: some View {
         NavigationView {
             ZStack {
-                // Background gradient (same as Dashboard/CreateJobView)
                 JTGradients.background(stops: 4)
-                .edgesIgnoringSafeArea(.all)
-                
+                    .ignoresSafeArea()
+
                 List {
                     ForEach(timesheetListVM.timesheets) { timesheet in
                         NavigationLink(destination: TimesheetDetailView(timesheet: timesheet)) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Week Starting: \(formattedDate(timesheet.weekStart))")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                Text("Total Hours: \(timesheet.totalHours)")
-                                    .font(.subheadline)
-                                    .foregroundColor(.white)
-                                if let pdfURL = timesheet.pdfURL, !pdfURL.isEmpty {
-                                    Text("PDF Created")
-                                        .font(.caption)
-                                        .foregroundColor(.green)
-                                } else {
-                                    Text("No PDF Available")
-                                        .font(.caption)
-                                        .foregroundColor(.red)
-                                }
-                            }
+                            PastTimesheetRow(timesheet: timesheet)
                         }
+                        .listRowBackground(Color.clear)
                     }
                     .onDelete(perform: deleteSheet)
                 }
-                .listStyle(GroupedListStyle())
-                // This modifier makes the List’s background transparent.
+                .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle("Past Timesheets")
+            .navigationBarTitleDisplayMode(.inline)
             .jtNavigationBarStyle()
             .onAppear {
                 if let user = authViewModel.currentUser {
@@ -48,13 +32,7 @@ struct PastTimesheetsView: View {
             }
         }
     }
-    
-    private func formattedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: date)
-    }
-    
+
     private func deleteSheet(at offsets: IndexSet) {
         offsets.forEach { index in
             let sheet = timesheetListVM.timesheets[index]
@@ -67,5 +45,39 @@ struct PastTimesheetsView: View {
             }
         }
         timesheetListVM.timesheets.remove(atOffsets: offsets)
+    }
+}
+
+private struct PastTimesheetRow: View {
+    let timesheet: Timesheet
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: JTSpacing.sm) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Week Starting: \(formattedDate(timesheet.weekStart))")
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.textPrimary)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(JTColors.textMuted)
+            }
+
+            Text("Total Hours: \(timesheet.totalHours)")
+                .font(JTTypography.subheadline)
+                .foregroundStyle(JTColors.textSecondary)
+
+            Label(timesheet.pdfURL?.isEmpty == false ? "PDF Created" : "No PDF Available",
+                  systemImage: timesheet.pdfURL?.isEmpty == false ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .font(JTTypography.caption)
+                .foregroundStyle(timesheet.pdfURL?.isEmpty == false ? JTColors.success : JTColors.error)
+        }
+        .padding(.vertical, JTSpacing.sm)
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
     }
 }
