@@ -27,6 +27,21 @@ class FirebaseService {
         let total: Int
         let message: String
     }
+
+    static func participantsBackfillPayload(for data: [String: Any]) -> [String: Any]? {
+        var participants = Set((data["participants"] as? [String] ?? []).filter { !$0.isEmpty })
+        let originalParticipants = participants
+
+        if let creator = data["createdBy"] as? String, !creator.isEmpty {
+            participants.insert(creator)
+        }
+        if let assignee = data["assignedTo"] as? String, !assignee.isEmpty {
+            participants.insert(assignee)
+        }
+
+        guard !participants.isEmpty, participants != originalParticipants else { return nil }
+        return ["participants": Array(participants).sorted()]
+    }
     
     // MARK: - Authentication
     
@@ -747,14 +762,9 @@ class FirebaseService {
             let docs = snapshot?.documents ?? []
             var updates: [(DocumentReference, [String: Any])] = []
             for doc in docs {
-                let data = doc.data()
-                let existing = (data["participants"] as? [String]) ?? []
-                if !existing.isEmpty { continue }
-                var ps = Set<String>()
-                if let c = data["createdBy"] as? String, !c.isEmpty { ps.insert(c) }
-                if let a = data["assignedTo"] as? String, !a.isEmpty { ps.insert(a) }
-                if ps.isEmpty { continue }
-                updates.append((doc.reference, ["participants": Array(ps)]))
+                if let payload = FirebaseService.participantsBackfillPayload(for: doc.data()) {
+                    updates.append((doc.reference, payload))
+                }
             }
             if updates.isEmpty {
                 DispatchQueue.main.async {

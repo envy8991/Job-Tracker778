@@ -115,6 +115,45 @@ final class AdminPanelViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.alert?.title, "Delete Blocked")
     }
 
+
+    func testRemovingCurrentUsersAdminAccessIsBlocked() {
+        var user = AppUser(id: "admin-1", firstName: "Riley", lastName: "Admin", email: "riley@example.com", position: "Admin")
+        user.isAdmin = true
+        let mockService = MockAdminPanelService()
+        let viewModel = AdminPanelViewModel(
+            service: mockService,
+            currentUserIDProvider: { user.id },
+            initialRoster: [user]
+        )
+
+        viewModel.setAdmin(false, for: user)
+
+        XCTAssertNil(mockService.lastUpdate)
+        XCTAssertTrue(viewModel.updatingAdminIDs.isEmpty)
+        XCTAssertEqual(viewModel.alert?.title, "Update Blocked")
+    }
+
+    func testParticipantsBackfillPayloadMergesMissingLegacyUsers() {
+        let payload = FirebaseService.participantsBackfillPayload(for: [
+            "participants": ["existing"],
+            "createdBy": "creator",
+            "assignedTo": "existing"
+        ])
+
+        let participants = payload?["participants"] as? [String]
+        XCTAssertEqual(participants, ["creator", "existing"])
+    }
+
+    func testParticipantsBackfillPayloadSkipsAlreadyCompleteParticipants() {
+        let payload = FirebaseService.participantsBackfillPayload(for: [
+            "participants": ["assignee", "creator"],
+            "createdBy": "creator",
+            "assignedTo": "assignee"
+        ])
+
+        XCTAssertNil(payload)
+    }
+
     func testBackfillProgressAndCompletion() async {
         let mockService = MockAdminPanelService()
         let viewModel = AdminPanelViewModel(service: mockService)

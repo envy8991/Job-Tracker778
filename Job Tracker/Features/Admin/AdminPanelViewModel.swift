@@ -227,6 +227,15 @@ final class AdminPanelViewModel: ObservableObject {
         changedFlag: ChangedFlag
     ) {
         let userID = user.id
+        if changedFlag == .admin, admin == false, currentUserIDProvider() == userID {
+            alert = AlertItem(
+                title: "Update Blocked",
+                message: "You cannot remove your own admin access from this screen.",
+                kind: .error
+            )
+            return
+        }
+
         if updatingAdminIDs.contains(userID) || updatingSupervisorIDs.contains(userID) {
             return
         }
