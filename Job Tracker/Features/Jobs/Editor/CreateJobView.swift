@@ -164,13 +164,23 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
 
 // MARK: - Your CreateJobView (uses AddressField)
 
+private struct AddressDraft: Identifiable, Equatable {
+    let id: UUID
+    var text: String
+
+    init(id: UUID = UUID(), text: String = "") {
+        self.id = id
+        self.text = text
+    }
+}
+
 struct CreateJobView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var jobsViewModel: JobsViewModel
     @EnvironmentObject var authViewModel: AuthViewModel
 
     // Form fields
-    @State private var addresses: [String] = [""]
+    @State private var addresses: [AddressDraft] = [AddressDraft()]
     @State private var date = Date()
     @State private var status = "Pending"
     @State private var notes = ""
@@ -181,7 +191,7 @@ struct CreateJobView: View {
     @State private var customStatusText = ""
     @State private var assignmentsText: String = ""
     @FocusState private var isAssignmentsFocused: Bool
-    @FocusState private var focusedAddressIndex: Int?
+    @FocusState private var focusedAddressID: AddressDraft.ID?
     @StateObject private var addressSearch = AddressSearchCompleter()
     @StateObject private var locationProvider = LocationProvider()
 
@@ -211,13 +221,14 @@ struct CreateJobView: View {
                         // Addresses
                         SectionCard(title: addresses.count > 1 ? "Addresses" : "Address") {
                             VStack(spacing: 12) {
-                                ForEach(Array(addresses.enumerated()), id: \.offset) { index, _ in
-                                    addressField(for: index)
+                                ForEach($addresses) { $address in
+                                    addressField(for: $address)
                                 }
 
                                 Button {
-                                    addresses.append("")
-                                    focusedAddressIndex = addresses.count - 1
+                                    let newAddress = AddressDraft()
+                                    addresses.append(newAddress)
+                                    focusedAddressID = newAddress.id
                                 } label: {
                                     Label("Add Another Address", systemImage: "plus.circle")
                                         .font(.subheadline.weight(.semibold))
@@ -417,9 +428,9 @@ struct CreateJobView: View {
             })
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
-                    if focusedAddressIndex != nil {
+                    if focusedAddressID != nil {
                         Spacer()
-                        Button("Done") { focusedAddressIndex = nil }
+                        Button("Done") { focusedAddressID = nil }
                     }
                     if isAssignmentsFocused {
                         Button(decimalSeparator) { assignmentsText.append(decimalSeparator) }
@@ -434,12 +445,12 @@ struct CreateJobView: View {
             .onChange(of: locationProvider.location) { _ in
                 addressSearch.updateDistances(from: locationProvider.location)
             }
-            .onChange(of: focusedAddressIndex) { newValue in
+            .onChange(of: focusedAddressID) { newValue in
                 guard let newValue else {
                     addressSearch.results = []
                     return
                 }
-                let current = addresses[safe: newValue] ?? ""
+                let current = addresses.first(where: { $0.id == newValue })?.text ?? ""
                 handleAddressQueryChange(current)
             }
         }
@@ -449,7 +460,7 @@ struct CreateJobView: View {
 
     private func attemptSave() {
         let trimmedAddresses = addresses
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
 
         if jobNumber.isEmpty {
@@ -562,7 +573,7 @@ struct CreateJobView: View {
 
     private var validAddressCount: Int {
         addresses
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .count
     }
@@ -581,20 +592,22 @@ struct CreateJobView: View {
     }
 
     @ViewBuilder
-    private func addressField(for index: Int) -> some View {
+    private func addressField(for address: Binding<AddressDraft>) -> some View {
+        let addressID = address.wrappedValue.id
+
         ZStack(alignment: .topLeading) {
             TextField("Enter address", text: Binding(
-                get: { addresses[index] },
+                get: { address.wrappedValue.text },
                 set: { newValue in
-                    addresses[index] = newValue
-                    if focusedAddressIndex == index {
+                    address.wrappedValue.text = newValue
+                    if focusedAddressID == addressID {
                         handleAddressQueryChange(newValue)
                     }
                 }
             ))
             .disableAutocorrection(true)
             .textInputAutocapitalization(.never)
-            .focused($focusedAddressIndex, equals: index)
+            .focused($focusedAddressID, equals: addressID)
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -605,14 +618,14 @@ struct CreateJobView: View {
                     .stroke(Color.gray.opacity(0.15), lineWidth: 1)
             )
 
-            if focusedAddressIndex == index && !addressSearch.results.isEmpty {
+            if focusedAddressID == addressID && !addressSearch.results.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(addressSearch.results.prefix(6).enumerated()), id: \.offset) { _, item in
                         Button {
                             let composed = item.subtitle.isEmpty ? item.title : "\(item.title) \(item.subtitle)"
-                            addresses[index] = composed
+                            address.wrappedValue.text = composed
                             addressSearch.results = []
-                            focusedAddressIndex = nil
+                            focusedAddressID = nil
                             UIApplication.shared.endEditing()
                         } label: {
                             HStack(alignment: .center, spacing: 10) {
@@ -661,7 +674,7 @@ struct CreateJobView: View {
         .overlay(alignment: .topTrailing) {
             if addresses.count > 1 {
                 Button {
-                    removeAddress(at: index)
+                    removeAddress(id: addressID)
                 } label: {
                     Image(systemName: "minus.circle.fill")
                         .foregroundStyle(.red)
@@ -681,25 +694,18 @@ struct CreateJobView: View {
         }
     }
 
-    private func removeAddress(at index: Int) {
-        guard addresses.indices.contains(index) else { return }
+    private func removeAddress(id: AddressDraft.ID) {
+        guard let index = addresses.firstIndex(where: { $0.id == id }) else { return }
+
+        if focusedAddressID != nil {
+            focusedAddressID = nil
+            addressSearch.results = []
+            UIApplication.shared.endEditing()
+        }
+
         addresses.remove(at: index)
         if addresses.isEmpty {
-            addresses = [""]
+            addresses = [AddressDraft()]
         }
-
-        if let focusedIndex = focusedAddressIndex {
-            if focusedIndex == index {
-                focusedAddressIndex = nil
-            } else if focusedIndex > index {
-                focusedAddressIndex = focusedIndex - 1
-            }
-        }
-    }
-}
-
-private extension Array {
-    subscript(safe index: Index) -> Element? {
-        indices.contains(index) ? self[index] : nil
     }
 }
