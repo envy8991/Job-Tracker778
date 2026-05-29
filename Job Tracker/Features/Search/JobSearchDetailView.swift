@@ -230,7 +230,7 @@ struct JobSearchDetailView: View {
             }
 
             if job.gibsonPortalURL != nil {
-                QuickActionButton(title: job.portalURL == nil ? "Open Location" : "Open Portal", systemImage: "safari") {
+                QuickActionButton(title: "Open Portal", systemImage: "safari") {
                     openPortal(job: job)
                 }
             }
@@ -805,7 +805,7 @@ struct UniversalJobDetailView: View {
                     }
 
                     if job.gibsonPortalURL != nil {
-                        UniversalQuickActionButton(title: job.portalURL == nil ? "Open Location" : "Open Portal", systemImage: "safari") {
+                        UniversalQuickActionButton(title: "Open Portal", systemImage: "safari") {
                             openPortal(job: job)
                         }
                     }
