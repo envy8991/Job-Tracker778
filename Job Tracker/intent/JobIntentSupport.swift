@@ -48,12 +48,16 @@ enum JobIntentLocationResult {
     case permissionRestricted
     case permissionNotDetermined
     case timedOut
-    case failed(String)
+    case noLocationUpdates
+    case coreLocationError(String)
+    case unknownFailure(String)
+
+    static let noMappedJobsFallbackReason = "I got your location, but today's jobs don't have map locations saved, so I used your next job for today."
 
     var fallbackReason: String {
         switch self {
         case .success:
-            return ""
+            return Self.noMappedJobsFallbackReason
         case .locationServicesDisabled:
             return "Location Services are turned off, so I used your next job for today."
         case .permissionDenied:
@@ -64,17 +68,27 @@ enum JobIntentLocationResult {
             return "Job Tracker needs location permission before Siri can find your current job, so I used your next job for today."
         case .timedOut:
             return "I couldn't get your current location within 10 seconds, so I used your next job for today."
-        case .failed(let message):
-            if message.isEmpty {
-                return "I couldn't get your current location, so I used your next job for today."
-            }
-            return "I couldn't get your current location because \(message), so I used your next job for today."
+        case .noLocationUpdates:
+            return "Core Location didn't return a usable location, so I used your next job for today."
+        case .coreLocationError(let message):
+            return failureReason(prefix: "Core Location reported", message: message)
+        case .unknownFailure(let message):
+            return failureReason(prefix: "I couldn't get your current location because", message: message)
         }
+    }
+
+    private func failureReason(prefix: String, message: String) -> String {
+        let detail = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !detail.isEmpty else {
+            return "I couldn't get your current location, so I used your next job for today."
+        }
+        return "\(prefix) \(detail), so I used your next job for today."
     }
 }
 
 @available(iOS 16.0, *)
-final class JobIntentLocationProvider: NSObject, CLLocationManagerDelegate {
+@MainActor
+final class JobIntentLocationProvider: NSObject, @preconcurrency CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private var continuation: CheckedContinuation<JobIntentLocationResult, Never>?
     private var timeoutTask: Task<Void, Never>?
@@ -101,11 +115,12 @@ final class JobIntentLocationProvider: NSObject, CLLocationManagerDelegate {
             case .restricted:
                 return .permissionRestricted
             default:
-                return .failed("")
+                return .unknownFailure("")
             }
         }
 
         return await withCheckedContinuation { continuation in
+            finish(with: .unknownFailure("Another location request is already in progress"))
             self.continuation = continuation
             manager.requestLocation()
             timeoutTask = Task { [weak self] in
@@ -117,14 +132,18 @@ final class JobIntentLocationProvider: NSObject, CLLocationManagerDelegate {
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else {
-            finish(with: .failed("Core Location returned no location updates"))
+            finish(with: .noLocationUpdates)
             return
         }
         finish(with: .success(location))
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        finish(with: .failed(error.localizedDescription))
+        if let coreLocationError = error as? CLError, coreLocationError.code == .denied {
+            finish(with: .permissionDenied)
+            return
+        }
+        finish(with: .coreLocationError(error.localizedDescription))
     }
 
     private func finish(with result: JobIntentLocationResult) {
@@ -151,7 +170,7 @@ enum JobIntentResolver {
         let jobs = try await todayJobs()
         guard !jobs.isEmpty else { return nil }
 
-        let locationProvider = JobIntentLocationProvider()
+        let locationProvider = await MainActor.run { JobIntentLocationProvider() }
         let locationResult = await locationProvider.currentLocation()
         let fallbackReason: String
         switch locationResult {
@@ -170,7 +189,7 @@ enum JobIntentResolver {
                 )
             }
 
-            fallbackReason = "I got your location, but today's jobs don't have map locations saved, so I used your next job for today."
+            fallbackReason = locationResult.fallbackReason
         default:
             fallbackReason = locationResult.fallbackReason
         }
