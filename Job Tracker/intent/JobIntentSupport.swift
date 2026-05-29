@@ -41,9 +41,42 @@ enum JobIntentFormatter {
 }
 
 @available(iOS 16.0, *)
+enum JobIntentLocationResult {
+    case success(CLLocation)
+    case locationServicesDisabled
+    case permissionDenied
+    case permissionRestricted
+    case permissionNotDetermined
+    case timedOut
+    case failed(String)
+
+    var fallbackReason: String {
+        switch self {
+        case .success:
+            return ""
+        case .locationServicesDisabled:
+            return "Location Services are turned off, so I used your next job for today."
+        case .permissionDenied:
+            return "Job Tracker doesn't have permission to use your location, so I used your next job for today."
+        case .permissionRestricted:
+            return "Location access is restricted on this device, so I used your next job for today."
+        case .permissionNotDetermined:
+            return "Job Tracker needs location permission before Siri can find your current job, so I used your next job for today."
+        case .timedOut:
+            return "I couldn't get your current location within 10 seconds, so I used your next job for today."
+        case .failed(let message):
+            if message.isEmpty {
+                return "I couldn't get your current location, so I used your next job for today."
+            }
+            return "I couldn't get your current location because \(message), so I used your next job for today."
+        }
+    }
+}
+
+@available(iOS 16.0, *)
 final class JobIntentLocationProvider: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
-    private var continuation: CheckedContinuation<CLLocation?, Never>?
+    private var continuation: CheckedContinuation<JobIntentLocationResult, Never>?
     private var timeoutTask: Task<Void, Never>?
 
     override init() {
@@ -52,37 +85,52 @@ final class JobIntentLocationProvider: NSObject, CLLocationManagerDelegate {
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
     }
 
-    func currentLocation() async -> CLLocation? {
+    func currentLocation() async -> JobIntentLocationResult {
+        guard CLLocationManager.locationServicesEnabled() else {
+            return .locationServicesDisabled
+        }
+
         let status = manager.authorizationStatus
         guard status == .authorizedAlways || status == .authorizedWhenInUse else {
-            if status == .notDetermined {
+            switch status {
+            case .notDetermined:
                 manager.requestWhenInUseAuthorization()
+                return .permissionNotDetermined
+            case .denied:
+                return .permissionDenied
+            case .restricted:
+                return .permissionRestricted
+            default:
+                return .failed("")
             }
-            return nil
         }
 
         return await withCheckedContinuation { continuation in
             self.continuation = continuation
             manager.requestLocation()
             timeoutTask = Task { [weak self] in
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                await MainActor.run { self?.finish(with: nil) }
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                await MainActor.run { self?.finish(with: .timedOut) }
             }
         }
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        finish(with: locations.last)
+        guard let location = locations.last else {
+            finish(with: .failed("Core Location returned no location updates"))
+            return
+        }
+        finish(with: .success(location))
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        finish(with: nil)
+        finish(with: .failed(error.localizedDescription))
     }
 
-    private func finish(with location: CLLocation?) {
+    private func finish(with result: JobIntentLocationResult) {
         timeoutTask?.cancel()
         timeoutTask = nil
-        continuation?.resume(returning: location)
+        continuation?.resume(returning: result)
         continuation = nil
     }
 }
@@ -104,8 +152,10 @@ enum JobIntentResolver {
         guard !jobs.isEmpty else { return nil }
 
         let locationProvider = JobIntentLocationProvider()
-        let currentLocation = await locationProvider.currentLocation()
-        if let currentLocation {
+        let locationResult = await locationProvider.currentLocation()
+        let fallbackReason: String
+        switch locationResult {
+        case .success(let currentLocation):
             let locatedJobs = jobs.compactMap { job -> (job: Job, distance: CLLocationDistance)? in
                 guard let jobLocation = job.clLocation else { return nil }
                 return (job, jobLocation.distance(from: currentLocation))
@@ -119,6 +169,10 @@ enum JobIntentResolver {
                     fallbackReason: nil
                 )
             }
+
+            fallbackReason = "I got your location, but today's jobs don't have map locations saved, so I used your next job for today."
+        default:
+            fallbackReason = locationResult.fallbackReason
         }
 
         let fallback = jobs
@@ -134,7 +188,7 @@ enum JobIntentResolver {
             job: fallback,
             locationWasUsed: false,
             distanceInMeters: nil,
-            fallbackReason: "I couldn't use your current location, so I used your next job for today."
+            fallbackReason: fallbackReason
         )
     }
 
