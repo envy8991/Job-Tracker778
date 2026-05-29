@@ -13,7 +13,7 @@ import CoreLocation
 @available(iOS 16.0, *)
 enum JobStatusIntentEnum: String, AppEnum {
     case pending = "Pending"
-    case needsAriel = "Needs Ariel"
+    case needsOH = "Needs OH"
     case needsUnderground = "Needs Underground"
     case needsNid = "Needs Nid"
     case needsCan = "Needs Can"
@@ -25,7 +25,7 @@ enum JobStatusIntentEnum: String, AppEnum {
 
     static var caseDisplayRepresentations: [JobStatusIntentEnum: DisplayRepresentation] = [
         .pending: "Pending",
-        .needsAriel: "Needs Ariel",
+        .needsOH: "Needs OH",
         .needsUnderground: "Needs Underground",
         .needsNid: "Needs Nid",
         .needsCan: "Needs Can",

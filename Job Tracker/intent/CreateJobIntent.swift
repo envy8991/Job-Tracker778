@@ -35,9 +35,9 @@ struct CreateJobIntent: AppIntent {
     
     // The perform method is called when Siri or Shortcuts executes this intent.
     func perform() async throws -> some ProvidesDialog {
-        let allowed = ["Pending","Needs Ariel","Needs Underground","Needs Nid","Needs Can","Done","Talk to Rick"]
+        let allowed = ["Pending","Needs OH","Needs Underground","Needs Nid","Needs Can","Done","Talk to Rick"]
         let chosen = status.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalized = allowed.first { $0.lowercased() == chosen.lowercased() } ?? chosen
+        let normalized = CrewPosition.normalizedStatusForSaving(allowed.first { $0.lowercased() == chosen.lowercased() } ?? chosen)
         
         // Construct a basic Job model
         let newJob = Job(

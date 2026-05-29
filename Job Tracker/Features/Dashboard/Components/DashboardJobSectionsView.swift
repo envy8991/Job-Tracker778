@@ -226,7 +226,7 @@ struct JobCard: View {
             Button {
                 showStatusDialog = true
             } label: {
-                Text(job.status)
+                Text(job.displayStatus)
                     .font(JTTypography.subheadline)
                     .fontWeight(.semibold)
                     .padding(.horizontal, JTSpacing.md)

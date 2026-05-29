@@ -179,7 +179,7 @@ final class DashboardTutorialStageModel: ObservableObject {
 
     enum Status: String, CaseIterable, Identifiable {
         case pending = "Pending"
-        case needsAerial = "Needs Aerial"
+        case needsOH = "Needs OH"
         case done = "Done"
         case custom = "Custom"
 
@@ -188,7 +188,7 @@ final class DashboardTutorialStageModel: ObservableObject {
         var symbolName: String {
             switch self {
             case .pending: return "hourglass"
-            case .needsAerial: return "airplane"
+            case .needsOH: return "airplane"
             case .done: return "checkmark.circle"
             case .custom: return "sparkles"
             }
@@ -204,7 +204,7 @@ final class DashboardTutorialStageModel: ObservableObject {
         selectedDayIndex = 0
         jobs = [
             Job(title: "Splice drop", address: "711 Post Oak Ct", status: .pending),
-            Job(title: "Aerial survey", address: "108 Amber Wave Blvd", status: .needsAerial),
+            Job(title: "OH survey", address: "108 Amber Wave Blvd", status: .needsOH),
             Job(title: "Fiber pull", address: "1436 Lyonia Dr", status: .pending)
         ]
     }
@@ -235,7 +235,7 @@ final class DashboardTutorialStageModel: ObservableObject {
 final class CreateJobTutorialStageModel: ObservableObject {
     enum StatusOption: String, CaseIterable, Identifiable {
         case pending = "Pending"
-        case aerial = "Needs Aerial"
+        case oh = "Needs OH"
         case ug = "Underground"
         case done = "Done"
 
@@ -781,7 +781,7 @@ private struct DashboardTutorialStageView: View {
                                 statusMenu(for: job)
                                     .tutorialHighlight(
                                         id: "dashboard.status.\(job.id)",
-                                        message: "Tap the status pill to move work between Pending, Needs Aerial, Done, or Custom.",
+                                        message: "Tap the status pill to move work between Pending, Needs OH, Done, or Custom.",
                                         arrowEdge: .bottom,
                                         shape: .capsule,
                                         showsPulse: !model.didChangeStatus
@@ -843,7 +843,7 @@ private struct DashboardTutorialStageView: View {
     private func color(for status: DashboardTutorialStageModel.Status) -> Color {
         switch status {
         case .pending: return Color.yellow
-        case .needsAerial: return Color.orange
+        case .needsOH: return Color.orange
         case .done: return Color.green
         case .custom: return Color.purple
         }

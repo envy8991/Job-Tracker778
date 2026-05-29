@@ -19,7 +19,7 @@ struct YellowSheetJobCard: View {
                     .foregroundColor(.white)
             }
             
-            Text("Status: \(job.status)")
+            Text("Status: \(job.displayStatus)")
                 .font(.subheadline)
                 .foregroundColor(.white)
             

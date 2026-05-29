@@ -276,7 +276,7 @@ final class JobSearchViewModel: ObservableObject {
                 secondary: secondaryAddress.isEmpty ? nil : secondaryAddress
             ),
             jobNumber: displayValue(entry.jobNumber),
-            status: entry.status.trimmingCharacters(in: .whitespacesAndNewlines),
+            status: CrewPosition.statusDisplayName(from: entry.status),
             date: entry.date,
             creator: creatorModel,
             snippet: snippet,
@@ -327,7 +327,7 @@ final class JobSearchViewModel: ObservableObject {
         if let normalized = normalizedNonEmpty(job.locationNumber) {
             haystackParts.append(normalized)
         }
-        if let normalized = normalizedNonEmpty(job.status) {
+        if let normalized = normalizedNonEmpty(CrewPosition.statusDisplayName(from: job.status)) {
             haystackParts.append(normalized)
         }
         if let normalized = normalizedNonEmpty(job.notes) {
@@ -372,7 +372,7 @@ final class JobSearchViewModel: ObservableObject {
         var creatorCounts: [String: (display: String, count: Int)] = [:]
 
         for entry in entries {
-            let status = entry.status.trimmingCharacters(in: .whitespacesAndNewlines)
+            let status = CrewPosition.statusDisplayName(from: entry.status).trimmingCharacters(in: .whitespacesAndNewlines)
             if !status.isEmpty {
                 let key = status.lowercased()
                 if var existing = statusCounts[key] {

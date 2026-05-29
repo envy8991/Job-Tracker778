@@ -1,4 +1,4 @@
-const nativeStatusOptions = ["Pending", "Needs Aerial", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick", "Custom"];
+const nativeStatusOptions = ["Pending", "Needs OH", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick", "Custom"];
 statuses.splice(0, statuses.length, ...nativeStatusOptions);
 
 const parityBase = {
@@ -16,7 +16,7 @@ encodeValue = function enhancedEncodeValue(value, key = "") {
 
 function normalizedPosition(user = currentUser) {
   const position = String(user?.normalizedPosition || user?.position || "").trim();
-  return position.toLowerCase() === "ariel" ? "Aerial" : position;
+  return ["oh", "overhead", "aerial", "ariel", "arial"].includes(position.toLowerCase()) ? "OH" : position;
 }
 
 function isCanUser(user = currentUser) {
@@ -51,7 +51,7 @@ shareJob = async function enhancedShareJob(id) {
       fromUserName: senderName,
       address: job.address,
       date: job.date,
-      status: job.status,
+      status: typeof normalizeCrewStatus === "function" ? normalizeCrewStatus(job.status) : job.status,
       jobNumber: job.jobNumber || "",
       assignment: senderIsCan ? job.assignments || "" : "",
       senderIsCan,

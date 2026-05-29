@@ -187,7 +187,7 @@ struct CreateJobView: View {
 
     @State private var alertMessage: String?
 
-    let statusOptions = ["Pending","Aerial","UG","Nid","Can","Done","Talk to Rick","Custom"]
+    let statusOptions = ["Pending","OH","UG","Nid","Can","Done","Talk to Rick","Custom"]
 
     // Address suggestion state removed
 
@@ -480,11 +480,10 @@ struct CreateJobView: View {
     private func saveJobs(addressesToSave: [String]) {
         guard let userID = authViewModel.currentUser?.id else { dismiss(); return }
 
-        // Normalize legacy spelling ("Ariel" -> "Aerial") before saving
         let baseStatus = (status == "Custom")
             ? customStatusText.trimmingCharacters(in: .whitespacesAndNewlines)
             : status
-        let finalStatus = baseStatus.caseInsensitiveCompare("Ariel") == .orderedSame ? "Aerial" : baseStatus
+        let finalStatus = CrewPosition.normalizedStatusForSaving(baseStatus)
 
         let sanitizedAssign = sanitizeAssignment(assignmentsText)
         let assignmentsValue = sanitizedAssign.isEmpty || !isValidAssignment(sanitizedAssign) ? nil : sanitizedAssign

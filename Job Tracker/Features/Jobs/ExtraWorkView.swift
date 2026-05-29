@@ -9,7 +9,7 @@ struct ExtraWorkView: View {
     
     // The statuses we consider "extra work"
     private let neededStatuses = [
-        "Needs Ariel",
+        "Needs OH",
         "Needs Underground",
         "Needs Nid",
         "Needs Can"
@@ -84,7 +84,7 @@ struct ExtraWorkView: View {
 
     private func unclaimedJobs(status: String) -> [Job] {
         jobsViewModel.jobs.filter { job in
-            job.status == status && job.assignedTo == nil
+            CrewPosition.statusDisplayName(from: job.status) == status && job.assignedTo == nil
         }
     }
     
