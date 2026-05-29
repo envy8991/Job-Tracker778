@@ -401,7 +401,7 @@ struct SupervisorDashboardView: View {
         guard let uid = uid, let user = usersViewModel.user(id: uid) else {
             return ""
         }
-        CrewPosition.normalizedKey(from: user.position)
+        return CrewPosition.normalizedKey(from: user.position)
     }
 
     private func resolveUserName(forUserId uid: String?) -> String {
