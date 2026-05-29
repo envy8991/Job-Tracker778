@@ -52,6 +52,7 @@ struct JobDetailView: View {
     @State private var selectedMaterialNid = ""
     @State private var preformCount = 0
     @State private var jHooksCount = 0
+    @State private var cableClampsCount = 0
     @State private var canFootage = ""     // CAN footage
     @State private var nidFootage = ""
 
@@ -519,6 +520,7 @@ private let jobPlacementChoices = ["OH", "UG"]
                     if CrewPosition.matches(position, .oh) {
                         preformCount = 0
                         jHooksCount = 0
+                        cableClampsCount = 0
                         parseOHMaterials(from: materials)
                     } else {
                         switch position {
@@ -738,6 +740,15 @@ extension JobDetailView {
                         .foregroundColor(.secondary)
                 }
             }
+            // Cable clamps
+            Stepper(value: $cableClampsCount, in: 0...100) {
+                HStack {
+                    Text("Cable Clamps")
+                    Spacer()
+                    Text("\(cableClampsCount)")
+                        .foregroundColor(.secondary)
+                }
+            }
             // U-Guard
             Stepper(value: $uGuardCount, in: 0...5) {
                 HStack {
@@ -906,6 +917,7 @@ extension JobDetailView {
                 }
                 if preformCount > 0 { parts.append("Preforms: \(preformCount)") }
                 if jHooksCount > 0 { parts.append("J Hooks: \(jHooksCount)") }
+                if cableClampsCount > 0 { parts.append("Cable Clamps: \(cableClampsCount)") }
                 if uGuardCount > 0 { parts.append("U-Guard: \(uGuardCount)") }
                 if storageBracket { parts.append("Storage Bracket") }
                 job.materialsUsed = parts.isEmpty ? nil : parts.joined(separator: ", ")
@@ -1006,7 +1018,7 @@ extension JobDetailView {
     // MARK: - Materials Parsing Helpers
     /// Parse an OH materials string we previously saved to restore UI state.
     private func parseOHMaterials(from text: String) {
-        // Expected tokens like: "Weatherhead" or "Rams Head", "Preforms: N", "J Hooks: N", "U-Guard: N", "Storage Bracket"
+        // Expected tokens like: "Weatherhead" or "Rams Head", "Preforms: N", "J Hooks: N", "Cable Clamps: N", "U-Guard: N", "Storage Bracket"
         selectedMaterialOH = "None"
         let lower = text.lowercased()
         if lower.contains("weatherhead") {
@@ -1021,6 +1033,7 @@ extension JobDetailView {
 
         if let n = captureInt(after: "preforms:", in: lower) { preformCount = n }
         if let n = captureInt(after: "j hooks:", in: lower) { jHooksCount = n }
+        if let n = captureInt(after: "cable clamps:", in: lower) { cableClampsCount = n }
         if let n = captureInt(after: "u-guard:", in: lower) { uGuardCount = n }
         storageBracket = lower.contains("storage bracket")
     }
