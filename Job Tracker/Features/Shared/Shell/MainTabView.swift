@@ -210,6 +210,7 @@ struct AdminPanelView: View {
     @StateObject private var viewModel = AdminPanelViewModel()
     @StateObject private var updateViewModel = AdminUpdateViewModel()
     @State private var pendingToggle: PendingToggle?
+    @State private var pendingDeleteUser: AppUser?
     @State private var showingBackfillConfirmation = false
     @State private var pendingUpdateAction: PendingUpdateAction?
     @State private var showingLogs = false
@@ -263,6 +264,34 @@ struct AdminPanelView: View {
             }
         } message: {
             Text("This updates Firebase immediately and may change the user's access right away.")
+        }
+        .confirmationDialog(
+            "Delete user?",
+            isPresented: Binding(
+                get: { pendingDeleteUser != nil },
+                set: { newValue in
+                    if !newValue {
+                        pendingDeleteUser = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let user = pendingDeleteUser {
+                Button("Delete \(user.firstName) \(user.lastName)", role: .destructive) {
+                    viewModel.deleteUser(user)
+                    pendingDeleteUser = nil
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDeleteUser = nil
+            }
+        } message: {
+            if let user = pendingDeleteUser {
+                Text("This removes \(user.firstName) \(user.lastName) from the app roster immediately. Use this only for accounts you no longer need.")
+            } else {
+                Text("This removes the selected user from the app roster immediately.")
+            }
         }
         .confirmationDialog(
             "Run participants backfill?",
@@ -509,6 +538,14 @@ struct AdminPanelView: View {
                                 .font(.subheadline)
                         }
                         .disabled(viewModel.isMutating(userID: user.id))
+
+                        Button(role: .destructive) {
+                            pendingDeleteUser = user
+                        } label: {
+                            Label("Delete User", systemImage: "trash")
+                                .font(.subheadline)
+                        }
+                        .disabled(viewModel.isMutating(userID: user.id) || authViewModel.currentUser?.id == user.id)
                     }
                     .padding(.vertical, 8)
                 }
