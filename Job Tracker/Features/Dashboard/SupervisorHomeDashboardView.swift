@@ -2,7 +2,9 @@ import FirebaseFirestore
 import SwiftUI
 
 struct SupervisorHomeDashboardView: View {
+    @EnvironmentObject private var jobsViewModel: JobsViewModel
     @EnvironmentObject private var usersViewModel: UsersViewModel
+    @EnvironmentObject private var authViewModel: AuthViewModel
     @StateObject private var viewModel = SupervisorHomeDashboardViewModel()
     @State private var selectedDate = Date()
 
@@ -24,6 +26,7 @@ struct SupervisorHomeDashboardView: View {
             }
             .navigationTitle("Supervisor Dashboard")
             .navigationBarTitleDisplayMode(.inline)
+            .jtNavigationBarStyle()
             .onAppear { viewModel.start(for: selectedDate) }
             .onChange(of: selectedDate) { newDate in viewModel.start(for: newDate) }
             .onDisappear { viewModel.stop() }
@@ -43,10 +46,20 @@ struct SupervisorHomeDashboardView: View {
 
     private var datePickerCard: some View {
         GlassCard {
-            DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
-                .datePickerStyle(.compact)
-                .font(JTTypography.body)
-                .padding(JTSpacing.lg)
+            HStack(spacing: JTSpacing.md) {
+                Image(systemName: "calendar")
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.accent)
+                    .frame(width: 32, height: 32)
+                    .background(JTColors.glassHighlight, in: Circle())
+
+                DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .font(JTTypography.body)
+                    .foregroundStyle(JTColors.textPrimary)
+                    .tint(JTColors.accent)
+            }
+            .padding(JTSpacing.lg)
         }
     }
 
@@ -60,6 +73,9 @@ struct SupervisorHomeDashboardView: View {
                         users: users(for: position),
                         jobs: viewModel.jobs
                     )
+                    .environmentObject(jobsViewModel)
+                    .environmentObject(usersViewModel)
+                    .environmentObject(authViewModel)
                 } label: {
                     SupervisorPositionCard(
                         position: position,
@@ -146,7 +162,7 @@ private struct SupervisorPositionCard: View {
             VStack(alignment: .leading, spacing: JTSpacing.md) {
                 HStack {
                     Text(position.displayName)
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .font(JTTypography.title3)
                         .foregroundStyle(JTColors.textPrimary)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -167,33 +183,53 @@ private struct SupervisorPositionCard: View {
 }
 
 private struct SupervisorPositionUsersView: View {
+    @EnvironmentObject private var jobsViewModel: JobsViewModel
+    @EnvironmentObject private var usersViewModel: UsersViewModel
+    @EnvironmentObject private var authViewModel: AuthViewModel
+
     let position: CrewPosition
     let date: Date
     let users: [AppUser]
     let jobs: [Job]
 
     var body: some View {
-        List {
-            if users.isEmpty {
-                Text("No users found for \(position.displayName).")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(users) { user in
-                    NavigationLink {
-                        SupervisorUserJobsView(user: user, date: date, jobs: jobsForUser(user))
-                    } label: {
-                        HStack {
-                            Text(displayName(for: user))
-                            Spacer()
-                            Text("\(jobsForUser(user).count)")
-                                .foregroundStyle(.secondary)
+        ZStack {
+            JTGradients.background
+                .ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: JTSpacing.md) {
+                    if users.isEmpty {
+                        GlassCard {
+                            Text("No users found for \(position.displayName).")
+                                .font(JTTypography.body)
+                                .foregroundStyle(JTColors.textSecondary)
+                                .padding(JTSpacing.lg)
+                                .frame(maxWidth: .infinity)
+                        }
+                    } else {
+                        ForEach(users) { user in
+                            NavigationLink {
+                                SupervisorUserJobsView(user: user, date: date, jobs: jobsForUser(user))
+                                    .environmentObject(jobsViewModel)
+                                    .environmentObject(usersViewModel)
+                                    .environmentObject(authViewModel)
+                            } label: {
+                                SupervisorUserRow(
+                                    name: displayName(for: user),
+                                    jobCount: jobsForUser(user).count
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
+                .padding(JTSpacing.lg)
             }
         }
         .navigationTitle(position.displayName)
         .navigationBarTitleDisplayMode(.inline)
+        .jtNavigationBarStyle()
     }
 
     private func jobsForUser(_ user: AppUser) -> [Job] {
@@ -210,27 +246,152 @@ private struct SupervisorPositionUsersView: View {
     }
 }
 
+private struct SupervisorUserRow: View {
+    let name: String
+    let jobCount: Int
+
+    var body: some View {
+        GlassCard {
+            HStack(spacing: JTSpacing.md) {
+                Image(systemName: "person.fill")
+                    .font(JTTypography.captionEmphasized)
+                    .foregroundStyle(JTColors.accent)
+                    .frame(width: 30, height: 30)
+                    .background(JTColors.glassHighlight, in: Circle())
+
+                Text(name)
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.textPrimary)
+
+                Spacer()
+
+                Text("\(jobCount)")
+                    .font(JTTypography.captionEmphasized)
+                    .foregroundStyle(JTColors.textPrimary)
+                    .padding(.horizontal, JTSpacing.md)
+                    .padding(.vertical, JTSpacing.sm)
+                    .background(JTColors.glassHighlight, in: Capsule(style: .continuous))
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(JTColors.textSecondary)
+            }
+            .padding(JTSpacing.lg)
+        }
+    }
+}
+
 private struct SupervisorUserJobsView: View {
+    @EnvironmentObject private var jobsViewModel: JobsViewModel
+    @EnvironmentObject private var usersViewModel: UsersViewModel
+    @EnvironmentObject private var authViewModel: AuthViewModel
+
     let user: AppUser
     let date: Date
     let jobs: [Job]
 
     var body: some View {
-        List {
-            if jobs.isEmpty {
-                Text("No jobs for this date.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(jobs) { job in
-                    SupervisorUserJobInfoCard(job: job)
+        ZStack {
+            JTGradients.background
+                .ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: JTSpacing.md) {
+                    if jobs.isEmpty {
+                        GlassCard {
+                            Text("No jobs for this date.")
+                                .font(JTTypography.body)
+                                .foregroundStyle(JTColors.textSecondary)
+                                .padding(JTSpacing.lg)
+                                .frame(maxWidth: .infinity)
+                        }
+                    } else {
+                        ForEach(jobs) { job in
+                            NavigationLink {
+                                JobSearchDetailView(
+                                    job: job,
+                                    metadata: supervisorHomeMetadata(for: job),
+                                    showsAddToDashboard: false
+                                )
+                                .environmentObject(jobsViewModel)
+                                .environmentObject(usersViewModel)
+                                .environmentObject(authViewModel)
+                            } label: {
+                                GlassCard {
+                                    SupervisorUserJobInfoCard(job: job)
+                                        .padding(JTSpacing.lg)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
+                .padding(JTSpacing.lg)
             }
         }
         .navigationTitle(displayName)
         .navigationBarTitleDisplayMode(.inline)
+        .jtNavigationBarStyle()
     }
 
     private var displayName: String {
+        let name = [user.firstName, user.lastName]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return name.isEmpty ? "Unnamed User" : name
+    }
+
+    private func supervisorHomeMetadata(for job: Job) -> JobSearchViewModel.Result {
+        let addressParts = job.address
+            .split(separator: ",", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let primaryAddress = addressParts.first ?? job.address.trimmingCharacters(in: .whitespacesAndNewlines)
+        let secondaryAddress = addressParts.dropFirst().joined(separator: ", ")
+        let creator = job.createdBy.flatMap { creatorID in
+            usersViewModel.user(id: creatorID).map { creatorUser in
+                JobSearchViewModel.Result.Creator(
+                    id: creatorUser.id,
+                    name: displayName(for: creatorUser),
+                    role: CrewPosition.normalizedKey(from: creatorUser.position)
+                )
+            }
+        }
+
+        return JobSearchViewModel.Result(
+            id: job.id,
+            address: .init(
+                primary: primaryAddress.isEmpty ? job.address : primaryAddress,
+                secondary: secondaryAddress.isEmpty ? nil : secondaryAddress
+            ),
+            jobNumber: job.jobNumber?.trimmedNonEmpty,
+            status: CrewPosition.statusDisplayName(from: job.status),
+            date: job.date,
+            creator: creator,
+            snippet: supervisorHomeSnippet(for: job),
+            isOwnedByCurrentUser: job.createdBy == authViewModel.currentUser?.id || job.assignedTo == authViewModel.currentUser?.id
+        )
+    }
+
+    private func supervisorHomeSnippet(for job: Job) -> JobSearchViewModel.Result.DetailSnippet? {
+        let candidates: [(String, String?)] = [
+            ("Portal ID", job.portalID),
+            ("Location", job.locationNumber),
+            ("Assignment", job.assignments),
+            ("Materials", job.materialsUsed),
+            ("Notes", job.notes),
+            ("Placement", job.jobPlacement)
+        ]
+
+        for (title, value) in candidates {
+            if let text = value?.trimmedNonEmpty {
+                return .init(title: title, value: text)
+            }
+        }
+        return nil
+    }
+
+    private func displayName(for user: AppUser) -> String {
         let name = [user.firstName, user.lastName]
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -264,7 +425,6 @@ private struct SupervisorUserJobInfoCard: View {
 
             detailRows
         }
-        .padding(.vertical, JTSpacing.sm)
     }
 
     @ViewBuilder

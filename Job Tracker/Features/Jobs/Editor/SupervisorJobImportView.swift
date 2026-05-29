@@ -100,109 +100,57 @@ struct SupervisorJobImportView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                if let img = pickedImage {
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxHeight: 200)
-                }
+            ZStack {
+                JTGradients.background
+                    .ignoresSafeArea()
 
-                Button("Select Job Sheet") { showImagePicker = true }
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: JTSpacing.lg) {
+                        header
+                        imagePreviewCard
+                        actionRow
 
-                Button("Parse Sheet") { runParsing() }
-                    .disabled(pickedImage == nil || isParsing)
-
-                if isParsing { ProgressView() }
-
-                if let err = parsingError {
-                    Text(err.localizedDescription).foregroundColor(.red)
-                }
-
-                if parsedEntries.isEmpty {
-                    Text("No job sheet selected")
-                        .foregroundColor(.secondary)
-                } else {
-                    List(parsedEntries) { entry in
-                        HStack(alignment: .top, spacing: 12) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(entry.resolvedAddress)
-                                    .font(.headline)
-
-                                if let jobNumber = entry.jobNumber {
-                                    Text("Job #: \(jobNumber)")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
+                        if isParsing {
+                            GlassCard {
+                                HStack(spacing: JTSpacing.md) {
+                                    ProgressView()
+                                        .tint(JTColors.accent)
+                                    Text("Parsing job sheet…")
+                                        .font(JTTypography.body)
+                                        .foregroundStyle(JTColors.textPrimary)
                                 }
-
-                                if let assignee = assigneeDisplayName(for: entry) {
-                                    Text("Assignee: \(assignee)")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                if let notes = entry.notes {
-                                    Text(notes)
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                } else if let fallbackNotes = entry.resolvedNotes {
-                                    Text(fallbackNotes)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                if entry.notes != nil,
-                                   let raw = entry.rawText,
-                                   !raw.isEmpty,
-                                   raw.caseInsensitiveCompare(entry.resolvedAddress) != .orderedSame {
-                                    Text("Original: \(raw)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
+                                .padding(JTSpacing.lg)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
+                        }
 
-                            Spacer()
+                        if let err = parsingError {
+                            GlassCard(strokeColor: JTColors.error.opacity(0.45)) {
+                                Label(err.localizedDescription, systemImage: "exclamationmark.triangle.fill")
+                                    .font(JTTypography.captionEmphasized)
+                                    .foregroundStyle(JTColors.error)
+                                    .padding(JTSpacing.lg)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
 
-                            if confirmed.contains(token(for: entry)) {
-                                Image(systemName: "checkmark.circle")
-                                    .foregroundColor(.green)
-                            } else if pending.contains(token(for: entry)) {
-                                ProgressView()
-                            } else {
-                                VStack(alignment: .trailing, spacing: 8) {
-                                    Button("Import") {
-                                        let fields = fields(for: entry)
-                                        let supervisorID = authViewModel.currentUser?.id
-                                        let job = Job(
-                                            address: fields.address,
-                                            date: fields.date,
-                                            status: "Pending",
-                                            assignedTo: fields.assigneeID ?? "",
-                                            createdBy: supervisorID ?? "",
-                                            notes: fields.notes ?? "",
-                                            jobNumber: fields.jobNumber,
-                                            assignments: nil,
-                                            materialsUsed: "",
-                                            latitude: nil,
-                                            longitude: nil
-                                        )
-                                        importEntry(job, for: entry)
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .disabled(!entry.hasResolvableAddress)
+                        if parsedEntries.isEmpty {
+                            emptyImportState
+                        } else {
+                            VStack(alignment: .leading, spacing: JTSpacing.md) {
+                                Text("Parsed jobs")
+                                    .font(JTTypography.title3)
+                                    .foregroundStyle(JTColors.textPrimary)
 
-                                    Button("Review…") {
-                                        reviewFields = fields(for: entry)
-                                        showReview = true
-                                    }
-                                    .disabled(!entry.hasResolvableAddress)
+                                ForEach(parsedEntries) { entry in
+                                    parsedEntryCard(entry)
                                 }
                             }
                         }
                     }
+                    .padding(JTSpacing.lg)
                 }
             }
-            .padding()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
@@ -230,6 +178,172 @@ struct SupervisorJobImportView: View {
         .onAppear {
             if pickedImage == nil {
                 showImagePicker = true
+            }
+        }
+    }
+
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: JTSpacing.xs) {
+            Text("Import Job Sheet")
+                .font(JTTypography.screenTitle)
+                .foregroundStyle(JTColors.textPrimary)
+            Text("Select a sheet, parse it, then import or review each job before saving.")
+                .font(JTTypography.caption)
+                .foregroundStyle(JTColors.textSecondary)
+        }
+    }
+
+    private var imagePreviewCard: some View {
+        GlassCard {
+            Group {
+                if let img = pickedImage {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 220)
+                        .clipShape(JTShapes.roundedRectangle(cornerRadius: JTShapes.smallCardCornerRadius))
+                } else {
+                    VStack(spacing: JTSpacing.sm) {
+                        Image(systemName: "doc.viewfinder")
+                            .font(.system(size: 34, weight: .semibold))
+                        Text("No job sheet selected")
+                            .font(JTTypography.headline)
+                    }
+                    .foregroundStyle(JTColors.textSecondary)
+                    .frame(maxWidth: .infinity, minHeight: 160)
+                }
+            }
+            .padding(JTSpacing.lg)
+        }
+    }
+
+    private var actionRow: some View {
+        HStack(spacing: JTSpacing.md) {
+            Button { showImagePicker = true } label: {
+                Label("Select Sheet", systemImage: "photo")
+                    .font(JTTypography.captionEmphasized)
+                    .foregroundStyle(JTColors.textPrimary)
+                    .padding(.vertical, JTSpacing.md)
+                    .padding(.horizontal, JTSpacing.lg)
+                    .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
+            }
+            .buttonStyle(.plain)
+
+            Button { runParsing() } label: {
+                Label("Parse Sheet", systemImage: "wand.and.stars")
+                    .font(JTTypography.captionEmphasized)
+                    .foregroundStyle(JTColors.onAccent)
+                    .padding(.vertical, JTSpacing.md)
+                    .padding(.horizontal, JTSpacing.lg)
+                    .background(JTColors.accent, in: Capsule(style: .continuous))
+                    .jtShadow(JTElevations.button)
+            }
+            .buttonStyle(.plain)
+            .disabled(pickedImage == nil || isParsing)
+            .opacity(pickedImage == nil || isParsing ? 0.55 : 1)
+        }
+    }
+
+    private var emptyImportState: some View {
+        GlassCard {
+            Text("Choose a job sheet to get started.")
+                .font(JTTypography.body)
+                .foregroundStyle(JTColors.textSecondary)
+                .padding(JTSpacing.lg)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func parsedEntryCard(_ entry: ParsedEntry) -> some View {
+        GlassCard {
+            HStack(alignment: .top, spacing: JTSpacing.md) {
+                VStack(alignment: .leading, spacing: JTSpacing.sm) {
+                    Text(entry.resolvedAddress)
+                        .font(JTTypography.headline)
+                        .foregroundStyle(JTColors.textPrimary)
+
+                    if let jobNumber = entry.jobNumber {
+                        detailLine("Job #", jobNumber)
+                    }
+
+                    if let assignee = assigneeDisplayName(for: entry) {
+                        detailLine("Assignee", assignee)
+                    }
+
+                    if let notes = entry.notes {
+                        detailLine("Notes", notes)
+                    } else if let fallbackNotes = entry.resolvedNotes {
+                        detailLine("Notes", fallbackNotes)
+                    }
+
+                    if entry.notes != nil,
+                       let raw = entry.rawText,
+                       !raw.isEmpty,
+                       raw.caseInsensitiveCompare(entry.resolvedAddress) != .orderedSame {
+                        detailLine("Original", raw)
+                    }
+                }
+
+                Spacer()
+
+                entryActions(for: entry)
+            }
+            .padding(JTSpacing.lg)
+        }
+    }
+
+    private func detailLine(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title.uppercased())
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(JTColors.textSecondary)
+            Text(value)
+                .font(JTTypography.caption)
+                .foregroundStyle(JTColors.textSecondary)
+        }
+    }
+
+    @ViewBuilder
+    private func entryActions(for entry: ParsedEntry) -> some View {
+        if confirmed.contains(token(for: entry)) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.title3)
+                .foregroundStyle(JTColors.success)
+        } else if pending.contains(token(for: entry)) {
+            ProgressView()
+                .tint(JTColors.accent)
+        } else {
+            VStack(alignment: .trailing, spacing: JTSpacing.sm) {
+                Button("Import") {
+                    let fields = fields(for: entry)
+                    let supervisorID = authViewModel.currentUser?.id
+                    let job = Job(
+                        address: fields.address,
+                        date: fields.date,
+                        status: "Pending",
+                        assignedTo: fields.assigneeID ?? "",
+                        createdBy: supervisorID ?? "",
+                        notes: fields.notes ?? "",
+                        jobNumber: fields.jobNumber,
+                        assignments: nil,
+                        materialsUsed: "",
+                        latitude: nil,
+                        longitude: nil
+                    )
+                    importEntry(job, for: entry)
+                }
+                .font(JTTypography.captionEmphasized)
+                .buttonStyle(.borderedProminent)
+                .tint(JTColors.accent)
+                .disabled(!entry.hasResolvableAddress)
+
+                Button("Review…") {
+                    reviewFields = fields(for: entry)
+                    showReview = true
+                }
+                .font(JTTypography.captionEmphasized)
+                .disabled(!entry.hasResolvableAddress)
             }
         }
     }

@@ -122,33 +122,15 @@ struct SupervisorDashboardView: View {
     }()
 
     var body: some View {
-        ZStack {
-            // App-wide gradient background
-            JTGradients.background(stops: 4)
-            .ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                JTGradients.background
+                .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Title
-                    HStack {
-                        Text("Supervisor")
-                            .font(.system(size: 34, weight: .bold))
-                            .foregroundColor(.white)
-                        Spacer()
-                    }
-                    .padding(.top, 8)
-
-                    // Search
-                    HStack(spacing: 10) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.secondary)
-                        TextField("Search address, job #, notes…", text: $searchText)
-                            .textInputAutocapitalization(.never)
-                            .disableAutocorrection(true)
-                    }
-                    .padding(12)
-                    .background(Color.black.opacity(0.25))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: JTSpacing.lg) {
+                    header
+                    searchField
 
                     // Filters card
                     filtersCard
@@ -165,11 +147,14 @@ struct SupervisorDashboardView: View {
                             ForEach(pendingGroups, id: \.key) { day, jobs in
                                 dayHeader(day)
                                 ForEach(jobs, id: \.id) { job in
-                                    SupervisorJobRow(
-                                        job: job,
-                                        userRoleResolver: resolveRole(forUserId:),
-                                        userNameResolver: resolveUserName(forUserId:)
-                                    )
+                                    NavigationLink(value: job) {
+                                        SupervisorJobRow(
+                                            job: job,
+                                            userRoleResolver: resolveRole(forUserId:),
+                                            userNameResolver: resolveUserName(forUserId:)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
                         }
@@ -183,31 +168,49 @@ struct SupervisorDashboardView: View {
                             ForEach(completedGroups, id: \.key) { day, jobs in
                                 dayHeader(day)
                                 ForEach(jobs, id: \.id) { job in
-                                    SupervisorJobRow(
-                                        job: job,
-                                        userRoleResolver: resolveRole(forUserId:),
-                                        userNameResolver: resolveUserName(forUserId:)
-                                    )
+                                    NavigationLink(value: job) {
+                                        SupervisorJobRow(
+                                            job: job,
+                                            userRoleResolver: resolveRole(forUserId:),
+                                            userNameResolver: resolveUserName(forUserId:)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
                         }
                     }
 
                     if pendingJobs.isEmpty && completedJobs.isEmpty && !vm.isLoading {
-                        Text("No jobs match these filters.")
-                            .foregroundColor(.white.opacity(0.8))
-                            .padding(.vertical, 24)
-                            .frame(maxWidth: .infinity)
+                        GlassCard {
+                            Text("No jobs match these filters.")
+                                .font(JTTypography.body)
+                                .foregroundStyle(JTColors.textSecondary)
+                                .padding(.vertical, JTSpacing.xl)
+                                .frame(maxWidth: .infinity)
+                        }
                     }
                 }
-                .padding(.horizontal)
-                .padding(.top, 56)
-                .padding(.bottom, 24)
+                .padding(.horizontal, JTSpacing.lg)
+                .padding(.top, JTSpacing.xxl + JTSpacing.xl)
+                .padding(.bottom, JTSpacing.xl)
+                }
+            }
+            .navigationDestination(for: Job.self) { job in
+                JobSearchDetailView(
+                    job: job,
+                    metadata: supervisorSearchMetadata(for: job),
+                    showsAddToDashboard: false
+                )
+                .environmentObject(jobsViewModel)
+                .environmentObject(usersViewModel)
+                .environmentObject(authViewModel)
             }
         }
         .onAppear { vm.start(range: dateRange) }
         .onDisappear { vm.stop() }
         .onChange(of: dateRange) { _ in vm.start(range: dateRange) }
+        .jtNavigationBarStyle()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if authViewModel.isSupervisorFlag || authViewModel.isAdminFlag {
@@ -240,21 +243,47 @@ struct SupervisorDashboardView: View {
     }
 
     // MARK: – Styled sections matching Dashboard
+    private var header: some View {
+        VStack(alignment: .leading, spacing: JTSpacing.xs) {
+            Text("Supervisor")
+                .font(JTTypography.screenTitle)
+                .foregroundStyle(JTColors.textPrimary)
+            Text("Filter crew jobs by role, status, and date range.")
+                .font(JTTypography.caption)
+                .foregroundStyle(JTColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: JTSpacing.sm) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(JTColors.textMuted)
+            TextField("Search address, job #, notes…", text: $searchText)
+                .font(JTTypography.body)
+                .foregroundStyle(JTColors.textPrimary)
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
+        }
+        .padding(JTSpacing.md)
+        .jtGlassBackground(cornerRadius: JTShapes.fieldCornerRadius, strokeColor: JTColors.glassSoftStroke)
+    }
+
     private func sectionHeader(_ title: String) -> some View {
         HStack {
             Text(title)
-                .font(.title3).bold()
-                .foregroundColor(.white)
+                .font(JTTypography.title3)
+                .foregroundStyle(JTColors.textPrimary)
             Spacer()
         }
-        .padding(.top, 8)
+        .padding(.top, JTSpacing.sm)
     }
 
     private func dayHeader(_ date: Date) -> some View {
         HStack {
             Text(dayString(date))
-                .font(.subheadline).bold()
-                .foregroundColor(.white.opacity(0.85))
+                .font(JTTypography.captionEmphasized)
+                .foregroundStyle(JTColors.textSecondary)
             Spacer()
         }
     }
@@ -283,7 +312,7 @@ struct SupervisorDashboardView: View {
                     Button("This month") { setPresetThisMonth() }
                 } label: {
                     Label("Quick Range", systemImage: "calendar.badge.clock")
-                        .foregroundColor(.white)
+                        .foregroundStyle(JTColors.textPrimary)
                 }
                 Spacer(minLength: 0)
             }
@@ -291,37 +320,38 @@ struct SupervisorDashboardView: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("From")
-                        .font(.footnote)
-                        .foregroundColor(.white.opacity(0.8))
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
                     DatePicker(
                         "From",
                         selection: Binding(get: { dateRange.start }, set: { dateRange = DateInterval(start: $0, end: dateRange.end) }),
                         displayedComponents: .date
                     )
                     .labelsHidden()
+                    .tint(JTColors.accent)
                     .accessibilityLabel("From")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("To")
-                        .font(.footnote)
-                        .foregroundColor(.white.opacity(0.8))
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
                     DatePicker(
                         "To",
                         selection: Binding(get: { dateRange.end }, set: { dateRange = DateInterval(start: dateRange.start, end: $0) }),
                         displayedComponents: .date
                     )
                     .labelsHidden()
+                    .tint(JTColors.accent)
                     .accessibilityLabel("To")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.top, 4)
         }
-        .padding(12)
-        .background(Color.black.opacity(0.25))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(JTSpacing.md)
+        .jtGlassBackground(cornerRadius: JTShapes.cardCornerRadius)
     }
 
     private func setPreset(days: Int) {
@@ -411,6 +441,56 @@ struct SupervisorDashboardView: View {
         return [first, last].filter { !$0.isEmpty }.joined(separator: " ")
     }
 
+    private func supervisorSearchMetadata(for job: Job) -> JobSearchViewModel.Result {
+        let addressParts = job.address
+            .split(separator: ",", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let primaryAddress = addressParts.first ?? job.address.trimmingCharacters(in: .whitespacesAndNewlines)
+        let secondaryAddress = addressParts.dropFirst().joined(separator: ", ")
+        let creatorID = job.createdBy
+        let creatorUser = creatorID.flatMap { usersViewModel.user(id: $0) }
+        let creator = creatorUser.map { user in
+            JobSearchViewModel.Result.Creator(
+                id: user.id,
+                name: resolveUserName(forUserId: user.id),
+                role: CrewPosition.normalizedKey(from: user.position)
+            )
+        }
+
+        return JobSearchViewModel.Result(
+            id: job.id,
+            address: .init(
+                primary: primaryAddress.isEmpty ? job.address : primaryAddress,
+                secondary: secondaryAddress.isEmpty ? nil : secondaryAddress
+            ),
+            jobNumber: job.jobNumber?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+            status: CrewPosition.statusDisplayName(from: job.status),
+            date: job.date,
+            creator: creator,
+            snippet: supervisorSnippet(for: job),
+            isOwnedByCurrentUser: job.createdBy == authViewModel.currentUser?.id || job.assignedTo == authViewModel.currentUser?.id
+        )
+    }
+
+    private func supervisorSnippet(for job: Job) -> JobSearchViewModel.Result.DetailSnippet? {
+        let candidates: [(String, String?)] = [
+            ("Portal ID", job.portalID),
+            ("Location Number", job.locationNumber),
+            ("Assignment", job.assignments),
+            ("Materials", job.materialsUsed),
+            ("Notes", job.notes),
+            ("NID Footage", job.nidFootage),
+            ("CAN Footage", job.canFootage)
+        ]
+
+        for (title, value) in candidates {
+            if let text = value?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+                return .init(title: title, value: text)
+            }
+        }
+        return nil
+    }
+
     // Summary chips
     private var summaryRow: some View {
         HStack(spacing: 12) {
@@ -426,12 +506,11 @@ struct SupervisorDashboardView: View {
             Image(systemName: system)
             Text(text)
         }
-        .font(.caption)
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .background(Color.black.opacity(0.15))
-        .clipShape(Capsule())
-        .foregroundColor(.white)
+        .font(JTTypography.captionEmphasized)
+        .padding(.vertical, JTSpacing.sm)
+        .padding(.horizontal, JTSpacing.md)
+        .background(JTColors.glassHighlight, in: Capsule(style: .continuous))
+        .foregroundStyle(JTColors.textPrimary)
     }
 }
 
@@ -447,27 +526,27 @@ private struct SupervisorJobRow: View {
             header
             metadata
         }
-        .padding(16)
-        .supervisorGlassCard(cornerRadius: 16, shadow: 12)
+        .padding(JTSpacing.lg)
+        .jtGlassBackground(cornerRadius: JTShapes.cardCornerRadius)
+        .jtShadow(JTElevations.card)
     }
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(job.address)
-                .font(.headline.weight(.semibold))
-                .foregroundColor(.white)
+                .font(JTTypography.headline)
+                .foregroundStyle(JTColors.textPrimary)
                 .lineLimit(2)
                 .truncationMode(.tail)
 
             Spacer(minLength: 8)
 
             Text(job.displayStatus)
-                .font(.caption.weight(.semibold))
-                .foregroundColor(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(statusBadgeColor)
-                .clipShape(Capsule())
+                .font(JTTypography.captionEmphasized)
+                .foregroundStyle(JTColors.textPrimary)
+                .padding(.horizontal, JTSpacing.md)
+                .padding(.vertical, JTSpacing.sm)
+                .background(statusBadgeColor, in: Capsule(style: .continuous))
         }
     }
 
@@ -482,24 +561,27 @@ private struct SupervisorJobRow: View {
                     } icon: {
                         Image(systemName: item.icon)
                     }
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.85))
+                    .font(JTTypography.caption)
+                    .foregroundStyle(JTColors.textSecondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             hoursBadge
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(JTColors.textSecondary)
         }
     }
 
     private var hoursBadge: some View {
         Text(hoursText)
-            .font(.caption.weight(.semibold))
-            .foregroundColor(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.white.opacity(0.16))
-            .clipShape(Capsule())
+            .font(JTTypography.captionEmphasized)
+            .foregroundStyle(JTColors.textPrimary)
+            .padding(.horizontal, JTSpacing.md)
+            .padding(.vertical, JTSpacing.sm)
+            .background(JTColors.glassHighlight, in: Capsule(style: .continuous))
     }
 
     private var hoursText: String {
@@ -545,7 +627,7 @@ private struct SupervisorJobRow: View {
     }
 
     private var statusBadgeColor: Color {
-        job.status.lowercased() == "pending" ? Color.orange.opacity(0.35) : Color.teal.opacity(0.35)
+        job.status.lowercased() == "pending" ? JTColors.warning.opacity(0.28) : JTColors.success.opacity(0.28)
     }
 
     private func dateString(_ d: Date) -> String {
@@ -555,19 +637,10 @@ private struct SupervisorJobRow: View {
     }
 }
 
-private extension View {
-    func supervisorGlassCard(cornerRadius: CGFloat = 16, shadow: CGFloat = 10) -> some View {
-        self
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(color: Color.black.opacity(0.20), radius: shadow, x: 0, y: 6)
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }
 
@@ -651,7 +724,7 @@ struct SupervisorCreateJobView: View {
         NavigationStack {
             ZStack {
                 JTGradients.background(stops: 4)
-                .ignoresSafeArea()
+                    .ignoresSafeArea()
 
                 Form {
                     // Worker Role filter
@@ -670,7 +743,7 @@ struct SupervisorCreateJobView: View {
                                     .font(.body)
                                 Text(roleFilter == .all ? "Choose from all users" : "Filtered by \(roleFilter.rawValue)")
                                     .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(JTColors.textMuted)
                             }
                             Spacer()
                             Button {
@@ -716,7 +789,7 @@ struct SupervisorCreateJobView: View {
                                                 VStack(alignment: .leading, spacing: 2) {
                                                     Text(item.title).font(.body)
                                                     if !item.subtitle.isEmpty {
-                                                        Text(item.subtitle).font(.caption).foregroundColor(.secondary)
+                                                        Text(item.subtitle).font(.caption).foregroundStyle(JTColors.textMuted)
                                                     }
                                                 }
                                                 Spacer()
@@ -771,7 +844,7 @@ struct SupervisorCreateJobView: View {
                             .disableAutocorrection(true)
                         Text("Enter the Gibson portal edit ID, or paste the full portal link and the app will store the ID.")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(JTColors.textMuted)
                         if isPortalIDInvalid {
                             Text("Enter a numeric Portal ID or paste a Gibson portal edit link.")
                                 .font(.caption)
@@ -786,7 +859,7 @@ struct SupervisorCreateJobView: View {
                             .disableAutocorrection(true)
                         Text("Use this when there is no Portal ID. Enter the location number or paste a Gibson consumer search link.")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(JTColors.textMuted)
                         if isLocationNumberInvalid {
                             Text("Enter a numeric location number or paste a Gibson consumer search link.")
                                 .font(.caption)
@@ -844,7 +917,10 @@ struct SupervisorCreateJobView: View {
     }
 
     private func saveJob() {
-        guard let supervisorID = authViewModel.currentUser?.id else { dismiss(); return }
+        guard let supervisorID = authViewModel.currentUser?.id else {
+            dismiss()
+            return
+        }
 
         // New jobs created by supervisors always start as Pending
         let finalStatus = "Pending"
@@ -895,7 +971,11 @@ private struct UserSelectSheet: View {
                         HStack {
                             Image(systemName: "person.crop.circle")
                             Text("Unassigned")
-                            if selectedUserID == nil { Spacer(); Image(systemName: "checkmark").foregroundColor(.accentColor) }
+                            if selectedUserID == nil {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.accentColor)
+                            }
                         }
                     }
                 }
@@ -913,7 +993,7 @@ private struct UserSelectSheet: View {
                                     Text("\(u.firstName) \(u.lastName)")
                                     Text(normalizedRole(u.position))
                                         .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundStyle(JTColors.textMuted)
                                 }
                                 Spacer()
                                 if selectedUserID == u.id {
@@ -926,12 +1006,12 @@ private struct UserSelectSheet: View {
             }
             .navigationTitle("Choose User")
             .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search users…")
+            .jtNavigationBarStyle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
                 }
             }
-            .jtNavigationBarStyle()
         }
     }
 

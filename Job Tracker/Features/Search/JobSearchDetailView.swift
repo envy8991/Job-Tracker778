@@ -5,6 +5,7 @@ import CoreLocation
 struct JobSearchDetailView: View {
     let job: Job
     let metadata: JobSearchViewModel.Result
+    var showsAddToDashboard = true
 
     @EnvironmentObject private var jobsViewModel: JobsViewModel
     @EnvironmentObject private var usersViewModel: UsersViewModel
@@ -86,6 +87,10 @@ struct JobSearchDetailView: View {
             items.append(.init(title: "CAN Footage", value: can, systemImage: "ruler"))
         }
 
+        if let placement = displayValue(job.jobPlacement) {
+            items.append(.init(title: "Placement", value: CrewPosition.positionDisplayName(from: placement), systemImage: "tag"))
+        }
+
         if job.hours > 0 {
             items.append(.init(title: "Hours logged", value: String(format: "%.1f hours", job.hours), systemImage: "clock"))
         }
@@ -129,16 +134,18 @@ struct JobSearchDetailView: View {
         .navigationTitle("Job Details")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: JTSpacing.sm) {
-                JTPrimaryButton(isAdding ? "Adding…" : "Add to Dashboard", systemImage: "plus.circle") {
-                    addToDashboard()
+            if showsAddToDashboard {
+                VStack(spacing: JTSpacing.sm) {
+                    JTPrimaryButton(isAdding ? "Adding…" : "Add to Dashboard", systemImage: "plus.circle") {
+                        addToDashboard()
+                    }
+                    .disabled(isAdding)
                 }
-                .disabled(isAdding)
+                .padding(.horizontal, JTSpacing.lg)
+                .padding(.top, JTSpacing.md)
+                .padding(.bottom, JTSpacing.lg)
+                .background(.ultraThinMaterial)
             }
-            .padding(.horizontal, JTSpacing.lg)
-            .padding(.top, JTSpacing.md)
-            .padding(.bottom, JTSpacing.lg)
-            .background(.ultraThinMaterial)
         }
         .sheet(isPresented: $showShareSheet, onDismiss: {
             shareItems = []
