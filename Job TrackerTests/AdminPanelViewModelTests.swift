@@ -79,6 +79,42 @@ final class AdminPanelViewModelTests: XCTestCase {
         XCTAssertFalse(mockService.didRefreshClaims)
     }
 
+    func testDeleteUserSuccessRemovesUserFromRoster() async {
+        let mockService = MockAdminPanelService()
+        let viewModel = AdminPanelViewModel(
+            service: mockService,
+            currentUserIDProvider: { sampleUsers[0].id },
+            initialRoster: sampleUsers
+        )
+
+        viewModel.deleteUser(sampleUsers[1])
+
+        XCTAssertTrue(viewModel.deletingUserIDs.contains(sampleUsers[1].id))
+        XCTAssertEqual(mockService.lastDeletedUserID, sampleUsers[1].id)
+
+        mockService.completeLastDelete(with: .success(()))
+        await Task.yield()
+
+        XCTAssertFalse(viewModel.deletingUserIDs.contains(sampleUsers[1].id))
+        XCTAssertFalse(viewModel.roster.contains { $0.id == sampleUsers[1].id })
+        XCTAssertEqual(viewModel.alert?.kind, .success)
+    }
+
+    func testDeleteCurrentUserIsBlocked() {
+        let mockService = MockAdminPanelService()
+        let viewModel = AdminPanelViewModel(
+            service: mockService,
+            currentUserIDProvider: { sampleUsers[0].id },
+            initialRoster: sampleUsers
+        )
+
+        viewModel.deleteUser(sampleUsers[0])
+
+        XCTAssertNil(mockService.lastDeletedUserID)
+        XCTAssertTrue(viewModel.deletingUserIDs.isEmpty)
+        XCTAssertEqual(viewModel.alert?.title, "Delete Blocked")
+    }
+
     func testBackfillProgressAndCompletion() async {
         let mockService = MockAdminPanelService()
         let viewModel = AdminPanelViewModel(service: mockService)
@@ -105,7 +141,9 @@ final class AdminPanelViewModelTests: XCTestCase {
 
 private final class MockAdminPanelService: AdminPanelService {
     private(set) var lastUpdate: (uid: String, isAdmin: Bool, isSupervisor: Bool)?
+    private(set) var lastDeletedUserID: String?
     private var updateCompletion: ((Result<Void, Error>) -> Void)?
+    private var deleteCompletion: ((Result<Void, Error>) -> Void)?
     private var backfillProgress: ((FirebaseService.AdminMaintenanceProgress) -> Void)?
     private var backfillCompletion: ((Result<Int, Error>) -> Void)?
     private(set) var didRefreshClaims = false
@@ -113,6 +151,11 @@ private final class MockAdminPanelService: AdminPanelService {
     func updateUserFlags(uid: String, isAdmin: Bool, isSupervisor: Bool, completion: @escaping (Result<Void, Error>) -> Void) {
         lastUpdate = (uid, isAdmin, isSupervisor)
         updateCompletion = completion
+    }
+
+    func deleteUser(uid: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        lastDeletedUserID = uid
+        deleteCompletion = completion
     }
 
     func adminBackfillParticipantsForAllJobs(progress: ((FirebaseService.AdminMaintenanceProgress) -> Void)?, completion: @escaping (Result<Int, Error>) -> Void) {
@@ -128,6 +171,11 @@ private final class MockAdminPanelService: AdminPanelService {
     func completeLastUpdate(with result: Result<Void, Error>) {
         updateCompletion?(result)
         updateCompletion = nil
+    }
+
+    func completeLastDelete(with result: Result<Void, Error>) {
+        deleteCompletion?(result)
+        deleteCompletion = nil
     }
 
     func sendProgress(_ progress: FirebaseService.AdminMaintenanceProgress) {

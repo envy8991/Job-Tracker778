@@ -9,6 +9,8 @@ protocol AdminPanelService: AnyObject {
         completion: @escaping (Result<Void, Error>) -> Void
     )
 
+    func deleteUser(uid: String, completion: @escaping (Result<Void, Error>) -> Void)
+
     func adminBackfillParticipantsForAllJobs(
         progress: ((FirebaseService.AdminMaintenanceProgress) -> Void)?,
         completion: @escaping (Result<Int, Error>) -> Void
@@ -54,6 +56,7 @@ final class AdminPanelViewModel: ObservableObject {
     @Published private(set) var roster: [AppUser]
     @Published private(set) var updatingAdminIDs: Set<String> = []
     @Published private(set) var updatingSupervisorIDs: Set<String> = []
+    @Published private(set) var deletingUserIDs: Set<String> = []
     @Published var alert: AlertItem?
     @Published private(set) var maintenanceStatus: MaintenanceStatus = .idle
 
@@ -109,8 +112,46 @@ final class AdminPanelViewModel: ObservableObject {
         updateFlags(for: user, admin: user.isAdmin, supervisor: isSupervisor, changedFlag: .supervisor)
     }
 
+    func deleteUser(_ user: AppUser) {
+        let userID = user.id
+        guard currentUserIDProvider() != userID else {
+            alert = AlertItem(
+                title: "Delete Blocked",
+                message: "You cannot delete your own admin account from this screen.",
+                kind: .error
+            )
+            return
+        }
+
+        guard !isMutating(userID: userID) else { return }
+
+        deletingUserIDs.insert(userID)
+        service.deleteUser(uid: userID) { [weak self] result in
+            guard let self else { return }
+            Task { @MainActor in
+                self.deletingUserIDs.remove(userID)
+
+                switch result {
+                case .success:
+                    self.roster.removeAll { $0.id == userID }
+                    self.alert = AlertItem(
+                        title: "User Deleted",
+                        message: "Removed \(user.firstName) \(user.lastName) from the app roster.",
+                        kind: .success
+                    )
+                case .failure(let error):
+                    self.alert = AlertItem(
+                        title: "Delete Failed",
+                        message: error.localizedDescription,
+                        kind: .error
+                    )
+                }
+            }
+        }
+    }
+
     func isMutating(userID: String) -> Bool {
-        updatingAdminIDs.contains(userID) || updatingSupervisorIDs.contains(userID)
+        updatingAdminIDs.contains(userID) || updatingSupervisorIDs.contains(userID) || deletingUserIDs.contains(userID)
     }
 
     func runParticipantsBackfill() {

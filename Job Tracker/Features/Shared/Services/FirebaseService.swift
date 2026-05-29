@@ -696,6 +696,18 @@ class FirebaseService {
         }
     }
 
+    func deleteUser(uid: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        db.collection("users").document(uid).delete { error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        }
+    }
+
     func refreshCustomClaims(for uid: String?, completion: ((Error?) -> Void)? = nil) {
         guard let currentUser = auth.currentUser else {
             DispatchQueue.main.async {
