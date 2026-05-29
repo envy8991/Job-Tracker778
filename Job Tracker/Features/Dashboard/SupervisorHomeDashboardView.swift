@@ -16,6 +16,15 @@ struct SupervisorHomeDashboardView: View {
                     VStack(alignment: .leading, spacing: JTSpacing.lg) {
                         header
                         datePickerCard
+
+                        if viewModel.isLoading {
+                            supervisorHomeStateCard(title: "Loading crew jobs…", systemImage: "hourglass")
+                        }
+
+                        if let error = viewModel.errorMessage {
+                            supervisorHomeStateCard(title: "Unable to load crew jobs", systemImage: "exclamationmark.triangle", message: error)
+                        }
+
                         positionGrid
                     }
                     .padding(.horizontal, JTSpacing.lg)
@@ -57,6 +66,27 @@ struct SupervisorHomeDashboardView: View {
                     .foregroundStyle(JTColors.textPrimary)
                     .tint(JTColors.accent)
             }
+            .padding(JTSpacing.lg)
+        }
+    }
+
+    private func supervisorHomeStateCard(title: String, systemImage: String, message: String? = nil) -> some View {
+        GlassCard(cornerRadius: JTShapes.largeCardCornerRadius, strokeColor: JTColors.glassSoftStroke) {
+            VStack(spacing: JTSpacing.sm) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 28))
+                    .foregroundStyle(message == nil ? JTColors.textMuted : JTColors.error)
+                Text(title)
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.textPrimary)
+                if let message {
+                    Text(message)
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity)
             .padding(JTSpacing.lg)
         }
     }
@@ -274,6 +304,8 @@ private struct SupervisorUserJobsView: View {
     let date: Date
     let jobs: [Job]
 
+    @State private var selectedJob: Job?
+
     var body: some View {
         ZStack {
             JTGradients.background
@@ -291,10 +323,16 @@ private struct SupervisorUserJobsView: View {
                         }
                     } else {
                         ForEach(jobs) { job in
-                            GlassCard {
-                                SupervisorUserJobInfoCard(job: job)
-                                    .padding(JTSpacing.lg)
+                            Button {
+                                selectedJob = job
+                            } label: {
+                                GlassCard {
+                                    SupervisorUserJobInfoCard(job: job)
+                                        .padding(JTSpacing.lg)
+                                }
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityHint("Opens the full job details")
                         }
                     }
                 }
@@ -304,6 +342,9 @@ private struct SupervisorUserJobsView: View {
         .navigationTitle(displayName)
         .navigationBarTitleDisplayMode(.inline)
         .jtNavigationBarStyle()
+        .sheet(item: $selectedJob) { job in
+            UniversalJobDetailView(job: job, showsDoneButton: true)
+        }
     }
 
     private var displayName: String {
@@ -338,7 +379,15 @@ private struct SupervisorUserJobInfoCard: View {
                     .foregroundStyle(statusTint)
             }
 
-            detailRows
+            HStack(alignment: .top, spacing: JTSpacing.sm) {
+                VStack(alignment: .leading, spacing: JTSpacing.sm) {
+                    detailRows
+                }
+                Spacer(minLength: JTSpacing.sm)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(JTColors.textMuted)
+            }
         }
     }
 
@@ -365,7 +414,7 @@ private struct SupervisorUserJobInfoCard: View {
     }
 
     private var statusTint: Color {
-        job.status.lowercased() == "pending" ? Color.orange : JTColors.success
+        universalStatusColor(job.status)
     }
 
     private func detailRow(_ title: String, _ value: String) -> some View {

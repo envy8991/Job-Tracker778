@@ -91,12 +91,13 @@ final class SupervisorJobsViewModel: ObservableObject {
 }
 
 // MARK: - UI helpers
+@MainActor
 private func roleColor(_ role: SupervisorRole) -> Color {
     switch role {
-    case .ug:     return Color.green.opacity(0.35)
-    case .oh: return Color.blue.opacity(0.35)
-    case .can:    return Color.orange.opacity(0.35)
-    case .nid:    return Color.purple.opacity(0.35)
+    case .ug:     return JTColors.success.opacity(0.35)
+    case .oh: return JTColors.info.opacity(0.35)
+    case .can:    return JTColors.warning.opacity(0.35)
+    case .nid:    return JTColors.accent.opacity(0.35)
     }
 }
 
@@ -109,6 +110,7 @@ struct SupervisorDashboardView: View {
     @StateObject private var vm = SupervisorJobsViewModel()
     @State private var showingCreate = false
     @State private var showingImport = false
+    @State private var selectedJob: Job?
 
     @State private var role: SupervisorRole = .ug
     @State private var status: StatusFilter = .all
@@ -138,6 +140,14 @@ struct SupervisorDashboardView: View {
                     summaryRow
                         .padding(.top, 4)
 
+                    if vm.isLoading {
+                        supervisorStateCard(title: "Loading jobs…", systemImage: "hourglass")
+                    }
+
+                    if let error = vm.error {
+                        supervisorStateCard(title: "Unable to load jobs", systemImage: "exclamationmark.triangle", message: error)
+                    }
+
                     // Pending section
                     if !pendingJobs.isEmpty {
                         sectionHeader("Not Completed")
@@ -146,11 +156,17 @@ struct SupervisorDashboardView: View {
                             ForEach(pendingGroups, id: \.key) { day, jobs in
                                 dayHeader(day)
                                 ForEach(jobs, id: \.id) { job in
-                                    SupervisorJobRow(
-                                        job: job,
-                                        userRoleResolver: resolveRole(forUserId:),
-                                        userNameResolver: resolveUserName(forUserId:)
-                                    )
+                                    Button {
+                                        selectedJob = job
+                                    } label: {
+                                        SupervisorJobRow(
+                                            job: job,
+                                            userRoleResolver: resolveRole(forUserId:),
+                                            userNameResolver: resolveUserName(forUserId:)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityHint("Opens the full job details")
                                 }
                             }
                         }
@@ -164,11 +180,17 @@ struct SupervisorDashboardView: View {
                             ForEach(completedGroups, id: \.key) { day, jobs in
                                 dayHeader(day)
                                 ForEach(jobs, id: \.id) { job in
-                                    SupervisorJobRow(
-                                        job: job,
-                                        userRoleResolver: resolveRole(forUserId:),
-                                        userNameResolver: resolveUserName(forUserId:)
-                                    )
+                                    Button {
+                                        selectedJob = job
+                                    } label: {
+                                        SupervisorJobRow(
+                                            job: job,
+                                            userRoleResolver: resolveRole(forUserId:),
+                                            userNameResolver: resolveUserName(forUserId:)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityHint("Opens the full job details")
                                 }
                             }
                         }
@@ -205,6 +227,9 @@ struct SupervisorDashboardView: View {
                     .accessibilityLabel("Create or Import Job")
                 }
             }
+        }
+        .sheet(item: $selectedJob) { job in
+            UniversalJobDetailView(job: job, showsDoneButton: true)
         }
         .sheet(isPresented: $showingCreate) {
             SupervisorCreateJobView()
@@ -249,6 +274,27 @@ struct SupervisorDashboardView: View {
         }
         .padding(JTSpacing.md)
         .jtGlassBackground(cornerRadius: JTShapes.fieldCornerRadius, strokeColor: JTColors.glassSoftStroke)
+    }
+
+    private func supervisorStateCard(title: String, systemImage: String, message: String? = nil) -> some View {
+        GlassCard(cornerRadius: JTShapes.largeCardCornerRadius, strokeColor: JTColors.glassSoftStroke) {
+            VStack(spacing: JTSpacing.sm) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 28))
+                    .foregroundStyle(message == nil ? JTColors.textMuted : JTColors.error)
+                Text(title)
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.textPrimary)
+                if let message {
+                    Text(message)
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(JTSpacing.lg)
+        }
     }
 
     private func sectionHeader(_ title: String) -> some View {
@@ -500,6 +546,10 @@ private struct SupervisorJobRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             hoursBadge
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(JTColors.textMuted)
         }
     }
 
@@ -555,7 +605,7 @@ private struct SupervisorJobRow: View {
     }
 
     private var statusBadgeColor: Color {
-        job.status.lowercased() == "pending" ? JTColors.warning.opacity(0.28) : JTColors.success.opacity(0.28)
+        universalStatusColor(job.status).opacity(0.22)
     }
 
     private func dateString(_ d: Date) -> String {
@@ -721,8 +771,8 @@ struct SupervisorCreateJobView: View {
                                                         .font(.caption.bold())
                                                         .padding(.vertical, 5)
                                                         .padding(.horizontal, 8)
-                                                        .background(Capsule().fill(Color(.secondarySystemBackground)))
-                                                        .overlay(Capsule().stroke(Color.gray.opacity(0.25)))
+                                                        .background(JTColors.glassHighlight, in: Capsule())
+                                                        .overlay(Capsule().stroke(JTColors.glassSoftStroke))
                                                 }
                                             }
                                             .padding(.vertical, 10)
@@ -736,15 +786,8 @@ struct SupervisorCreateJobView: View {
                                         }
                                     }
                                 }
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color(.systemBackground))
-                                        .shadow(radius: 6)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.gray.opacity(0.2))
-                                )
+                                .jtGlassBackground(cornerRadius: JTShapes.fieldCornerRadius, strokeColor: JTColors.glassSoftStroke)
+                                .jtShadow(JTElevations.card)
                                 .padding(.top, 44)
                             }
                         }
@@ -770,7 +813,7 @@ struct SupervisorCreateJobView: View {
                         if isPortalIDInvalid {
                             Text("Enter a numeric Portal ID or paste a Gibson portal edit link.")
                                 .font(.caption)
-                                .foregroundColor(.red)
+                                .foregroundStyle(JTColors.error)
                         }
                     }
 
@@ -785,7 +828,7 @@ struct SupervisorCreateJobView: View {
                         if isLocationNumberInvalid {
                             Text("Enter a numeric location number or paste a Gibson consumer search link.")
                                 .font(.caption)
-                                .foregroundColor(.red)
+                                .foregroundStyle(JTColors.error)
                         }
                     }
 
@@ -798,6 +841,8 @@ struct SupervisorCreateJobView: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
+                .tint(JTColors.accent)
+                .foregroundStyle(JTColors.textPrimary)
             }
             .navigationTitle("New Job")
             .navigationBarTitleDisplayMode(.inline)
@@ -896,7 +941,7 @@ private struct UserSelectSheet: View {
                             if selectedUserID == nil {
                                 Spacer()
                                 Image(systemName: "checkmark")
-                                    .foregroundColor(.accentColor)
+                                    .foregroundStyle(JTColors.accent)
                             }
                         }
                     }
@@ -919,7 +964,7 @@ private struct UserSelectSheet: View {
                                 }
                                 Spacer()
                                 if selectedUserID == u.id {
-                                    Image(systemName: "checkmark.circle.fill").foregroundColor(.accentColor)
+                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(JTColors.accent)
                                 }
                             }
                         }

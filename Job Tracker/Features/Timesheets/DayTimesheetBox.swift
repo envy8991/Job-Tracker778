@@ -17,72 +17,114 @@ struct DayTimesheetBox: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(dateLabel)
-                .font(.headline)
-            
+        VStack(alignment: .leading, spacing: JTSpacing.md) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(dateLabel)
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.textPrimary)
+                Spacer()
+                Text("\(jobs.count) job\(jobs.count == 1 ? "" : "s")")
+                    .font(JTTypography.caption)
+                    .foregroundStyle(JTColors.textSecondary)
+            }
+
             if jobs.isEmpty {
-                Text("No jobs")
-                    .foregroundColor(.gray)
+                emptyState
             } else {
-                headingView
-                ForEach(jobs, id: \.id) { job in
-                    jobRow(job)
+                VStack(spacing: JTSpacing.sm) {
+                    ForEach(jobs, id: \.id) { job in
+                        jobRow(job)
+                    }
                 }
             }
-            
+
             totalHoursView
         }
-        .padding(8)
+        .padding(JTSpacing.lg)
         .frame(minHeight: 130)
-        .overlay(
-            RoundedRectangle(cornerRadius: 4)
-                .stroke(Color.gray, lineWidth: 1)
-        )
     }
-    
+
     // MARK: - Subviews
 
-    private var headingView: some View {
-        HStack {
-            Text("Job #")
-                .frame(width: 60, alignment: .leading)
-            Text("Hours")
-                .frame(width: 50, alignment: .leading)
-            Spacer()
+    private var emptyState: some View {
+        HStack(spacing: JTSpacing.sm) {
+            Image(systemName: "tray")
+            Text("No jobs")
         }
-        .font(.subheadline)
-        .foregroundColor(.blue)
+        .font(JTTypography.subheadline)
+        .foregroundStyle(JTColors.textSecondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, JTSpacing.md)
     }
-    
+
     private func jobRow(_ job: Job) -> some View {
-        HStack {
-            Text(job.jobNumber ?? "")
-                .frame(width: 60, alignment: .leading)
-            Text(String(format: "%.1f", job.hours))
-                .frame(width: 50, alignment: .leading)
-            // Display only the house number and street name.
-            Text(houseNumberAndStreet(from: job.shortAddress))
-            Spacer()
-        }
-        .font(.caption)
-        .contentShape(Rectangle())
-        .onTapGesture {
+        Button {
             onJobTap?(job)
+        } label: {
+            HStack(spacing: JTSpacing.md) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: JTSpacing.xs) {
+                        if let jobNumber = job.jobNumber, !jobNumber.isEmpty {
+                            Text("#\(jobNumber)")
+                                .font(JTTypography.captionEmphasized)
+                                .foregroundStyle(JTColors.textPrimary)
+                        }
+
+                        Text(job.displayStatus)
+                            .font(JTTypography.caption)
+                            .foregroundStyle(universalStatusColor(job.status))
+                            .padding(.horizontal, JTSpacing.sm)
+                            .padding(.vertical, 2)
+                            .background(universalStatusColor(job.status).opacity(0.16), in: Capsule())
+                    }
+
+                    Text(houseNumberAndStreet(from: job.shortAddress))
+                        .font(JTTypography.subheadline)
+                        .foregroundStyle(JTColors.textPrimary)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: JTSpacing.sm)
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(String(format: "%.1f", job.hours))
+                        .font(JTTypography.headline)
+                        .foregroundStyle(JTColors.textPrimary)
+                    Text("hrs")
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(JTColors.textMuted)
+            }
+            .padding(JTSpacing.md)
+            .jtGlassBackground(cornerRadius: JTShapes.smallCardCornerRadius, strokeColor: JTColors.glassSoftStroke)
         }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens the full job details")
     }
-    
+
     private var totalHoursView: some View {
-        HStack {
-            Text("Total Hours:")
-                .font(.caption)
-            TextField("Enter total hours", text: $totalHoursEditable)
-                .font(.caption)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .frame(maxWidth: 80)
+        HStack(spacing: JTSpacing.sm) {
+            Label("Total Hours", systemImage: "clock")
+                .font(JTTypography.captionEmphasized)
+                .foregroundStyle(JTColors.textSecondary)
+            Spacer()
+            TextField("0.0", text: $totalHoursEditable)
+                .font(JTTypography.captionEmphasized)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .padding(.vertical, JTSpacing.xs)
+                .padding(.horizontal, JTSpacing.sm)
+                .frame(maxWidth: 84)
+                .jtGlassBackground(cornerRadius: JTShapes.chipCornerRadius, strokeColor: JTColors.glassSoftStroke)
+                .foregroundStyle(JTColors.textPrimary)
         }
+        .padding(.top, JTSpacing.xs)
     }
-    
+
     // MARK: - Helper
 
     private var dateLabel: String {
@@ -97,14 +139,14 @@ struct DayTimesheetBox: View {
         if let comma = fullAddress.firstIndex(of: ",") {
             return String(fullAddress[..<comma]).trimmingCharacters(in: .whitespaces)
         }
-        
+
         // 2. Otherwise, keep tokens until we hit a known street suffix or run out.
         let suffixes: Set<String> = [
             "st", "street", "rd", "road", "ave", "avenue",
             "blvd", "circle", "cir", "ln", "lane", "dr", "drive",
             "ct", "court", "pkwy", "pl", "place", "ter", "terrace"
         ]
-        
+
         var resultTokens: [Substring] = []
         for token in fullAddress.split(separator: " ") {
             resultTokens.append(token)

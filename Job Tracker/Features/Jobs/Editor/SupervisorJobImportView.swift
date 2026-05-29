@@ -100,109 +100,32 @@ struct SupervisorJobImportView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                if let img = pickedImage {
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxHeight: 200)
-                }
+            ZStack {
+                JTGradients.background(stops: 4)
+                    .ignoresSafeArea()
 
-                Button("Select Job Sheet") { showImagePicker = true }
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: JTSpacing.lg) {
+                        headerCard
+                        actionCard
 
-                Button("Parse Sheet") { runParsing() }
-                    .disabled(pickedImage == nil || isParsing)
-
-                if isParsing { ProgressView() }
-
-                if let err = parsingError {
-                    Text(err.localizedDescription).foregroundColor(.red)
-                }
-
-                if parsedEntries.isEmpty {
-                    Text("No job sheet selected")
-                        .foregroundColor(.secondary)
-                } else {
-                    List(parsedEntries) { entry in
-                        HStack(alignment: .top, spacing: 12) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(entry.resolvedAddress)
-                                    .font(.headline)
-
-                                if let jobNumber = entry.jobNumber {
-                                    Text("Job #: \(jobNumber)")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                if let assignee = assigneeDisplayName(for: entry) {
-                                    Text("Assignee: \(assignee)")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                if let notes = entry.notes {
-                                    Text(notes)
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                } else if let fallbackNotes = entry.resolvedNotes {
-                                    Text(fallbackNotes)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                if entry.notes != nil,
-                                   let raw = entry.rawText,
-                                   !raw.isEmpty,
-                                   raw.caseInsensitiveCompare(entry.resolvedAddress) != .orderedSame {
-                                    Text("Original: \(raw)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-
-                            Spacer()
-
-                            if confirmed.contains(token(for: entry)) {
-                                Image(systemName: "checkmark.circle")
-                                    .foregroundColor(.green)
-                            } else if pending.contains(token(for: entry)) {
-                                ProgressView()
-                            } else {
-                                VStack(alignment: .trailing, spacing: 8) {
-                                    Button("Import") {
-                                        let fields = fields(for: entry)
-                                        let supervisorID = authViewModel.currentUser?.id
-                                        let job = Job(
-                                            address: fields.address,
-                                            date: fields.date,
-                                            status: "Pending",
-                                            assignedTo: fields.assigneeID ?? "",
-                                            createdBy: supervisorID ?? "",
-                                            notes: fields.notes ?? "",
-                                            jobNumber: fields.jobNumber,
-                                            assignments: nil,
-                                            materialsUsed: "",
-                                            latitude: nil,
-                                            longitude: nil
-                                        )
-                                        importEntry(job, for: entry)
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .disabled(!entry.hasResolvableAddress)
-
-                                    Button("Review…") {
-                                        reviewFields = fields(for: entry)
-                                        showReview = true
-                                    }
-                                    .disabled(!entry.hasResolvableAddress)
-                                }
+                        if let err = parsingError {
+                            GlassCard(cornerRadius: JTShapes.largeCardCornerRadius, strokeColor: JTColors.glassSoftStroke) {
+                                Label(err.localizedDescription, systemImage: "exclamationmark.triangle")
+                                    .font(JTTypography.subheadline)
+                                    .foregroundStyle(JTColors.error)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(JTSpacing.lg)
                             }
                         }
+
+                        parsedEntriesSection
                     }
+                    .padding(JTSpacing.lg)
                 }
             }
-            .padding()
+            .navigationTitle("Import Job Sheet")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
@@ -232,6 +155,211 @@ struct SupervisorJobImportView: View {
                 showImagePicker = true
             }
         }
+    }
+
+    private var headerCard: some View {
+        GlassCard(cornerRadius: JTShapes.largeCardCornerRadius, strokeColor: JTColors.glassSoftStroke) {
+            VStack(alignment: .leading, spacing: JTSpacing.md) {
+                Label("Supervisor Import", systemImage: "doc.text.viewfinder")
+                    .font(JTTypography.title3)
+                    .foregroundStyle(JTColors.textPrimary)
+
+                Text("Choose a job sheet image, parse it, then import or review each job before it is assigned.")
+                    .font(JTTypography.subheadline)
+                    .foregroundStyle(JTColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let img = pickedImage {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 180)
+                        .clipShape(JTShapes.roundedRectangle(cornerRadius: JTShapes.smallCardCornerRadius))
+                        .overlay {
+                            JTShapes.roundedRectangle(cornerRadius: JTShapes.smallCardCornerRadius)
+                                .stroke(JTColors.glassSoftStroke, lineWidth: 1)
+                        }
+                } else {
+                    HStack(spacing: JTSpacing.sm) {
+                        Image(systemName: "photo")
+                        Text("No job sheet selected")
+                    }
+                    .font(JTTypography.subheadline)
+                    .foregroundStyle(JTColors.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, JTSpacing.xl)
+                    .jtGlassBackground(cornerRadius: JTShapes.smallCardCornerRadius, strokeColor: JTColors.glassSoftStroke)
+                }
+            }
+            .padding(JTSpacing.lg)
+        }
+    }
+
+    private var actionCard: some View {
+        GlassCard(cornerRadius: JTShapes.largeCardCornerRadius, strokeColor: JTColors.glassSoftStroke) {
+            VStack(spacing: JTSpacing.md) {
+                Button {
+                    showImagePicker = true
+                } label: {
+                    Label("Select Job Sheet", systemImage: "photo.on.rectangle")
+                        .font(JTTypography.button)
+                        .foregroundStyle(JTColors.textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, JTSpacing.md)
+                        .jtGlassBackground(cornerRadius: JTShapes.buttonCornerRadius, strokeColor: JTColors.glassSoftStroke)
+                }
+                .buttonStyle(.plain)
+
+                JTPrimaryButton(isParsing ? "Parsing…" : "Parse Sheet", systemImage: "wand.and.stars") {
+                    runParsing()
+                }
+                .disabled(pickedImage == nil || isParsing)
+
+                if isParsing {
+                    ProgressView("Reading job sheet…")
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+                        .tint(JTColors.accent)
+                }
+            }
+            .padding(JTSpacing.lg)
+        }
+    }
+
+    @ViewBuilder
+    private var parsedEntriesSection: some View {
+        if parsedEntries.isEmpty {
+            GlassCard(cornerRadius: JTShapes.largeCardCornerRadius, strokeColor: JTColors.glassSoftStroke) {
+                VStack(spacing: JTSpacing.sm) {
+                    Image(systemName: "tray")
+                        .font(.system(size: 34))
+                        .foregroundStyle(JTColors.textMuted)
+                    Text("No parsed jobs yet")
+                        .font(JTTypography.headline)
+                        .foregroundStyle(JTColors.textPrimary)
+                    Text("Parsed jobs will appear here with import and review actions.")
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(JTSpacing.xl)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: JTSpacing.md) {
+                Text("Parsed Jobs")
+                    .font(JTTypography.title3)
+                    .foregroundStyle(JTColors.textPrimary)
+
+                ForEach(parsedEntries) { entry in
+                    parsedEntryCard(entry)
+                }
+            }
+        }
+    }
+
+    private func parsedEntryCard(_ entry: ParsedEntry) -> some View {
+        let entryToken = token(for: entry)
+        return GlassCard(cornerRadius: JTShapes.largeCardCornerRadius, strokeColor: JTColors.glassSoftStroke) {
+            VStack(alignment: .leading, spacing: JTSpacing.md) {
+                HStack(alignment: .top, spacing: JTSpacing.sm) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(entry.resolvedAddress)
+                            .font(JTTypography.headline)
+                            .foregroundStyle(JTColors.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        HStack(spacing: JTSpacing.xs) {
+                            if let jobNumber = entry.jobNumber {
+                                importChip("#\(jobNumber)", tint: JTColors.accent)
+                            }
+                            if let assignee = assigneeDisplayName(for: entry) {
+                                importChip(assignee, tint: JTColors.info)
+                            }
+                        }
+                    }
+
+                    Spacer(minLength: JTSpacing.sm)
+
+                    if confirmed.contains(entryToken) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(JTColors.success)
+                    } else if pending.contains(entryToken) {
+                        ProgressView()
+                            .tint(JTColors.accent)
+                    }
+                }
+
+                if let notes = entry.notes ?? entry.resolvedNotes {
+                    Text(notes)
+                        .font(JTTypography.subheadline)
+                        .foregroundStyle(JTColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if entry.notes != nil,
+                   let raw = entry.rawText,
+                   !raw.isEmpty,
+                   raw.caseInsensitiveCompare(entry.resolvedAddress) != .orderedSame {
+                    Text("Original: \(raw)")
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if !confirmed.contains(entryToken) && !pending.contains(entryToken) {
+                    HStack(spacing: JTSpacing.sm) {
+                        Button {
+                            let fields = fields(for: entry)
+                            let supervisorID = authViewModel.currentUser?.id
+                            let job = Job(
+                                address: fields.address,
+                                date: fields.date,
+                                status: "Pending",
+                                assignedTo: fields.assigneeID ?? "",
+                                createdBy: supervisorID ?? "",
+                                notes: fields.notes ?? "",
+                                jobNumber: fields.jobNumber,
+                                assignments: nil,
+                                materialsUsed: "",
+                                latitude: nil,
+                                longitude: nil
+                            )
+                            importEntry(job, for: entry)
+                        } label: {
+                            Label("Import", systemImage: "tray.and.arrow.down")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(JTColors.accent)
+                        .disabled(!entry.hasResolvableAddress)
+
+                        Button {
+                            reviewFields = fields(for: entry)
+                            showReview = true
+                        } label: {
+                            Label("Review", systemImage: "square.and.pencil")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(JTColors.accent)
+                        .disabled(!entry.hasResolvableAddress)
+                    }
+                }
+            }
+            .padding(JTSpacing.lg)
+        }
+    }
+
+    private func importChip(_ text: String, tint: Color) -> some View {
+        Text(text)
+            .font(JTTypography.caption)
+            .fontWeight(.semibold)
+            .foregroundStyle(tint)
+            .padding(.vertical, 5)
+            .padding(.horizontal, JTSpacing.sm)
+            .background(tint.opacity(0.16), in: Capsule())
     }
 
     // MARK: - Helpers
