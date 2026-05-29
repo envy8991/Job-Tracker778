@@ -506,11 +506,22 @@ class FirebaseService {
     }
 
     /// NOTE: Do not modify 'participants' here; historical access is preserved even if users unpair later.
-    /// Update only the status field of a job document.
-    func updateJobStatus(jobId: String, newStatus: String, completion: @escaping (Error?) -> Void) {
-        db.collection("jobs").document(jobId).updateData(["status": newStatus]) { error in
+    /// Update only the provided editable fields on a job document.
+    func updateJobFields(jobId: String, fields: [String: Any], completion: @escaping (Error?) -> Void) {
+        guard !fields.isEmpty else {
+            completion(nil)
+            return
+        }
+
+        db.collection("jobs").document(jobId).updateData(fields) { error in
             completion(error)
         }
+    }
+
+    /// NOTE: Do not modify 'participants' here; historical access is preserved even if users unpair later.
+    /// Update only the status field of a job document.
+    func updateJobStatus(jobId: String, newStatus: String, completion: @escaping (Error?) -> Void) {
+        updateJobFields(jobId: jobId, fields: ["status": newStatus], completion: completion)
     }
 
     /// Remove the current user from a job's participants (soft delete for non-creators).
@@ -932,13 +943,18 @@ extension FirebaseService {
         }
     }
 
-    /// Async: update job status
-    func updateJobStatusAsync(jobId: String, newStatus: String) async throws {
+    /// Async: update editable job fields
+    func updateJobFieldsAsync(jobId: String, fields: [String: Any]) async throws {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            self.updateJobStatus(jobId: jobId, newStatus: newStatus) { error in
+            self.updateJobFields(jobId: jobId, fields: fields) { error in
                 if let error = error { cont.resume(throwing: error) }
                 else { cont.resume(returning: ()) }
             }
         }
+    }
+
+    /// Async: update job status
+    func updateJobStatusAsync(jobId: String, newStatus: String) async throws {
+        try await updateJobFieldsAsync(jobId: jobId, fields: ["status": newStatus])
     }
 }
