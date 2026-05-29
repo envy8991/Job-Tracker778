@@ -16,6 +16,7 @@ struct YellowSheetView: View {
     @State private var showSaveAlert = false
     @State private var partnerUid: String? = nil
     @State private var saveAlertMessage = ""
+    @State private var selectedJob: Job?
     
     private var topContentPadding: CGFloat {
         horizontalSizeClass == .compact ? 72 : 32
@@ -28,37 +29,60 @@ struct YellowSheetView: View {
                 JTGradients.background(stops: 4)
                 .ignoresSafeArea()
                 
-                VStack {
+                VStack(spacing: JTSpacing.lg) {
                     // Minimal Week Picker
                     minimalWeekPicker
+                        .padding(.horizontal, JTSpacing.lg)
 
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 16) {
-                            ForEach(sortedJobGroups, id: \.key) { group in
-                                Section(header: Text("Job Number: \(group.key)")
-                                            .font(.headline)
-                                            .foregroundColor(JTColors.textPrimary)
-                                            .padding(.vertical, 4)) {
-                                    ForEach(group.value) { job in
-                                        YellowSheetJobCard(job: job)
-                                            .padding(.horizontal)
+                        LazyVStack(alignment: .leading, spacing: JTSpacing.lg) {
+                            if sortedJobGroups.isEmpty {
+                                GlassCard(cornerRadius: JTShapes.largeCardCornerRadius, strokeColor: JTColors.glassSoftStroke) {
+                                    VStack(spacing: JTSpacing.sm) {
+                                        Image(systemName: "tray")
+                                            .font(.system(size: 34))
+                                            .foregroundStyle(JTColors.textMuted)
+                                        Text("No yellow sheet jobs")
+                                            .font(JTTypography.headline)
+                                            .foregroundStyle(JTColors.textPrimary)
+                                        Text("Completed jobs for this week will show here once they are available.")
+                                            .font(JTTypography.caption)
+                                            .foregroundStyle(JTColors.textSecondary)
+                                            .multilineTextAlignment(.center)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(JTSpacing.xl)
+                                }
+                            } else {
+                                ForEach(sortedJobGroups, id: \.key) { group in
+                                    VStack(alignment: .leading, spacing: JTSpacing.md) {
+                                        Text("Job Number: \(group.key)")
+                                            .font(JTTypography.headline)
+                                            .foregroundStyle(JTColors.textPrimary)
+                                            .padding(.horizontal, JTSpacing.xs)
+
+                                        ForEach(group.value) { job in
+                                            Button {
+                                                selectedJob = job
+                                            } label: {
+                                                YellowSheetJobCard(job: job)
+                                            }
+                                            .buttonStyle(.plain)
+                                            .accessibilityHint("Opens the full job details")
+                                        }
                                     }
                                 }
                             }
                         }
-                        .padding(.top)
+                        .padding(.horizontal, JTSpacing.lg)
+                        .padding(.bottom, JTSpacing.xl)
                     }
-                    
-                    Button("Save Yellow Sheet") {
+
+                    JTPrimaryButton("Save Yellow Sheet", systemImage: "tray.and.arrow.down") {
                         saveCurrentYellowSheet()
                     }
-                    .foregroundColor(JTColors.onAccent)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(JTColors.accent.opacity(0.9))
-                    .cornerRadius(8)
-                    .padding(.horizontal)
-                    .padding(.bottom, 10)
+                    .padding(.horizontal, JTSpacing.lg)
+                    .padding(.bottom, JTSpacing.md)
                 }
                 .padding(.top, topContentPadding)
             }
@@ -91,6 +115,9 @@ struct YellowSheetView: View {
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
+        .sheet(item: $selectedJob) { job in
+            UniversalJobDetailView(job: job, showsDoneButton: true)
+        }
         // Full calendar sheet.
         .sheet(isPresented: $showCalendar) {
             NavigationView {
@@ -135,6 +162,7 @@ struct YellowSheetView: View {
             }) {
                 Image(systemName: "chevron.left")
                     .padding(8)
+                    .foregroundStyle(JTColors.textPrimary)
             }
             Spacer(minLength: 0)
             Button(action: {
@@ -143,7 +171,7 @@ struct YellowSheetView: View {
                 Text("Week of \(formattedDate(startOfWeek))")
                     .font(.subheadline)
                     .lineLimit(1)
-                    .foregroundColor(.white)
+                    .foregroundStyle(JTColors.textPrimary)
             }
             Spacer(minLength: 0)
             Button(action: {
@@ -153,12 +181,12 @@ struct YellowSheetView: View {
             }) {
                 Image(systemName: "chevron.right")
                     .padding(8)
+                    .foregroundStyle(JTColors.textPrimary)
             }
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
-        .background(Color.gray.opacity(0.2))
-        .cornerRadius(8)
+        .jtGlassBackground(cornerRadius: JTShapes.fieldCornerRadius, strokeColor: JTColors.glassSoftStroke)
     }
     
     private func formattedDate(_ date: Date) -> String {

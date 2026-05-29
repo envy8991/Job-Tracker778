@@ -637,3 +637,315 @@ private struct QuickActionButton: View {
         .buttonStyle(.plain)
     }
 }
+
+
+// MARK: - Shared job detail presentation
+
+struct UniversalJobDetailView: View {
+    let job: Job
+    var showsDoneButton = false
+
+    @EnvironmentObject private var usersViewModel: UsersViewModel
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("addressSuggestionProvider") private var suggestionProviderRaw = "apple"
+
+    private var summaryTitle: String {
+        displayValue(job.shortAddress).flatMap { $0.isEmpty ? nil : $0 } ?? displayValue(job.address) ?? "Job"
+    }
+
+    private var assignedToText: String? {
+        guard let assignedID = job.assignedTo else { return nil }
+        return displayName(for: assignedID)
+    }
+
+    private var creatorText: String? {
+        guard let creatorID = job.createdBy else { return nil }
+        return displayName(for: creatorID)
+    }
+
+    private var detailItems: [UniversalJobInfoItem] {
+        var items: [UniversalJobInfoItem] = []
+
+        if let jobNumber = displayValue(job.jobNumber) {
+            items.append(.init(title: "Job Number", value: jobNumber, systemImage: "number"))
+        }
+        items.append(.init(title: "Status", value: job.displayStatus, systemImage: "flag.fill"))
+        items.append(.init(title: "Date", value: job.date.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar"))
+        if let assignedToText {
+            items.append(.init(title: "Assigned to", value: assignedToText, systemImage: "person.crop.circle"))
+        }
+        if let creatorText {
+            items.append(.init(title: "Created by", value: creatorText, systemImage: "person.badge.key"))
+        }
+        if let portalID = displayValue(job.portalID) {
+            items.append(.init(title: "Portal ID", value: portalID, systemImage: "safari"))
+        }
+        if let locationNumber = displayValue(job.locationNumber) {
+            items.append(.init(title: "Location Number", value: locationNumber, systemImage: "mappin.and.ellipse"))
+        }
+        if let assignments = displayValue(job.assignments) {
+            items.append(.init(title: "Assignment", value: assignments, systemImage: "list.number"))
+        }
+        if let placement = displayValue(job.jobPlacement) {
+            items.append(.init(title: "Placement", value: placement, systemImage: "arrow.triangle.branch"))
+        }
+        if let nid = displayValue(job.nidFootage) {
+            items.append(.init(title: "NID Footage", value: nid, systemImage: "ruler"))
+        }
+        if let can = displayValue(job.canFootage) {
+            items.append(.init(title: "CAN Footage", value: can, systemImage: "ruler"))
+        }
+        if job.hours > 0 {
+            items.append(.init(title: "Hours logged", value: String(format: "%.1f hours", job.hours), systemImage: "clock"))
+        }
+
+        return items
+    }
+
+    private var photoURLStrings: [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for urlString in [job.housePhotoURL, job.nidPhotoURL, job.canPhotoURL].compactMap({ $0 }) + job.photos {
+            let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { continue }
+            ordered.append(trimmed)
+        }
+        return ordered
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack(alignment: .top) {
+                JTGradients.background(stops: 4)
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: JTSpacing.xl) {
+                        summaryCard
+
+                        if !detailItems.isEmpty {
+                            UniversalJobInfoCard(title: "Job information", items: detailItems)
+                        }
+
+                        if let materials = displayValue(job.materialsUsed) {
+                            UniversalJobTextCard(title: "Materials", systemImage: "shippingbox", text: materials)
+                        }
+
+                        if let notes = displayValue(job.notes) {
+                            UniversalJobTextCard(title: "Notes", systemImage: "note.text", text: notes)
+                        }
+
+                        if !photoURLStrings.isEmpty {
+                            PhotosSection(photos: photoURLStrings)
+                        }
+                    }
+                    .padding(.horizontal, JTSpacing.lg)
+                    .padding(.vertical, JTSpacing.xl)
+                }
+            }
+            .navigationTitle("Job Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if showsDoneButton {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+            }
+        }
+        .jtNavigationBarStyle()
+    }
+
+    private var summaryCard: some View {
+        GlassCard(cornerRadius: JTShapes.largeCardCornerRadius,
+                  strokeColor: JTColors.glassSoftStroke) {
+            VStack(alignment: .leading, spacing: JTSpacing.md) {
+                HStack(alignment: .top, spacing: JTSpacing.sm) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(summaryTitle)
+                            .font(JTTypography.title3)
+                            .foregroundStyle(JTColors.textPrimary)
+                            .lineLimit(3)
+
+                        if displayValue(job.shortAddress) != displayValue(job.address), let address = displayValue(job.address) {
+                            Text(address)
+                                .font(JTTypography.subheadline)
+                                .foregroundStyle(JTColors.textSecondary)
+                                .lineLimit(3)
+                        }
+                    }
+                    Spacer(minLength: JTSpacing.sm)
+                    if let jobNumber = displayValue(job.jobNumber) {
+                        Text("#\(jobNumber)")
+                            .font(JTTypography.caption)
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 10)
+                            .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
+                            .foregroundStyle(JTColors.textPrimary)
+                    }
+                }
+
+                HStack(spacing: JTSpacing.sm) {
+                    Text(job.displayStatus)
+                        .font(JTTypography.caption)
+                        .fontWeight(.semibold)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 10)
+                        .background(universalStatusColor(job.status).opacity(0.18), in: Capsule())
+                        .foregroundStyle(universalStatusColor(job.status))
+
+                    Text(job.date, style: .date)
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+                }
+
+                HStack(spacing: JTSpacing.sm) {
+                    UniversalQuickActionButton(title: "Directions", systemImage: "map") {
+                        openInMaps(job: job)
+                    }
+
+                    if job.gibsonPortalURL != nil {
+                        UniversalQuickActionButton(title: job.portalURL == nil ? "Open Location" : "Open Portal", systemImage: "safari") {
+                            openPortal(job: job)
+                        }
+                    }
+                }
+            }
+            .padding(JTSpacing.lg)
+        }
+    }
+
+    private func displayName(for idOrName: String) -> String {
+        let trimmed = idOrName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let user = usersViewModel.usersDict[trimmed] else { return trimmed }
+        let fullName = "\(user.firstName) \(user.lastName)".trimmingCharacters(in: .whitespacesAndNewlines)
+        return fullName.isEmpty ? user.email : fullName
+    }
+
+    private func openPortal(job: Job) {
+        guard let url = job.gibsonPortalURL else { return }
+        UIApplication.shared.open(url)
+    }
+
+    private func openInMaps(job: Job) {
+        guard let encoded = job.address.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { return }
+        if suggestionProviderRaw == "google",
+           let url = URL(string: "comgooglemaps://?daddr=\(encoded)&directionsmode=driving") {
+            UIApplication.shared.open(url, options: [:]) { success in
+                if success { return }
+                if let appleURL = URL(string: "maps://?saddr=Current%20Location&daddr=\(encoded)") {
+                    UIApplication.shared.open(appleURL)
+                }
+            }
+            return
+        }
+        if let appleURL = URL(string: "maps://?saddr=Current%20Location&daddr=\(encoded)") {
+            UIApplication.shared.open(appleURL)
+        }
+    }
+
+    private func displayValue(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+private struct UniversalJobInfoItem: Identifiable, Hashable {
+    let id = UUID()
+    let title: String
+    let value: String
+    let systemImage: String
+}
+
+private struct UniversalJobInfoCard: View {
+    let title: String
+    let items: [UniversalJobInfoItem]
+
+    var body: some View {
+        GlassCard(cornerRadius: JTShapes.largeCardCornerRadius,
+                  strokeColor: JTColors.glassSoftStroke) {
+            VStack(alignment: .leading, spacing: JTSpacing.md) {
+                Text(title)
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.textPrimary)
+
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    HStack(alignment: .top, spacing: JTSpacing.sm) {
+                        Image(systemName: item.systemImage)
+                            .foregroundStyle(JTColors.textSecondary)
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.title.uppercased())
+                                .font(JTTypography.caption)
+                                .foregroundStyle(JTColors.textSecondary)
+                            Text(item.value)
+                                .font(JTTypography.body)
+                                .foregroundStyle(JTColors.textPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    if index < items.count - 1 {
+                        Divider()
+                            .overlay(JTColors.glassSoftStroke.opacity(0.5))
+                    }
+                }
+            }
+            .padding(JTSpacing.lg)
+        }
+    }
+}
+
+private struct UniversalJobTextCard: View {
+    let title: String
+    let systemImage: String
+    let text: String
+
+    var body: some View {
+        GlassCard(cornerRadius: JTShapes.largeCardCornerRadius,
+                  strokeColor: JTColors.glassSoftStroke) {
+            VStack(alignment: .leading, spacing: JTSpacing.md) {
+                Label(title, systemImage: systemImage)
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.textPrimary)
+
+                Text(text)
+                    .font(JTTypography.body)
+                    .foregroundStyle(JTColors.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(JTSpacing.lg)
+        }
+    }
+}
+
+private struct UniversalQuickActionButton: View {
+    let title: String
+    let systemImage: String
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: JTSpacing.xs) {
+                Image(systemName: systemImage)
+                Text(title)
+            }
+            .font(JTTypography.caption)
+            .foregroundStyle(JTColors.textPrimary)
+            .padding(.vertical, JTSpacing.xs)
+            .padding(.horizontal, JTSpacing.sm)
+            .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+@MainActor
+func universalStatusColor(_ status: String) -> Color {
+    let lower = status.lowercased()
+    if lower.contains("complete") || lower.contains("done") { return JTColors.success }
+    if lower.contains("pending") || lower.contains("need") { return JTColors.info }
+    if lower.contains("hold") || lower.contains("talk") { return JTColors.warning }
+    return JTColors.accent
+}

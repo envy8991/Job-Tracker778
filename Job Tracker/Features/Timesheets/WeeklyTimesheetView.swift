@@ -187,13 +187,8 @@ struct WeeklyTimesheetView: View {
                                 }
                             )
                             .frame(maxWidth: .infinity)
-                            .background(.ultraThinMaterial)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .shadow(color: Color.black.opacity(0.18), radius: 6, x: 0, y: 4)
+                            .jtGlassBackground(cornerRadius: JTShapes.largeCardCornerRadius, strokeColor: JTColors.glassSoftStroke)
+                            .jtShadow(JTElevations.card)
                             .padding(.bottom, 12)
                         }
                         
@@ -214,7 +209,7 @@ struct WeeklyTimesheetView: View {
                     }
                     .background(.ultraThinMaterial)
                     .overlay(
-                        Rectangle().fill(Color.white.opacity(0.12)).frame(height: 0.5), alignment: .top
+                        Rectangle().fill(JTColors.glassSoftStroke.opacity(0.7)).frame(height: 0.5), alignment: .top
                     )
                 }
 
@@ -287,14 +282,9 @@ struct WeeklyTimesheetView: View {
                     .disabled(isGeneratingPDF)
                 }
             }
-            // Job editing sheet.
+            // Job detail sheet.
             .sheet(item: $selectedJob) { job in
-                if let index = timesheetJobsVM.jobs.firstIndex(where: { $0.id == job.id }) {
-                    JobEditView(job: $timesheetJobsVM.jobs[index])
-                        .environmentObject(timesheetJobsVM)
-                } else {
-                    Text("Job not found.")
-                }
+                UniversalJobDetailView(job: job, showsDoneButton: true)
             }
             .sheet(isPresented: $showPDFPreview) {
                 if let url = previewURL {
@@ -373,10 +363,15 @@ extension WeeklyTimesheetView {
     private var timesheetHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Supervisor row
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Supervisor:").foregroundColor(.white)
-                TextField("", text: $supervisor)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
+            HStack(alignment: .firstTextBaseline, spacing: JTSpacing.sm) {
+                Text("Supervisor:")
+                    .font(JTTypography.captionEmphasized)
+                    .foregroundStyle(JTColors.textSecondary)
+                TextField("Supervisor", text: $supervisor)
+                    .padding(.vertical, JTSpacing.sm)
+                    .padding(.horizontal, JTSpacing.md)
+                    .jtGlassBackground(cornerRadius: JTShapes.fieldCornerRadius, strokeColor: JTColors.glassSoftStroke)
+                    .foregroundStyle(JTColors.textPrimary)
             }
 
             // Column headers + rows (Name expands; other columns fixed so it always fits)
@@ -388,17 +383,17 @@ extension WeeklyTimesheetView {
             // Header row
             HStack(spacing: rowSpacing) {
                 Text("Name")
-                    .foregroundColor(.white)
+                    .foregroundStyle(JTColors.textPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .lineLimit(1)
                 Text("Gibson")
-                    .foregroundColor(.white)
+                    .foregroundStyle(JTColors.textPrimary)
                     .frame(width: gibsonWidth, alignment: .leading)
                 Text("CS Hours")
-                    .foregroundColor(.white)
+                    .foregroundStyle(JTColors.textPrimary)
                     .frame(width: csWidth, alignment: .leading)
                 Text("Total")
-                    .foregroundColor(.white)
+                    .foregroundStyle(JTColors.textPrimary)
                     .frame(width: totalWidth, alignment: .leading)
             }
             .font(.subheadline)
@@ -406,7 +401,7 @@ extension WeeklyTimesheetView {
             .padding(.bottom, 4)
             .overlay(
                 Rectangle()
-                    .fill(Color.white.opacity(0.08))
+                    .fill(JTColors.glassSoftStroke.opacity(0.5))
                     .frame(height: 0.5)
                     .padding(.top, 28), alignment: .bottom
             )
@@ -434,7 +429,7 @@ extension WeeklyTimesheetView {
 
                         Text(String(format: "%.1f", worker.total))
                             .frame(width: totalWidth, alignment: .leading)
-                            .foregroundColor(.white)
+                            .foregroundStyle(JTColors.textPrimary)
                             .font(.headline)
 
                         Button(role: .destructive) {
@@ -443,7 +438,7 @@ extension WeeklyTimesheetView {
                             }
                         } label: {
                             Image(systemName: "minus.circle.fill")
-                                .foregroundColor(.red)
+                                .foregroundStyle(JTColors.error)
                         }
                         .opacity(workers.count > 1 ? 1 : 0.3)
                         .disabled(workers.count <= 1)
@@ -453,21 +448,17 @@ extension WeeklyTimesheetView {
                 Button {
                     if workers.count < 2 { workers.append(WorkerHours(name: "", gibson: "", cs: "")) }
                 } label: {
-                    Label("Add Name", systemImage: "plus.circleFill")
+                    Label("Add Name", systemImage: "plus.circle.fill")
                 }
                 .buttonStyle(.borderless)
-                .foregroundColor(.white)
+                .foregroundStyle(JTColors.textPrimary)
                 .opacity(workers.count < 2 ? 1 : 0.3)
                 .disabled(workers.count >= 2)
             }
         }
         .padding()
-        .background(.ultraThinMaterial)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .jtGlassBackground(cornerRadius: JTShapes.largeCardCornerRadius, strokeColor: JTColors.glassSoftStroke)
+        .jtShadow(JTElevations.card)
     }
     
     private func filteredJobs(for day: Date) -> [Job] {
