@@ -25,7 +25,7 @@ private extension Notification.Name {
 
 enum SupervisorRole: String, CaseIterable, Identifiable {
     case ug = "UG"
-    case aerial = "Aerial"
+    case oh = "OH"
     case can = "Can"
     case nid = "Nid"
 
@@ -94,7 +94,7 @@ final class SupervisorJobsViewModel: ObservableObject {
 private func roleColor(_ role: SupervisorRole) -> Color {
     switch role {
     case .ug:     return Color.green.opacity(0.35)
-    case .aerial: return Color.blue.opacity(0.35)
+    case .oh: return Color.blue.opacity(0.35)
     case .can:    return Color.orange.opacity(0.35)
     case .nid:    return Color.purple.opacity(0.35)
     }
@@ -401,8 +401,7 @@ struct SupervisorDashboardView: View {
         guard let uid = uid, let user = usersViewModel.user(id: uid) else {
             return ""
         }
-        let pos = user.position.trimmingCharacters(in: .whitespacesAndNewlines)
-        return pos.caseInsensitiveCompare("Ariel") == .orderedSame ? "Aerial" : pos
+        return CrewPosition.normalizedKey(from: user.position)
     }
 
     private func resolveUserName(forUserId uid: String?) -> String {
@@ -462,7 +461,7 @@ private struct SupervisorJobRow: View {
 
             Spacer(minLength: 8)
 
-            Text(job.status)
+            Text(job.displayStatus)
                 .font(.caption.weight(.semibold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 10)
@@ -576,7 +575,7 @@ private extension View {
 private enum RoleFilter: String, CaseIterable, Identifiable {
     case all = "All"
     case underground = "UG"
-    case aerial = "Aerial"
+    case oh = "OH"
     case can = "Can"
     case nid = "Nid"
     var id: String { rawValue }
@@ -835,11 +834,9 @@ struct SupervisorCreateJobView: View {
         switch roleFilter {
         case .all:
             base = users
-        case .underground, .aerial, .can, .nid:
+        case .underground, .oh, .can, .nid:
             base = users.filter { user in
-                let pos = user.position.trimmingCharacters(in: .whitespacesAndNewlines)
-                let norm = pos.caseInsensitiveCompare("Ariel") == .orderedSame ? "Aerial" : pos
-                return norm.caseInsensitiveCompare(roleFilter.rawValue) == .orderedSame
+                CrewPosition.normalizedKey(from: user.position).caseInsensitiveCompare(roleFilter.rawValue) == .orderedSame
             }
         }
         return base.sorted { ($0.firstName + $0.lastName)
@@ -948,7 +945,6 @@ private struct UserSelectSheet: View {
     }
 
     private func normalizedRole(_ s: String) -> String {
-        let pos = s.trimmingCharacters(in: .whitespacesAndNewlines)
-        return pos.caseInsensitiveCompare("Ariel") == .orderedSame ? "Aerial" : pos
+        CrewPosition.positionDisplayName(from: s)
     }
 }

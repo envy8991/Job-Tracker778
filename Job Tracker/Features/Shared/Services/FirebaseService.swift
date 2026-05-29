@@ -121,19 +121,42 @@ class FirebaseService {
                 completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User doc not found"])))
                 return
             }
-            do {
-                var user = try snapshot.data(as: AppUser.self)
-                // Backfill missing email from Firebase Auth if needed
-                if user.email.isEmpty, let authEmail = self.auth.currentUser?.email {
-                    self.db.collection("users").document(uid)
-                        .setData(["email": authEmail], merge: true)
-                    // Also update the local instance so callers receive a populated email immediately
-                    user.email = authEmail
-                }
-                completion(.success(user))
-            } catch {
+            self.decodeCurrentUserSnapshot(snapshot, uid: uid, completion: completion)
+        }
+    }
+
+    func listenCurrentUser(completion: @escaping (Result<AppUser, Error>) -> Void) -> ListenerRegistration? {
+        guard let uid = currentUserID() else {
+            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No user logged in"])))
+            return nil
+        }
+
+        return db.collection("users").document(uid).addSnapshotListener { snapshot, error in
+            if let error = error {
                 completion(.failure(error))
+                return
             }
+            guard let snapshot = snapshot, snapshot.exists else {
+                completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User doc not found"])))
+                return
+            }
+            self.decodeCurrentUserSnapshot(snapshot, uid: uid, completion: completion)
+        }
+    }
+
+    private func decodeCurrentUserSnapshot(_ snapshot: DocumentSnapshot, uid: String, completion: @escaping (Result<AppUser, Error>) -> Void) {
+        do {
+            var user = try snapshot.data(as: AppUser.self)
+            // Backfill missing email from Firebase Auth if needed
+            if user.email.isEmpty, let authEmail = self.auth.currentUser?.email {
+                self.db.collection("users").document(uid)
+                    .setData(["email": authEmail], merge: true)
+                // Also update the local instance so callers receive a populated email immediately
+                user.email = authEmail
+            }
+            completion(.success(user))
+        } catch {
+            completion(.failure(error))
         }
     }
     // Manual mapper for PartnerRequest (no FirebaseFirestoreSwift dependency)

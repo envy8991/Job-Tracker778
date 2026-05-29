@@ -192,7 +192,7 @@ struct JobSearchDetailView: View {
                 }
 
                 HStack(spacing: JTSpacing.sm) {
-                    Text(job.status)
+                    Text(job.displayStatus)
                         .font(JTTypography.caption)
                         .fontWeight(.semibold)
                         .padding(.vertical, 6)

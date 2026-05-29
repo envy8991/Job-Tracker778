@@ -17,7 +17,7 @@ struct AppUser: Identifiable, Codable, Hashable {
     var firstName: String
     var lastName:  String
     var email:     String
-    /// "Ariel", "Underground", "Nid", or "Can"
+    /// "OH", "Underground", "Nid", or "Can"
     var position:  String
     /// Access flags
     var isAdmin: Bool      // platform admin (you)
@@ -73,10 +73,8 @@ extension AppUser {
         let l = lastName.first.map(String.init)  ?? ""
         return (f + l).uppercased()
     }
-    /// Normalized role (fixes legacy "Ariel" -> "Aerial")
+    /// Normalized role for display (legacy Aerial/Ariel/Arial values display as OH).
     var normalizedPosition: String {
-        let trimmed = position.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.caseInsensitiveCompare("Ariel") == .orderedSame { return "Aerial" }
-        return trimmed
+        CrewPosition.positionDisplayName(from: position)
     }
 }

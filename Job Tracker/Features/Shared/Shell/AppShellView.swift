@@ -78,12 +78,17 @@ private struct AppShellDetailView: View {
 
     @EnvironmentObject private var jobsViewModel: JobsViewModel
     @EnvironmentObject private var usersViewModel: UsersViewModel
+    @EnvironmentObject private var authViewModel: AuthViewModel
 
     @ViewBuilder
     var body: some View {
         switch destination {
         case .dashboard:
-            DashboardView()
+            if authViewModel.isSupervisorFlag {
+                SupervisorHomeDashboardView()
+            } else {
+                DashboardView()
+            }
         case .timesheets:
             WeeklyTimesheetView()
         case .yellowSheet:

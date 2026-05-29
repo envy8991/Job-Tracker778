@@ -271,7 +271,7 @@ private struct AuthSignUpForm: View {
     @State private var lastName = ""
     @State private var email = ""
     @State private var password = ""
-    @State private var position = "Aerial"
+    @State private var position = "OH"
 
     @State private var firstNameError: String?
     @State private var lastNameError: String?
@@ -290,7 +290,7 @@ private struct AuthSignUpForm: View {
         case password
     }
 
-    private let positions = ["Aerial", "Underground", "Nid", "Can"]
+    private let positions = CrewPosition.signupOptions
 
     var onShowSignIn: () -> Void
 

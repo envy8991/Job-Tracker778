@@ -27,7 +27,7 @@ struct GetTodayJobsIntent: AppIntent {
         // Keep dialog short for Siri
         let firstFew = visible.prefix(5).map { job in
             let addr = job.address.components(separatedBy: ",").first ?? job.address
-            return "\(addr) – \(job.status)"
+            return "\(addr) – \(job.displayStatus)"
         }.joined(separator: "; ")
 
         return .result(dialog: IntentDialog("Jobs today: \(firstFew)."))
