@@ -44,6 +44,7 @@ struct JobTrackerApp: App {
     @StateObject private var usersViewModel = JobTrackerApp.makeUsersVM()
     @StateObject private var navigationViewModel = AppNavigationViewModel()
     @StateObject private var themeManager = JTThemeManager.shared
+    @StateObject private var forceUpdateViewModel = ForceUpdateViewModel()
     @AppStorage("arrivalAlertsEnabledToday") private var arrivalAlertsEnabledToday = true
     @State private var showSplash: Bool = true
     @State private var showImportSuccess: Bool = false
@@ -98,6 +99,16 @@ struct JobTrackerApp: App {
                     }
                     .transition(.opacity)
                 }
+
+                if case let .updateRequired(requirement) = forceUpdateViewModel.decision {
+                    ForceUpdateView(
+                        requirement: requirement,
+                        currentVersion: Bundle.main.appShortVersion,
+                        currentBuild: Bundle.main.appBuildVersion
+                    )
+                    .transition(.opacity)
+                    .zIndex(10)
+                }
                 
                 // Import banners (shown after deep link handling)
                 VStack(spacing: 8) {
@@ -125,6 +136,9 @@ struct JobTrackerApp: App {
             .environmentObject(themeManager)
             .preferredColorScheme(themeManager.theme.colorScheme)
             .tint(themeManager.theme.accentColor)
+            .task {
+                forceUpdateViewModel.startMonitoring()
+            }
             .sheet(item: $pendingSharedJobPreview) { preview in
                 JobImportPreviewView(
                     preview: preview,
