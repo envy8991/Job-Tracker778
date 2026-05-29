@@ -60,6 +60,55 @@ struct JobTrackerShortcuts: AppShortcutsProvider {
                 shortTitle: "Next Job Address",
                 systemImageName: "mappin.and.ellipse"
             )
+            ,
+            AppShortcut(
+                intent: GetNearestJobAssignmentIntent(),
+                phrases: [
+                    "What's the assignment for my job in \(.applicationName)",
+                    "What is my current job assignment in \(.applicationName)",
+                    "Get my job assignment with \(.applicationName)"
+                ],
+                shortTitle: "Current Assignment",
+                systemImageName: "list.number"
+            ),
+            AppShortcut(
+                intent: SetNearestJobAssignmentIntent(),
+                phrases: [
+                    "Add assignment to my job in \(.applicationName)",
+                    "Set my current job assignment with \(.applicationName)"
+                ],
+                shortTitle: "Set Assignment",
+                systemImageName: "square.and.pencil"
+            ),
+            AppShortcut(
+                intent: SetNearestJobFootageIntent(),
+                phrases: [
+                    "Add CAN and NID footage in \(.applicationName)",
+                    "Add footage to my current job with \(.applicationName)",
+                    "Save CAN and NID footage with \(.applicationName)"
+                ],
+                shortTitle: "Add Footage",
+                systemImageName: "ruler"
+            ),
+            AppShortcut(
+                intent: GetNearestJobFootageIntent(),
+                phrases: [
+                    "What's the footage for my job in \(.applicationName)",
+                    "Get my current job footage with \(.applicationName)"
+                ],
+                shortTitle: "Current Footage",
+                systemImageName: "ruler.fill"
+            ),
+            AppShortcut(
+                intent: GetNearestJobSummaryIntent(),
+                phrases: [
+                    "What's my current job in \(.applicationName)",
+                    "Tell me about my job with \(.applicationName)",
+                    "Current job details in \(.applicationName)"
+                ],
+                shortTitle: "Current Job",
+                systemImageName: "briefcase"
+            )
         ]
     }
 }
