@@ -30,7 +30,7 @@
       codeCoverageEnabled = "YES">
       <TestPlans>
          <TestPlanReference
-            reference = "container:Job Tracker Safety Net.xctestplan"
+            reference = "container:../Job Tracker Safety Net.xctestplan"
             default = "YES">
          </TestPlanReference>
       </TestPlans>
