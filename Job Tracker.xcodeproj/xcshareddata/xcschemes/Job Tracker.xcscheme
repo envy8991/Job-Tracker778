@@ -46,6 +46,17 @@
                ReferencedContainer = "container:Job Tracker.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "CD9A00000000000000000006"
+               BuildableName = "Job TrackerUITests.xctest"
+               BlueprintName = "Job TrackerUITests"
+               ReferencedContainer = "container:Job Tracker.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

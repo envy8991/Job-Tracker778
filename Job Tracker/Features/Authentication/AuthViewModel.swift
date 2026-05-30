@@ -20,7 +20,21 @@ class AuthViewModel: ObservableObject {
     private var observedCurrentUserID: String?
 
     init() {
-        checkAuthState()
+        if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
+            let isAdmin = ProcessInfo.processInfo.shouldUseAdminJobTrackerUITestUser
+            var user = AppUser(
+                id: "ui-test-user",
+                firstName: isAdmin ? "Admin" : "Crew",
+                lastName: "Tester",
+                email: isAdmin ? "admin-ui@example.com" : "crew-ui@example.com",
+                position: isAdmin ? "Supervisor" : "Technician"
+            )
+            user.isAdmin = isAdmin
+            user.isSupervisor = isAdmin
+            applyUser(user)
+        } else {
+            checkAuthState()
+        }
     }
 
     deinit {
@@ -35,6 +49,10 @@ class AuthViewModel: ObservableObject {
     }
 
     func checkAuthState() {
+        if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
+            return
+        }
+
         if FirebaseService.shared.currentUserID() != nil {
             startCurrentUserListener()
         } else {
@@ -125,6 +143,11 @@ class AuthViewModel: ObservableObject {
     }
 
     func signOut() {
+        if ProcessInfo.processInfo.isJobTrackerUITesting {
+            applyUser(nil)
+            return
+        }
+
         do {
             stopCurrentUserListener()
             try FirebaseService.shared.signOutUser()

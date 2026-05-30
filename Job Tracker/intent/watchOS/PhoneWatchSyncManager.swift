@@ -93,6 +93,11 @@ final class PhoneWatchSyncManager: NSObject {
         let today = Date()
         let cal = Calendar.current
 
+        return makeSnapshotItems(jobs: source, currentUserID: me, today: today)
+    }
+
+    func makeSnapshotItems(jobs source: [Job], currentUserID me: String, today: Date = Date()) -> [[String: Any]] {
+        let cal = Calendar.current
         let todaysMinePending = source.filter { job in
             let mine = (job.createdBy == me) || (job.assignedTo == me)
             guard mine else { return false }

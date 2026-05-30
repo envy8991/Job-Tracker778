@@ -12,6 +12,13 @@ import FirebaseFirestore
 import UIKit
 import WatchConnectivity
 
+private struct UITestAppUpdateRequirementProvider: AppUpdateRequirementProviding {
+    func observeRequirement(_ onChange: @escaping (Result<AppUpdateRequirement?, Error>) -> Void) -> ListenerRegistration? {
+        onChange(.success(nil))
+        return nil
+    }
+}
+
 @main
 struct JobTrackerApp: App {
     // Ensure Firebase is configured before any view models are created
@@ -26,14 +33,40 @@ struct JobTrackerApp: App {
             db.settings = settings
         }
     }
+    private static var isUITesting: Bool {
+        ProcessInfo.processInfo.isJobTrackerUITesting
+    }
+
     private static func makeAuthVM() -> AuthViewModel {
-        ensureFirebaseConfigured(); return AuthViewModel()
+        if !isUITesting { ensureFirebaseConfigured() }
+        return AuthViewModel()
     }
     private static func makeJobsVM() -> JobsViewModel {
-        ensureFirebaseConfigured(); return JobsViewModel()
+        if !isUITesting { ensureFirebaseConfigured() }
+        return JobsViewModel()
     }
     private static func makeUsersVM() -> UsersViewModel {
-        ensureFirebaseConfigured(); return UsersViewModel()
+        if !isUITesting { ensureFirebaseConfigured() }
+        if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
+            var user = AppUser(
+                id: "ui-test-user",
+                firstName: ProcessInfo.processInfo.shouldUseAdminJobTrackerUITestUser ? "Admin" : "Crew",
+                lastName: "Tester",
+                email: ProcessInfo.processInfo.shouldUseAdminJobTrackerUITestUser ? "admin-ui@example.com" : "crew-ui@example.com",
+                position: ProcessInfo.processInfo.shouldUseAdminJobTrackerUITestUser ? "Supervisor" : "Technician"
+            )
+            user.isAdmin = ProcessInfo.processInfo.shouldUseAdminJobTrackerUITestUser
+            user.isSupervisor = ProcessInfo.processInfo.shouldUseAdminJobTrackerUITestUser
+            return UsersViewModel(shouldListen: false, seedUsers: [user.id: user])
+        }
+        return UsersViewModel()
+    }
+    private static func makeForceUpdateVM() -> ForceUpdateViewModel {
+        if isUITesting {
+            return ForceUpdateViewModel(provider: UITestAppUpdateRequirementProvider())
+        }
+        ensureFirebaseConfigured()
+        return ForceUpdateViewModel()
     }
     
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -44,7 +77,7 @@ struct JobTrackerApp: App {
     @StateObject private var usersViewModel = JobTrackerApp.makeUsersVM()
     @StateObject private var navigationViewModel = AppNavigationViewModel()
     @StateObject private var themeManager = JTThemeManager.shared
-    @StateObject private var forceUpdateViewModel = ForceUpdateViewModel()
+    @StateObject private var forceUpdateViewModel = JobTrackerApp.makeForceUpdateVM()
     @AppStorage("arrivalAlertsEnabledToday") private var arrivalAlertsEnabledToday = true
     @State private var showSplash: Bool = true
     @State private var showImportSuccess: Bool = false
@@ -71,6 +104,8 @@ struct JobTrackerApp: App {
                     ContentView()
                     // Activate WCSession + push snapshot when main UI appears
                         .onAppear {
+                            guard !ProcessInfo.processInfo.isJobTrackerUITesting else { return }
+
                             if !didWireWatchBridge {
                                 PhoneWatchSyncManager.shared.configure(jobsViewModel: jobsViewModel)
                                 didWireWatchBridge = true

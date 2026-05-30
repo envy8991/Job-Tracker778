@@ -34,6 +34,9 @@ class JobsViewModel: ObservableObject {
     }
 
     init() {
+        if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
+            seedUITestJobs()
+        }
         // No initial fetch in init()
     }
 
@@ -104,7 +107,50 @@ class JobsViewModel: ObservableObject {
 
     // MARK: - Fetch
 
+    private func seedUITestJobs() {
+        let now = Date()
+        jobs = [
+            Job(
+                id: "ui-test-job-1",
+                address: "100 Safety Net Lane",
+                date: now,
+                status: "Pending",
+                assignedTo: "ui-test-user",
+                createdBy: "ui-test-user",
+                notes: "Seeded UI test dashboard job",
+                jobNumber: "UI-100",
+                locationNumber: "491320",
+                assignments: "42.7.1",
+                materialsUsed: "Fiber Cable",
+                participants: ["ui-test-user"],
+                nidFootage: "150",
+                canFootage: "200"
+            ),
+            Job(
+                id: "ui-test-job-2",
+                address: "200 Completed Avenue",
+                date: now,
+                status: "Done",
+                assignedTo: "ui-test-user",
+                createdBy: "ui-test-user",
+                notes: "Completed seeded UI test job",
+                jobNumber: "UI-200",
+                participants: ["ui-test-user"]
+            )
+        ]
+        searchJobs = jobs.map(JobSearchIndexEntry.init(job:))
+        hasLoadedInitialJobs = true
+        rebuildSearchIndexEntries()
+    }
+
     func fetchJobs(startDate: Date? = nil, endDate: Date? = nil) {
+        if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
+            hasLoadedInitialJobs = true
+            rebuildSearchIndexEntries()
+            notifyJobsChanged()
+            return
+        }
+
         listenerRegistration?.remove()
 
         hasLoadedInitialJobs = false
@@ -201,6 +247,11 @@ class JobsViewModel: ObservableObject {
     /// Begin listening to a lightweight representation of every job so search can span the entire
     /// database (subject to Firestore rules). Safe to call multiple times; it will only attach once.
     func startSearchIndexForAllJobs() {
+        if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
+            rebuildSearchIndexEntries()
+            return
+        }
+
         if searchListenerRegistration != nil { return }
 
         // The dedicated `jobsSearch` collection previously mirrored global job metadata, but in
@@ -276,6 +327,16 @@ class JobsViewModel: ObservableObject {
     // MARK: - Create
 
     func createJob(_ job: Job, completion: @escaping (Bool) -> Void = { _ in }) {
+        if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
+            var newJob = job
+            newJob.id = "ui-test-created-\(jobs.count + 1)"
+            jobs.append(newJob)
+            rebuildSearchIndexEntries()
+            notifyJobsChanged()
+            completion(true)
+            return
+        }
+
         // Pre-generate the doc ID so it exists locally while offline & UI can show pending state
         let docRef = db.collection("jobs").document()
         var newJob = job
@@ -303,6 +364,15 @@ class JobsViewModel: ObservableObject {
     // MARK: - Update
 
     func updateJob(_ job: Job, documentID: String) {
+        if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
+            if let index = jobs.firstIndex(where: { $0.id == documentID }) {
+                jobs[index] = job
+                rebuildSearchIndexEntries()
+                notifyJobsChanged()
+            }
+            return
+        }
+
         let ref = db.collection("jobs").document(documentID)
 
         // 1) Read current participants so we never drop them during an update
@@ -378,6 +448,15 @@ class JobsViewModel: ObservableObject {
 
     /// Update only the status; fast local feedback + safe offline queueing.
     func updateJobStatus(job: Job, newStatus: String) {
+        if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
+            if let index = jobs.firstIndex(where: { $0.id == job.id }) {
+                jobs[index].status = newStatus
+                rebuildSearchIndexEntries()
+                notifyJobsChanged()
+            }
+            return
+        }
+
         let docID = job.id
 
         // Optimistic local update for snappy UI
@@ -407,6 +486,14 @@ class JobsViewModel: ObservableObject {
     // MARK: - Delete
 
     func deleteJob(documentID: String, completion: @escaping (Bool) -> Void = { _ in }) {
+        if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
+            jobs.removeAll { $0.id == documentID }
+            rebuildSearchIndexEntries()
+            notifyJobsChanged()
+            completion(true)
+            return
+        }
+
         FirebaseService.shared.deleteJobRespectingPairing(jobId: documentID) { result in
             DispatchQueue.main.async {
                 switch result {

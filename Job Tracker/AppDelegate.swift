@@ -19,14 +19,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        if FirebaseApp.app() == nil {
+        if !ProcessInfo.processInfo.isJobTrackerUITesting, FirebaseApp.app() == nil {
             FirebaseApp.configure()
         }
         #if canImport(GooglePlaces)
         GMSPlacesClient.provideAPIKey("AIzaSyABtSWf7_UPKKD-O83BYmhUlslXZHdp7U0")
         #endif
 
-        configureNotifications()
+        if !ProcessInfo.processInfo.isJobTrackerUITesting {
+            configureNotifications()
+        }
         return true
     }
 

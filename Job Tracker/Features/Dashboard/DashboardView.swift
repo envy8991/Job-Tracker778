@@ -195,7 +195,9 @@ struct DashboardView: View {
             .onAppear {
                 viewModel.configureIfNeeded(jobsViewModel: jobsViewModel)
                 viewModel.updateNearestJob(with: jobsViewModel.jobs, currentLocation: locationService.current)
-                JobPhotoUploadQueue.shared.publishCurrentSyncState()
+                if !ProcessInfo.processInfo.isJobTrackerUITesting {
+                    JobPhotoUploadQueue.shared.publishCurrentSyncState()
+                }
             }
             .onReceive(locationService.$current) { location in
                 viewModel.updateNearestJob(with: jobsViewModel.jobs, currentLocation: location)
