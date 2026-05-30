@@ -61,6 +61,70 @@ final class ForceUpdateViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.lastErrorMessage, "offline")
     }
 
+
+    @MainActor
+    func testMonitoringStateTracksTrustedRemoteConfigSourceAndRequiredUI() async {
+        let provider = MockAppUpdateRequirementProvider()
+        let viewModel = ForceUpdateViewModel(
+            provider: provider,
+            currentVersionProvider: { "2.1.0" },
+            currentBuildProvider: { "10" },
+            trustedConfigSource: "test trusted source"
+        )
+        let requirement = AppUpdateRequirement(
+            latestVersion: "2.3.0",
+            latestBuild: "20",
+            updateURL: URL(string: "https://apps.apple.com/app/job-tracker"),
+            releaseNotes: "Security fix"
+        )
+
+        viewModel.startMonitoring()
+        XCTAssertEqual(viewModel.monitoringState, .monitoring(source: "test trusted source"))
+        provider.publish(.success(requirement))
+        await Task.yield()
+
+        XCTAssertEqual(viewModel.monitoringState, .updateRequired(source: "test trusted source"))
+        let content = ForceUpdateViewContent(requirement: requirement, currentVersion: "2.1.0", currentBuild: "10")
+        XCTAssertEqual(content.title, "Update Required")
+        XCTAssertEqual(content.installedText, "Installed: 2.1.0 (10)")
+        XCTAssertEqual(content.availableText, "Available: 2.3.0 (20)")
+        XCTAssertEqual(content.releaseNotes, "Security fix")
+        XCTAssertTrue(content.isUpdateButtonEnabled)
+        XCTAssertEqual(content.accessibilityIdentifier, "ForceUpdateView")
+    }
+
+    @MainActor
+    func testForcedUpdateUIExplainsMissingUpdateURL() {
+        let requirement = AppUpdateRequirement(latestVersion: "2.3.0", updateURL: nil, releaseNotes: "   ")
+        let content = ForceUpdateViewContent(requirement: requirement, currentVersion: "2.1.0", currentBuild: "10")
+
+        XCTAssertEqual(content.availableText, "Available: 2.3.0")
+        XCTAssertNil(content.releaseNotes)
+        XCTAssertFalse(content.isUpdateButtonEnabled)
+        XCTAssertEqual(content.missingUpdateURLMessage, "Ask your administrator for the latest install link.")
+    }
+
+    func testRemoteConfigDocumentParsesTrustedFirestorePayloadAndRejectsUntrustedURLScheme() {
+        let document = AppUpdateRemoteConfigDocument(data: [
+            "latestVersion": "2.4.0",
+            "minimumRequiredVersion": "2.3.0",
+            "latestBuild": "30",
+            "minimumRequiredBuild": "25",
+            "updateURL": "javascript:alert(1)",
+            "releaseNotes": "Required security update",
+            "forceUpdateEnabled": true
+        ])
+
+        let requirement = document.requirement
+        XCTAssertEqual(requirement.latestVersion, "2.4.0")
+        XCTAssertEqual(requirement.minimumRequiredVersion, "2.3.0")
+        XCTAssertEqual(requirement.latestBuild, "30")
+        XCTAssertEqual(requirement.minimumRequiredBuild, "25")
+        XCTAssertNil(requirement.updateURL)
+        XCTAssertEqual(requirement.releaseNotes, "Required security update")
+        XCTAssertTrue(requirement.isEnabled)
+    }
+
     @MainActor
     func testStartMonitoringOnlyRegistersOneProviderListener() {
         let provider = MockAppUpdateRequirementProvider()

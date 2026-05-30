@@ -30,3 +30,9 @@ The Admin module exposes elevated controls for supervisors and company administr
 - The admin panel should only be reachable for users whose `AuthViewModel` exposes `isAdmin == true`.
 - Ensure Cloud Functions and Firestore security rules validate that only admins can invoke the maintenance endpoints described above.
 - When adding new admin maintenance tasks, expose them through `AdminPanelService` so the existing dependency injection remains intact for testing.
+
+## App Update Policy
+
+- Production iOS releases are managed through App Store/TestFlight. The app does not download, verify, or apply executable update packages from the admin panel in production builds.
+- Production forced-update behavior is driven by the trusted Firestore remote config document at `app_config/ios_version`, which is observed by `ForceUpdateViewModel` at launch. Admins can set `latestVersion`, `minimumRequiredVersion`, `latestBuild`, `minimumRequiredBuild`, `updateURL`, `releaseNotes`, and `forceUpdateEnabled` to block outdated clients until they install the approved release.
+- The admin package-update screen is a debug/development demo only. It is compiled behind `#if DEBUG`, labeled as a demo in the admin UI, and must not be used as a production enterprise distribution or rollback mechanism.
