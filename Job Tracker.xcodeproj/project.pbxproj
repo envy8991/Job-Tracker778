@@ -68,6 +68,7 @@
 		CDDA111D2D579EC0007BADFF /* Job Tracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Job Tracker.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CDFE39FD2FA3624A00AEEAAB /* WebMaps */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WebMaps; path = "Job Tracker/Resources/WebMaps"; sourceTree = SOURCE_ROOT; };
 		CD7E57000000000000000101 /* Job TrackerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Job TrackerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CD7E5700000000000000010D /* Job Tracker Safety Net.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Job Tracker Safety Net.xctestplan"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -142,6 +143,7 @@
 		CDDA11142D579EC0007BADFF = {
 			isa = PBXGroup;
 			children = (
+				CD7E5700000000000000010D /* Job Tracker Safety Net.xctestplan */,
 				CDDA111F2D579EC0007BADFF /* Job Tracker */,
 				CD1C8C782E5BBB140001CE7E /* Job Tracker Companion Watch App */,
 				CD7E57000000000000000102 /* Job TrackerTests */,
