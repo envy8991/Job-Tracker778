@@ -108,10 +108,10 @@ check('Platforms/WatchOS.platform/Developer/SDKs/' not in project,
       "Project must not hard-code a specific watchOS SDK path; use SDKROOT framework references for Xcode Cloud image compatibility.")
 
 # The app embeds an Apple Watch companion app. Apple Watch pairs with iPhone simulators only,
-# so keeping the host app/test bundle iPhone-only prevents Xcode Cloud from scheduling iPad
-# build-for-testing destinations that fail before compilation with xcodebuild exit code 70.
+# but the App Store app target must remain free to support iPad. Xcode Cloud
+# destination constraints should be handled in the workflow or CI-only test setup,
+# while this safety net only keeps the XCTest bundle restricted to iPhone simulators.
 for target_id, target_name in {
-    "CDDA111C2D579EC0007BADFF": "Job Tracker",
     "CD7E57000000000000000106": "Job TrackerTests",
 }.items():
     target_match = re.search(
