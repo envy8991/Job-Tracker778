@@ -91,6 +91,15 @@ extension Job: Hashable {
 }
 
 extension Job {
+    /// A job is still active while its status is Pending; any other status means it is done.
+    var isPending: Bool {
+        status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "pending"
+    }
+
+    var isDone: Bool {
+        !isPending
+    }
+
     /// Returns the first component of the address (before any commas) as a "short address."
     var shortAddress: String {
         let components = address.split(separator: ",")
