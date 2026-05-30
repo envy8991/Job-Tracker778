@@ -7,7 +7,7 @@ The repository now treats Xcode Cloud as the safety net for the full app project
 - The shared `Job Tracker` scheme runs `Job Tracker Safety Net.xctestplan`.
 - The safety-net test plan includes the `Job TrackerTests` XCTest bundle and collects code coverage.
 - The checked-in project keeps the main app target wired to the embedded watch app for normal local builds and archive workflows. The watch app must support both `watchos` and `watchsimulator`, and framework references must resolve from `SDKROOT` so supported simulator builds remain portable across current Xcode Cloud images.
-- `ci_scripts/ci_pre_xcodebuild.sh` runs before Xcode Cloud's build/test action and fails fast if the shared scheme, test plan, XCTest target coverage, or watch simulator compatibility drifts out of date. During Xcode Cloud `build-for-testing` only, the script removes the host app's watch embed/dependency edges in the temporary checkout so unit-test builds do not fail destination resolution when the workflow supplies generic or unpaired iOS simulators.
+- `ci_scripts/ci_pre_xcodebuild.sh` runs before Xcode Cloud's build/test action and fails fast if the shared scheme, test plan, XCTest target coverage, or watch simulator compatibility drifts out of date. During Xcode Cloud Test actions (`build-for-testing`, `test`, or `test-without-building`), the script removes the host app's watch embed/dependency edges in the temporary checkout so unit-test builds do not fail destination resolution when the workflow supplies generic or unpaired iOS simulators.
 
 ## Run tests locally
 
@@ -45,7 +45,7 @@ Create or update the workflow in Xcode with these settings:
 6. Enable code coverage for the workflow.
 7. Run the workflow for pull requests and before release/archive workflows.
 
-A separate Build action is not required before the Test action because Xcode builds the app and test host as part of the test action. The companion watch app remains part of normal local/archive project wiring, but the pre-xcodebuild guard temporarily omits it for Xcode Cloud `build-for-testing` actions because the safety-net unit tests do not exercise the packaged watch app.
+A separate Build action is not required before the Test action because Xcode builds the app and test host as part of the test action. The companion watch app remains part of normal local/archive project wiring, but the pre-xcodebuild guard temporarily omits it for Xcode Cloud Test actions because the safety-net unit tests do not exercise the packaged watch app. Archive and Build actions keep the embedded watch app intact.
 
 ## Future-proofing rules
 

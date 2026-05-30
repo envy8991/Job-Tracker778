@@ -158,19 +158,32 @@ if errors:
     sys.exit(1)
 PY
 
-prepare_xcode_cloud_build_for_testing() {
-  # Xcode Cloud supplies the build-for-testing destinations from the workflow UI.
-  # When that list contains generic/unpaired iOS simulators, the embedded watch
-  # companion can make destination resolution fail with xcodebuild exit code 70
-  # before compilation starts. Unit tests do not exercise the packaged watch app,
-  # so remove only the app target's watch embed/dependency edges in Xcode Cloud's
-  # temporary checkout for this build-for-testing action. Archive/build actions
-  # keep the checked-in project graph unchanged and still package the watch app.
-  if [ "${CI_XCODE_CLOUD:-}" != "TRUE" ] || [ "${CI_XCODEBUILD_ACTION:-}" != "build-for-testing" ]; then
+prepare_xcode_cloud_test_build() {
+  # Xcode Cloud supplies the simulator destinations from the workflow UI. During a
+  # Test action, Xcode first invokes build-for-testing and then runs the products
+  # with test-without-building. The CI_XCODEBUILD_ACTION value names the workflow
+  # action Xcode Cloud is preparing, so accept the observed test-action values
+  # instead of requiring the literal xcodebuild subcommand. When the destination
+  # list contains generic/unpaired iOS simulators, the embedded watch companion can
+  # make destination resolution fail with xcodebuild exit code 70 before
+  # compilation starts. Unit tests do not exercise the packaged watch app, so
+  # remove only the app target's watch embed/dependency edges in Xcode Cloud's
+  # temporary checkout for test actions. Archive/build actions keep the checked-in
+  # project graph unchanged and still package the watch app.
+  if [ "${CI_XCODE_CLOUD:-}" != "TRUE" ]; then
     return 0
   fi
 
-  log "Preparing Xcode Cloud build-for-testing project graph without embedded watch content."
+  case "${CI_XCODEBUILD_ACTION:-}" in
+    build-for-testing|test|test-without-building)
+      ;;
+    *)
+      log "Keeping embedded watch content for Xcode Cloud action '${CI_XCODEBUILD_ACTION:-unknown}'."
+      return 0
+      ;;
+  esac
+
+  log "Preparing Xcode Cloud test project graph without embedded watch content."
   python3 <<'PYINNER'
 from pathlib import Path
 
@@ -190,7 +203,7 @@ project_path.write_text(updated)
 PYINNER
 }
 
-prepare_xcode_cloud_build_for_testing
+prepare_xcode_cloud_test_build
 
 if command -v xcodebuild >/dev/null 2>&1; then
   log "Checking that Xcode can resolve the shared scheme."
