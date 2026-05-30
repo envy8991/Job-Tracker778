@@ -47,10 +47,12 @@ class UserTimesheetsViewModel: ObservableObject {
     }
     
     func saveTimesheet(_ timesheet: Timesheet, completion: @escaping (Result<Void, Error>) -> Void = { _ in }) {
-        let partnerComponent = timesheet.partnerId ?? ""
-        let docId = "\(timesheet.userId)\(partnerComponent.isEmpty ? "" : "_\(partnerComponent)")_\(weekStartString(from: timesheet.weekStart))"
+        var sharedTimesheet = timesheet
+        sharedTimesheet.userId = Timesheet.canonicalOwnerID(userId: timesheet.userId, partnerId: timesheet.partnerId)
+        sharedTimesheet.partnerId = Timesheet.canonicalPartnerID(userId: timesheet.userId, partnerId: timesheet.partnerId)
+        let docId = Timesheet.documentID(userId: timesheet.userId, partnerId: timesheet.partnerId, weekStart: timesheet.weekStart)
         do {
-            try db.collection("timesheets").document(docId).setData(from: timesheet) { error in
+            try db.collection("timesheets").document(docId).setData(from: sharedTimesheet) { error in
                 DispatchQueue.main.async {
                     if let error = error {
                         completion(.failure(error))
@@ -75,11 +77,5 @@ class UserTimesheetsViewModel: ObservableObject {
                 completion(true)
             }
         }
-    }
-    
-    private func weekStartString(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
     }
 }
