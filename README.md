@@ -137,6 +137,8 @@ Run the full suite from Xcode (`⌘U`) or via command line:
 xcodebuild test -scheme "Job Tracker" -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
 
+The shared `Job Tracker` scheme includes the `Job TrackerTests` XCTest bundle, so Xcode Cloud can use the same scheme for its Test action. See [Xcode Cloud Testing Setup](Documentation/XcodeCloudTesting.md) for workflow guidance.
+
 ## Contributing & Documentation
 
 - Review the [Design System guide](Job%20Tracker/DesignSystem/DesignSystem.md) for UI consistency.
