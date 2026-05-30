@@ -65,6 +65,40 @@ plan_targets = {
 check(plan_targets.get("CD7E57000000000000000106") == "Job TrackerTests",
       "Safety-net test plan must include the Job TrackerTests target.")
 
+watch_target_match = re.search(
+    r'CD1C8C762E5BBB140001CE7E /\* Job Tracker Companion Watch App \*/ = \{\n\s+isa = PBXNativeTarget;(?P<body>.*?)\n\s+\};',
+    project,
+    re.S,
+)
+check(watch_target_match is not None,
+      "Project must keep the companion watch app target wired into the app target graph.")
+if watch_target_match:
+    config_list_match = re.search(r'buildConfigurationList = ([A-F0-9]{24}) /\*', watch_target_match.group('body'))
+    check(config_list_match is not None,
+          "Watch app target must have a build configuration list.")
+    if config_list_match:
+        config_list = re.search(
+            rf'^\t\t{config_list_match.group(1)} /\* .*? \*/ = \{{(?P<body>.*?)\n\s+\}};',
+            project,
+            re.S | re.M,
+        )
+        watch_config_ids = re.findall(r'([A-F0-9]{24}) /\* (?:Debug|Release) \*/', config_list.group('body') if config_list else '')
+        check(len(watch_config_ids) >= 2,
+              "Watch app target must keep Debug and Release configurations.")
+        for config_id in watch_config_ids:
+            config_match = re.search(
+                rf'{config_id} /\* (?:Debug|Release) \*/ = \{{\n\s+isa = XCBuildConfiguration;(?P<body>.*?)\n\s+\}};',
+                project,
+                re.S,
+            )
+            if config_match:
+                body = config_match.group('body')
+                check('SUPPORTED_PLATFORMS = "watchos watchsimulator";' in body,
+                      "Watch app Debug/Release configurations must support watchsimulator so iOS simulator test destinations can build the embedded watch app.")
+
+check('Platforms/WatchOS.platform/Developer/SDKs/' not in project,
+      "Project must not hard-code a specific watchOS SDK path; use SDKROOT framework references for Xcode Cloud image compatibility.")
+
 # Future-proofing: if another XCTest target is added to the project later, require it to be added to this plan too.
 project_test_targets = {}
 for match in re.finditer(r'([A-F0-9]{24}) /\* ([^*]+) \*/ = \{\n\s+isa = PBXNativeTarget;(?P<body>.*?)\n\s+\};', project, re.S):
