@@ -6,8 +6,8 @@ The repository now treats Xcode Cloud as the safety net for the full app project
 
 - The shared `Job Tracker` scheme runs `Job Tracker Safety Net.xctestplan`.
 - The safety-net test plan includes the `Job TrackerTests` XCTest bundle and collects code coverage.
-- The scheme still builds the main app target, which also builds the embedded watch app dependency through the project graph.
-- `ci_scripts/ci_pre_xcodebuild.sh` runs before Xcode Cloud's build/test action and fails fast if the shared scheme, test plan, or XCTest target coverage drifts out of date.
+- The scheme still builds the main app target, which also builds the embedded watch app dependency through the project graph. The watch app must support both `watchos` and `watchsimulator`, and framework references must resolve from `SDKROOT` so iOS simulator test destinations can build the embedded watch app on any current Xcode Cloud image.
+- `ci_scripts/ci_pre_xcodebuild.sh` runs before Xcode Cloud's build/test action and fails fast if the shared scheme, test plan, XCTest target coverage, or watch simulator compatibility drifts out of date.
 
 ## Run tests locally
 
