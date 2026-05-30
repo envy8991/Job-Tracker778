@@ -5,7 +5,7 @@ The repository now treats Xcode Cloud as the safety net for the full app project
 ## What is wired together
 
 - The shared `Job Tracker` scheme runs `Job Tracker Safety Net.xctestplan`.
-- The safety-net test plan includes the `Job TrackerTests` XCTest bundle and collects code coverage.
+- The safety-net test plan includes the `Job TrackerTests` XCTest bundle, the seeded `Job TrackerUITests` UI-test bundle, and collects code coverage.
 - The checked-in project keeps the main app target wired to the embedded watch app for normal local builds and archive workflows. The watch app must support both `watchos` and `watchsimulator`, and framework references must resolve from `SDKROOT` so supported simulator builds remain portable across current Xcode Cloud images.
 - `ci_scripts/ci_pre_xcodebuild.sh` runs before Xcode Cloud's build/test action and fails fast if the shared scheme, test plan, XCTest target coverage, or watch simulator compatibility drifts out of date. During Xcode Cloud Test actions (`build-for-testing`, `test`, or `test-without-building`), the script removes the host app's watch embed/dependency edges in the temporary checkout so unit-test builds do not fail destination resolution when the workflow supplies generic or unpaired iOS simulators.
 
@@ -33,6 +33,10 @@ ci_scripts/ci_pre_xcodebuild.sh
 
 The `Job TrackerTests` bundle is intentionally part of the shared `Job Tracker` scheme so Xcode Cloud and local developers run the same tests. See [Testing Safety Net](TestingSafetyNet.md) for the coverage map and the minimum expectations for future changes.
 
+## Build smoke-test checklist
+
+Use `.xcode-cloud/smoke-test-checklist.md` as the small PR/release checklist for building the iOS app, companion watch app, and iMessage extension surface in addition to running the XCTest plan.
+
 ## Recommended Xcode Cloud workflow
 
 Create or update the workflow in Xcode with these settings:
@@ -52,6 +56,7 @@ A separate Build action is not required before the Test action because Xcode bui
 Keep this setup as the default safety net when the project grows:
 
 - Add every new XCTest or UI-test bundle to `Job Tracker Safety Net.xctestplan` before merging it.
+- Keep the UI-test seed harness (`JT_UI_TESTING=1`) deterministic and isolated from production Firebase.
 - Keep the `Job Tracker` scheme shared and pointed at the safety-net test plan.
 - Keep code coverage enabled in both the scheme and the test plan.
 - Prefer deterministic unit tests for parsing, search matching, app-update checks, routing, view models, PDF helpers, import/export payloads, and admin logic.

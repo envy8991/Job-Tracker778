@@ -34,6 +34,13 @@
 			remoteGlobalIDString = CDDA111C2D579EC0007BADFF;
 			remoteInfo = "Job Tracker";
 		};
+		CD9A00000000000000000007 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CDDA11152D579EC0007BADFF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CDDA111C2D579EC0007BADFF;
+			remoteInfo = "Job Tracker";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -68,6 +75,7 @@
 		CDDA111D2D579EC0007BADFF /* Job Tracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Job Tracker.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CDFE39FD2FA3624A00AEEAAB /* WebMaps */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WebMaps; path = "Job Tracker/Resources/WebMaps"; sourceTree = SOURCE_ROOT; };
 		CD7E57000000000000000101 /* Job TrackerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Job TrackerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CD9A00000000000000000001 /* Job TrackerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Job TrackerUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -84,6 +92,11 @@
 		CD7E57000000000000000102 /* Job TrackerTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "Job TrackerTests";
+			sourceTree = "<group>";
+		};
+		CD9A00000000000000000002 /* Job TrackerUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Job TrackerUITests";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -118,6 +131,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CD9A00000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -145,6 +165,7 @@
 				CDDA111F2D579EC0007BADFF /* Job Tracker */,
 				CD1C8C782E5BBB140001CE7E /* Job Tracker Companion Watch App */,
 				CD7E57000000000000000102 /* Job TrackerTests */,
+				CD9A00000000000000000002 /* Job TrackerUITests */,
 				CD1C8C642E5BB9390001CE7E /* Frameworks */,
 				CDDA111E2D579EC0007BADFF /* Products */,
 				CDD73CEB2FC6A28F00909B7D /* Recovered References */,
@@ -157,6 +178,7 @@
 				CDDA111D2D579EC0007BADFF /* Job Tracker.app */,
 				CD1C8C772E5BBB140001CE7E /* Job Tracker Companion Watch App.app */,
 				CD7E57000000000000000101 /* Job TrackerTests.xctest */,
+				CD9A00000000000000000001 /* Job TrackerUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -240,6 +262,29 @@
 			productReference = CD7E57000000000000000101 /* Job TrackerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		CD9A00000000000000000006 /* Job TrackerUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CD9A0000000000000000000B /* Build configuration list for PBXNativeTarget "Job TrackerUITests" */;
+			buildPhases = (
+				CD9A00000000000000000005 /* Sources */,
+				CD9A00000000000000000003 /* Frameworks */,
+				CD9A00000000000000000004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CD9A00000000000000000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				CD9A00000000000000000002 /* Job TrackerUITests */,
+			);
+			name = "Job TrackerUITests";
+			packageProductDependencies = (
+			);
+			productName = "Job TrackerUITests";
+			productReference = CD9A00000000000000000001 /* Job TrackerUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -257,6 +302,10 @@
 						CreatedOnToolsVersion = 16.2;
 					};
 					CD7E57000000000000000106 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = CDDA111C2D579EC0007BADFF;
+					};
+					CD9A00000000000000000006 = {
 						CreatedOnToolsVersion = 16.4;
 						TestTargetID = CDDA111C2D579EC0007BADFF;
 					};
@@ -282,6 +331,7 @@
 				CDDA111C2D579EC0007BADFF /* Job Tracker */,
 				CD1C8C762E5BBB140001CE7E /* Job Tracker Companion Watch App */,
 				CD7E57000000000000000106 /* Job TrackerTests */,
+				CD9A00000000000000000006 /* Job TrackerUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -303,6 +353,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		CD7E57000000000000000104 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CD9A00000000000000000004 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -333,6 +390,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CD9A00000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -345,6 +409,11 @@
 			isa = PBXTargetDependency;
 			target = CDDA111C2D579EC0007BADFF /* Job Tracker */;
 			targetProxy = CD7E57000000000000000107 /* PBXContainerItemProxy */;
+		};
+		CD9A00000000000000000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CDDA111C2D579EC0007BADFF /* Job Tracker */;
+			targetProxy = CD9A00000000000000000007 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -670,6 +739,46 @@
 			};
 			name = Release;
 		};
+		CD9A00000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z2Z5T47373;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.quinton.Job-Tracker-CS25UITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = "Job Tracker";
+			};
+			name = Debug;
+		};
+		CD9A0000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Z2Z5T47373;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.quinton.Job-Tracker-CS25UITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = "Job Tracker";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -705,6 +814,15 @@
 			buildConfigurations = (
 				CD7E57000000000000000109 /* Debug */,
 				CD7E5700000000000000010A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CD9A0000000000000000000B /* Build configuration list for PBXNativeTarget "Job TrackerUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CD9A00000000000000000009 /* Debug */,
+				CD9A0000000000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -89,7 +89,9 @@ struct YellowSheetView: View {
             .navigationTitle("     ")
             .jtNavigationBarStyle()
             .onAppear {
-                if let me = authViewModel.currentUser?.id {
+                if ProcessInfo.processInfo.isJobTrackerUITesting {
+                    self.partnerUid = nil
+                } else if let me = authViewModel.currentUser?.id {
                     FirebaseService.shared.fetchPartnerId(for: me) { pid in
                         DispatchQueue.main.async { self.partnerUid = pid }
                     }
@@ -102,7 +104,9 @@ struct YellowSheetView: View {
                 jobsViewModel.fetchJobsForWeek(selectedDate)
             }
             .onReceive(authViewModel.$currentUser) { _ in
-                if let me = authViewModel.currentUser?.id {
+                if ProcessInfo.processInfo.isJobTrackerUITesting {
+                    self.partnerUid = nil
+                } else if let me = authViewModel.currentUser?.id {
                     FirebaseService.shared.fetchPartnerId(for: me) { pid in
                         DispatchQueue.main.async { self.partnerUid = pid }
                     }

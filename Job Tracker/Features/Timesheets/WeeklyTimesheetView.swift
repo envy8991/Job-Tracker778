@@ -294,14 +294,18 @@ struct WeeklyTimesheetView: View {
                 }
             }
             .onAppear {
-                if let me = authViewModel.currentUser?.id {
+                if ProcessInfo.processInfo.isJobTrackerUITesting {
+                    self.partnerUid = nil
+                } else if let me = authViewModel.currentUser?.id {
                     FirebaseService.shared.fetchPartnerId(for: me) { pid in
                         DispatchQueue.main.async { self.partnerUid = pid }
                     }
                 } else {
                     self.partnerUid = nil
                 }
-                loadTimesheet()
+                if !ProcessInfo.processInfo.isJobTrackerUITesting {
+                    loadTimesheet()
+                }
             }
             .onChange(of: selectedDate) { _ in
                 loadTimesheet()
