@@ -1,5 +1,51 @@
 import Foundation
 
+#if DEBUG
+protocol AdminUpdateService {
+    func checkForUpdates(currentVersion: String) async throws -> AdminUpdateViewModel.UpdateManifest?
+    func downloadUpdate(version: String, progress: @escaping @MainActor (Double) -> Void) async throws -> AdminUpdateViewModel.DownloadedPackage
+    func verifyDownload(_ package: AdminUpdateViewModel.DownloadedPackage, progress: @escaping @MainActor (Double) -> Void) async throws
+    func applyUpdate(_ package: AdminUpdateViewModel.DownloadedPackage) async throws
+    func rollback(to version: String) async throws
+}
+
+struct DevelopmentAdminUpdateService: AdminUpdateService {
+    func checkForUpdates(currentVersion: String) async throws -> AdminUpdateViewModel.UpdateManifest? {
+        try await Task.sleep(nanoseconds: 300_000_000)
+        return AdminUpdateViewModel.UpdateManifest(
+            version: "2.5.0-dev-demo",
+            changelog: [
+                "Debug-only update workflow demo",
+                "Production distribution remains App Store/TestFlight managed",
+                "Forced-update gates are controlled by trusted Firestore remote config"
+            ]
+        )
+    }
+
+    func downloadUpdate(version: String, progress: @escaping @MainActor (Double) -> Void) async throws -> AdminUpdateViewModel.DownloadedPackage {
+        for step in 1...10 {
+            try await Task.sleep(nanoseconds: 75_000_000)
+            await progress(Double(step) / 10)
+        }
+        return AdminUpdateViewModel.DownloadedPackage(version: version, checksum: "debug-demo-")
+    }
+
+    func verifyDownload(_ package: AdminUpdateViewModel.DownloadedPackage, progress: @escaping @MainActor (Double) -> Void) async throws {
+        for step in 1...5 {
+            try await Task.sleep(nanoseconds: 75_000_000)
+            await progress(Double(step) / 5)
+        }
+    }
+
+    func applyUpdate(_ package: AdminUpdateViewModel.DownloadedPackage) async throws {
+        try await Task.sleep(nanoseconds: 250_000_000)
+    }
+
+    func rollback(to version: String) async throws {
+        try await Task.sleep(nanoseconds: 250_000_000)
+    }
+}
+
 @MainActor
 final class AdminUpdateViewModel: ObservableObject {
     enum ActionState: String {
@@ -42,6 +88,16 @@ final class AdminUpdateViewModel: ObservableObject {
         let fractionComplete: Double?
     }
 
+    struct UpdateManifest: Equatable {
+        let version: String
+        let changelog: [String]
+    }
+
+    struct DownloadedPackage: Equatable {
+        let version: String
+        let checksum: String
+    }
+
     @Published var currentVersion: String
     @Published var availableVersion: String?
     @Published var changelog: [String] = []
@@ -54,49 +110,57 @@ final class AdminUpdateViewModel: ObservableObject {
     @Published var logs: [String] = []
     @Published var lastCheckDate: Date?
 
+    private let service: AdminUpdateService
+    private var downloadedPackage: DownloadedPackage?
     private var lastStableVersion: String?
 
-    init(bundle: Bundle = .main) {
+    init(bundle: Bundle = .main, service: AdminUpdateService = DevelopmentAdminUpdateService()) {
         if let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
             currentVersion = version
         } else {
             currentVersion = "Unknown"
         }
+        self.service = service
         lastStableVersion = currentVersion
+        log("Debug-only admin update demo initialized. Production updates use App Store/TestFlight plus forced-update remote config.")
     }
 
     var hasAvailableUpdate: Bool { availableVersion != nil }
-    var hasDownloadedUpdate: Bool { downloadedVersion != nil }
+    var hasDownloadedUpdate: Bool { downloadedPackage != nil }
     var isBusy: Bool { actionState != .idle }
     var canApplyUpdate: Bool { verificationStatus.isVerified && hasDownloadedUpdate && maintenanceModeEnabled }
 
     func checkForUpdates() {
         guard startAction(.checking) else { return }
         errorReason = nil
-        progress = ProgressState(title: "Checking for updates", message: "Reaching update server…", fractionComplete: nil)
-        log("Started checking for updates")
+        progress = ProgressState(title: "Checking for debug demo update", message: "Reading development update service…", fractionComplete: nil)
+        log("Started debug update check")
 
-        Task {
-            try? await Task.sleep(nanoseconds: 800_000_000)
-            let sampleVersion = "2.5.0"
-            let newChangelog = [
-                "Security hardening for admin workflows",
-                "Performance improvements for sync service",
-                "Improved logging around update application"
-            ]
-            await MainActor.run {
-                availableVersion = sampleVersion
-                changelog = newChangelog
+        Task { @MainActor [service, currentVersion] in
+            do {
+                let manifest = try await service.checkForUpdates(currentVersion: currentVersion)
+                if let manifest {
+                    availableVersion = manifest.version
+                    changelog = manifest.changelog
+                    log("Debug demo update v\(manifest.version) is available")
+                } else {
+                    availableVersion = nil
+                    changelog = []
+                    log("No debug demo update available")
+                }
+                downloadedPackage = nil
+                downloadedVersion = nil
+                verificationStatus = .notVerified
                 lastCheckDate = Date()
-                progress = nil
                 finishAction()
-                log("Update v\(sampleVersion) is available")
+            } catch {
+                failCurrentAction("Update check failed: \(error.localizedDescription)")
             }
         }
     }
 
     func downloadUpdate() {
-        guard hasAvailableUpdate else {
+        guard let availableVersion else {
             errorReason = "No update available to download."
             log("Download skipped: no available version")
             return
@@ -104,31 +168,32 @@ final class AdminUpdateViewModel: ObservableObject {
         guard startAction(.downloading) else { return }
         errorReason = nil
         verificationStatus = .notVerified
-        progress = ProgressState(title: "Downloading", message: "Fetching package…", fractionComplete: 0)
-        log("Downloading update v\(availableVersion ?? "?")")
+        downloadedPackage = nil
+        downloadedVersion = nil
+        progress = ProgressState(title: "Downloading debug package", message: "Fetching development package…", fractionComplete: 0)
+        log("Downloading debug demo update v\(availableVersion)")
 
-        Task {
-            for step in 1...10 {
-                try? await Task.sleep(nanoseconds: 200_000_000)
-                await MainActor.run {
-                    progress = ProgressState(
-                        title: "Downloading",
-                        message: "Fetching package…",
-                        fractionComplete: Double(step) / 10
+        Task { @MainActor [service] in
+            do {
+                let package = try await service.downloadUpdate(version: availableVersion) { fraction in
+                    self.progress = ProgressState(
+                        title: "Downloading debug package",
+                        message: "Fetching development package…",
+                        fractionComplete: fraction
                     )
                 }
-            }
-            await MainActor.run {
-                downloadedVersion = availableVersion
-                progress = nil
+                downloadedPackage = package
+                downloadedVersion = package.version
                 finishAction()
-                log("Download completed for v\(availableVersion ?? "?")")
+                log("Download completed for debug demo v\(package.version)")
+            } catch {
+                failCurrentAction("Download failed: \(error.localizedDescription)")
             }
         }
     }
 
     func verifyDownload() {
-        guard hasDownloadedUpdate else {
+        guard let downloadedPackage else {
             errorReason = "Download an update before verifying."
             log("Verification blocked: no downloaded package")
             return
@@ -136,51 +201,53 @@ final class AdminUpdateViewModel: ObservableObject {
         guard startAction(.verifying) else { return }
         errorReason = nil
         verificationStatus = .verifying
-        progress = ProgressState(title: "Verifying", message: "Checking signatures…", fractionComplete: 0)
-        log("Started verification for v\(downloadedVersion ?? "?")")
+        progress = ProgressState(title: "Verifying debug package", message: "Checking development package signature…", fractionComplete: 0)
+        log("Started verification for debug demo v\(downloadedPackage.version)")
 
-        Task {
-            for step in 1...5 {
-                try? await Task.sleep(nanoseconds: 200_000_000)
-                await MainActor.run {
-                    progress = ProgressState(
-                        title: "Verifying",
-                        message: "Checking signatures…",
-                        fractionComplete: Double(step) / 5
+        Task { @MainActor [service] in
+            do {
+                try await service.verifyDownload(downloadedPackage) { fraction in
+                    self.progress = ProgressState(
+                        title: "Verifying debug package",
+                        message: "Checking development package signature…",
+                        fractionComplete: fraction
                     )
                 }
-            }
-            await MainActor.run {
                 verificationStatus = .verified
-                progress = nil
                 finishAction()
-                log("Package verified for v\(downloadedVersion ?? "?")")
+                log("Debug demo package verified for v\(downloadedPackage.version)")
+            } catch {
+                verificationStatus = .failed(error.localizedDescription)
+                failCurrentAction("Verification failed: \(error.localizedDescription)")
             }
         }
     }
 
     func applyUpdate() {
-        guard canApplyUpdate else {
+        guard canApplyUpdate, let downloadedPackage else {
             errorReason = "Enable maintenance mode and verify the package before applying."
             log("Apply blocked: guardrails not satisfied")
             return
         }
         guard startAction(.applying) else { return }
         errorReason = nil
-        progress = ProgressState(title: "Applying update", message: "Switching traffic to maintenance mode…", fractionComplete: nil)
-        log("Applying update v\(downloadedVersion ?? "?")")
+        progress = ProgressState(title: "Applying debug update", message: "Simulating development update activation…", fractionComplete: nil)
+        log("Applying debug demo update v\(downloadedPackage.version)")
 
-        Task {
-            try? await Task.sleep(nanoseconds: 800_000_000)
-            await MainActor.run {
+        Task { @MainActor [service] in
+            do {
+                try await service.applyUpdate(downloadedPackage)
                 lastStableVersion = currentVersion
-                currentVersion = downloadedVersion ?? currentVersion
+                currentVersion = downloadedPackage.version
                 availableVersion = nil
+                changelog = []
+                self.downloadedPackage = nil
                 downloadedVersion = nil
                 verificationStatus = .notVerified
-                progress = nil
                 finishAction()
-                log("Update applied; now running v\(currentVersion)")
+                log("Debug demo update applied; now showing v\(currentVersion)")
+            } catch {
+                failCurrentAction("Apply failed: \(error.localizedDescription)")
             }
         }
     }
@@ -193,19 +260,22 @@ final class AdminUpdateViewModel: ObservableObject {
         }
         guard startAction(.rollingBack) else { return }
         errorReason = nil
-        progress = ProgressState(title: "Rolling back", message: "Restoring stable build…", fractionComplete: nil)
-        log("Rolling back to v\(stable)")
+        progress = ProgressState(title: "Rolling back debug update", message: "Restoring previous development state…", fractionComplete: nil)
+        log("Rolling back debug demo to v\(stable)")
 
-        Task {
-            try? await Task.sleep(nanoseconds: 700_000_000)
-            await MainActor.run {
+        Task { @MainActor [service] in
+            do {
+                try await service.rollback(to: stable)
                 currentVersion = stable
                 availableVersion = nil
+                changelog = []
+                downloadedPackage = nil
                 downloadedVersion = nil
                 verificationStatus = .notVerified
-                progress = nil
                 finishAction()
-                log("Rollback complete; running v\(stable)")
+                log("Rollback complete; showing v\(stable)")
+            } catch {
+                failCurrentAction("Rollback failed: \(error.localizedDescription)")
             }
         }
     }
@@ -231,6 +301,12 @@ final class AdminUpdateViewModel: ObservableObject {
         progress = nil
     }
 
+    private func failCurrentAction(_ message: String) {
+        errorReason = message
+        finishAction()
+        log(message)
+    }
+
     private func log(_ message: String) {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
@@ -238,3 +314,4 @@ final class AdminUpdateViewModel: ObservableObject {
         logs.insert("[\(timestamp)] \(message)", at: 0)
     }
 }
+#endif

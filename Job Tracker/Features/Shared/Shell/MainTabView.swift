@@ -208,7 +208,9 @@ struct AdminPanelView: View {
     @EnvironmentObject private var authViewModel: AuthViewModel
     @EnvironmentObject private var usersViewModel: UsersViewModel
     @StateObject private var viewModel = AdminPanelViewModel()
+    #if DEBUG
     @StateObject private var updateViewModel = AdminUpdateViewModel()
+    #endif
     @State private var pendingToggle: PendingToggle?
     @State private var pendingDeleteUser: AppUser?
     @State private var showingBackfillConfirmation = false
@@ -308,8 +310,9 @@ struct AdminPanelView: View {
         } message: {
             Text("Merges legacy job creators and assignees into each job's participants array. Only run when you understand the impact.")
         }
+        #if DEBUG
         .confirmationDialog(
-            pendingUpdateAction == .apply ? "Apply update?" : "Rollback to previous version?",
+            pendingUpdateAction == .apply ? "Apply debug update?" : "Rollback debug update?",
             isPresented: Binding(
                 get: { pendingUpdateAction != nil },
                 set: { newValue in
@@ -321,12 +324,12 @@ struct AdminPanelView: View {
             if let action = pendingUpdateAction {
                 switch action {
                 case .apply:
-                    Button("Apply Update", role: .destructive) {
+                    Button("Apply Debug Update", role: .destructive) {
                         updateViewModel.applyUpdate()
                         pendingUpdateAction = nil
                     }
                 case .rollback:
-                    Button("Rollback", role: .destructive) {
+                    Button("Rollback Debug Update", role: .destructive) {
                         updateViewModel.rollbackUpdate()
                         pendingUpdateAction = nil
                     }
@@ -338,9 +341,9 @@ struct AdminPanelView: View {
             }
         } message: {
             if pendingUpdateAction == .apply {
-                Text("Applies the downloaded build while in maintenance mode. Services may restart during the process.")
+                Text("This is a debug-only simulation. Production releases are distributed through App Store/TestFlight and gated by remote forced-update config.")
             } else {
-                Text("Restores the last stable build. Use only if the new update is failing health checks.")
+                Text("Restores the previous debug demo version. This does not roll back a production App Store build.")
             }
         }
         .sheet(isPresented: $showingLogs) {
@@ -348,6 +351,7 @@ struct AdminPanelView: View {
                 AdminUpdateLogsView(logs: updateViewModel.logs)
             }
         }
+        #endif
         .onAppear {
             viewModel.attach(usersViewModel: usersViewModel)
             viewModel.refreshRosterSnapshot()
@@ -364,9 +368,16 @@ struct AdminPanelView: View {
     @ViewBuilder
     private var updatesSection: some View {
         Section("App Updates") {
+            #if DEBUG
             VStack(alignment: .leading, spacing: 12) {
+                Label("Debug-only update demo", systemImage: "ladybug")
+                    .font(.headline)
+                Text("Production iOS updates are released through App Store/TestFlight. The live forced-update gate is controlled by trusted Firestore remote config and shown to users automatically when required.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
                 HStack {
-                    Label("Current version", systemImage: "info.circle")
+                    Label("Current demo version", systemImage: "info.circle")
                     Spacer()
                     Text(updateViewModel.currentVersion)
                         .font(.subheadline.monospaced())
@@ -374,13 +385,13 @@ struct AdminPanelView: View {
 
                 if let available = updateViewModel.availableVersion {
                     VStack(alignment: .leading, spacing: 4) {
-                        Label("Update available", systemImage: "arrow.down.circle")
+                        Label("Demo update available", systemImage: "arrow.down.circle")
                             .font(.subheadline)
                         Text("Version \(available)")
                             .font(.subheadline.weight(.semibold))
                         if !updateViewModel.changelog.isEmpty {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Changelog")
+                                Text("Demo changelog")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 ForEach(updateViewModel.changelog, id: \.self) { item in
@@ -396,7 +407,7 @@ struct AdminPanelView: View {
                     }
                 } else {
                     VStack(alignment: .leading, spacing: 4) {
-                        Label("No pending updates", systemImage: "checkmark.seal")
+                        Label("No pending demo updates", systemImage: "checkmark.seal")
                             .font(.subheadline)
                         if let lastCheck = updateViewModel.lastCheckDate {
                             Text("Last checked at \(lastCheck.formatted(date: .abbreviated, time: .shortened))")
@@ -407,7 +418,7 @@ struct AdminPanelView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Package status")
+                    Text("Demo package status")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(updateViewModel.verificationStatus.message)
@@ -417,8 +428,8 @@ struct AdminPanelView: View {
 
                 Toggle(isOn: $updateViewModel.maintenanceModeEnabled) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Maintenance mode")
-                        Text("Required to apply or rollback updates.")
+                        Text("Demo maintenance mode")
+                        Text("Required before applying the debug-only simulated update.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -455,7 +466,7 @@ struct AdminPanelView: View {
                     Button {
                         updateViewModel.checkForUpdates()
                     } label: {
-                        Label("Check for Updates", systemImage: "arrow.clockwise")
+                        Label("Check Demo Updates", systemImage: "arrow.clockwise")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
@@ -464,7 +475,7 @@ struct AdminPanelView: View {
                     Button {
                         updateViewModel.downloadUpdate()
                     } label: {
-                        Label("Download Update", systemImage: "tray.and.arrow.down")
+                        Label("Download Demo Package", systemImage: "tray.and.arrow.down")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -473,7 +484,7 @@ struct AdminPanelView: View {
                     Button {
                         updateViewModel.verifyDownload()
                     } label: {
-                        Label("Verify Package", systemImage: "checkmark.shield")
+                        Label("Verify Demo Package", systemImage: "checkmark.shield")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
@@ -482,7 +493,7 @@ struct AdminPanelView: View {
                     Button(role: .destructive) {
                         pendingUpdateAction = .apply
                     } label: {
-                        Label("Apply Update", systemImage: "hammer")
+                        Label("Apply Demo Update", systemImage: "hammer")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
@@ -491,7 +502,7 @@ struct AdminPanelView: View {
                     Button {
                         pendingUpdateAction = .rollback
                     } label: {
-                        Label("Rollback", systemImage: "arrow.uturn.backward")
+                        Label("Rollback Demo", systemImage: "arrow.uturn.backward")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
@@ -500,13 +511,23 @@ struct AdminPanelView: View {
                     Button {
                         showingLogs = true
                     } label: {
-                        Label("View Logs", systemImage: "doc.text.magnifyingglass")
+                        Label("View Demo Logs", systemImage: "doc.text.magnifyingglass")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderless)
                 }
             }
             .padding(.vertical, 4)
+            #else
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Release management", systemImage: "shippingbox")
+                    .font(.headline)
+                Text("Production builds do not include the admin package update demo. Ship releases through App Store/TestFlight, and use the trusted Firestore app_config/ios_version document to force users below the required version to update.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 4)
+            #endif
         }
     }
 
