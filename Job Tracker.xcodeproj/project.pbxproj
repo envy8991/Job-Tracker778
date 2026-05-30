@@ -14,6 +14,7 @@
 		CDDA116C2D579F85007BADFF /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA116B2D579F85007BADFF /* FirebaseCore */; };
 		CDDA116E2D579F85007BADFF /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA116D2D579F85007BADFF /* FirebaseDatabase */; };
 		CDDA11702D579F85007BADFF /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA116F2D579F85007BADFF /* FirebaseFirestore */; };
+		CD7E5700000000000000010C /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA116F2D579F85007BADFF /* FirebaseFirestore */; };
 		CDDA11722D579F85007BADFF /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA11712D579F85007BADFF /* FirebaseStorage */; };
 		CDFE39FE2FA3624A00AEEAAB /* WebMaps in Resources */ = {isa = PBXBuildFile; fileRef = CDFE39FD2FA3624A00AEEAAB /* WebMaps */; };
 /* End PBXBuildFile section */
@@ -113,6 +114,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CD7E5700000000000000010C /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -232,6 +234,7 @@
 			);
 			name = "Job TrackerTests";
 			packageProductDependencies = (
+				CDDA116F2D579F85007BADFF /* FirebaseFirestore */,
 			);
 			productName = "Job TrackerTests";
 			productReference = CD7E57000000000000000101 /* Job TrackerTests.xctest */;
