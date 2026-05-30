@@ -3,7 +3,6 @@ import CoreLocation
 import Combine
 @testable import Job_Tracker
 
-@MainActor
 final class FiberMapViewModelTests: XCTestCase {
     private var dataService: MockFiberAssetSyncService!
 
@@ -17,6 +16,7 @@ final class FiberMapViewModelTests: XCTestCase {
         try super.tearDownWithError()
     }
 
+    @MainActor
     func testPersistenceAcrossViewModelInstances() {
         let viewModel = FiberMapViewModel(dataService: dataService, searchProvider: MockMapSearchProvider())
         waitForInitialLoad(of: viewModel)
@@ -49,6 +49,7 @@ final class FiberMapViewModelTests: XCTestCase {
         XCTAssertTrue(reloadedViewModel.poles.contains(where: { $0.id == newPole.id }))
     }
 
+    @MainActor
     func testSearchResultsUpdateAndPersistCenter() async throws {
         let expectedResult = MapSearchResult(
             title: "Test Location",
@@ -95,6 +96,7 @@ final class FiberMapViewModelTests: XCTestCase {
         XCTAssertEqual(reloadedViewModel.mapCamera.longitude, expectedResult.coordinate.longitude, accuracy: 0.0001)
     }
 
+    @MainActor
     func testPendingCenterCommandUpdatesWhenLocationServicePublishes() {
         let service = MockLocationService()
         let viewModel = FiberMapViewModel(dataService: dataService, searchProvider: MockMapSearchProvider())
@@ -117,6 +119,7 @@ final class FiberMapViewModelTests: XCTestCase {
         cancellable.cancel()
     }
 
+    @MainActor
     func testLocateUserFallsBackToAuthorizationFlow() {
         let service = MockLocationService()
         let viewModel = FiberMapViewModel(dataService: dataService, searchProvider: MockMapSearchProvider())
@@ -130,6 +133,7 @@ final class FiberMapViewModelTests: XCTestCase {
         XCTAssertEqual(service.startUpdatesCallCount, 1)
     }
 
+    @MainActor
     private func waitForInitialLoad(of viewModel: FiberMapViewModel, timeout: TimeInterval = 1.0) {
         guard viewModel.isLoadingSnapshot else { return }
 
@@ -147,6 +151,7 @@ final class FiberMapViewModelTests: XCTestCase {
         cancellable?.cancel()
     }
 
+    @MainActor
     func testLocateButtonAccessibilityLabel() {
         XCTAssertEqual(MapsView.Accessibility.locateButtonLabel, "Show my location")
     }

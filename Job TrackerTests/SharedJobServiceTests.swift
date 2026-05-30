@@ -1,7 +1,6 @@
 import XCTest
 import CoreLocation
 import FirebaseFirestore
-import FirebaseFirestoreSwift
 @testable import Job_Tracker
 
 final class SharedJobServiceTests: XCTestCase {

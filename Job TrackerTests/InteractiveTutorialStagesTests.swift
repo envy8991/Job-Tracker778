@@ -2,6 +2,7 @@ import XCTest
 @testable import Job_Tracker
 
 final class InteractiveTutorialStagesTests: XCTestCase {
+    @MainActor
     func testAuthStageCompletesAfterVisitingAllSteps() {
         let model = AuthTutorialStageModel()
         XCTAssertFalse(model.isActionComplete)
@@ -13,6 +14,7 @@ final class InteractiveTutorialStagesTests: XCTestCase {
         XCTAssertTrue(model.isActionComplete)
     }
 
+    @MainActor
     func testDashboardStageRequiresStatusChangeAndShare() {
         let model = DashboardTutorialStageModel()
         guard let firstJob = model.jobs.first else {
@@ -29,6 +31,7 @@ final class InteractiveTutorialStagesTests: XCTestCase {
         XCTAssertTrue(model.isActionComplete)
     }
 
+    @MainActor
     func testCreateJobStageRequiresValidSubmission() {
         let model = CreateJobTutorialStageModel()
         XCTAssertFalse(model.isActionComplete)
@@ -41,6 +44,7 @@ final class InteractiveTutorialStagesTests: XCTestCase {
         XCTAssertTrue(model.isActionComplete)
     }
 
+    @MainActor
     func testTimesheetStageCompletesAfterEditingHours() {
         let model = TimesheetTutorialStageModel()
         guard let entry = model.entries.first else {
