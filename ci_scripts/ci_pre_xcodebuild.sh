@@ -99,6 +99,40 @@ if watch_target_match:
 check('Platforms/WatchOS.platform/Developer/SDKs/' not in project,
       "Project must not hard-code a specific watchOS SDK path; use SDKROOT framework references for Xcode Cloud image compatibility.")
 
+# The app embeds an Apple Watch companion app. Apple Watch pairs with iPhone simulators only,
+# so keeping the host app/test bundle iPhone-only prevents Xcode Cloud from scheduling iPad
+# build-for-testing destinations that fail before compilation with xcodebuild exit code 70.
+for target_id, target_name in {
+    "CDDA111C2D579EC0007BADFF": "Job Tracker",
+    "CD7E57000000000000000106": "Job TrackerTests",
+}.items():
+    target_match = re.search(
+        rf'{target_id} /\* {re.escape(target_name)} \*/ = \{{\n\s+isa = PBXNativeTarget;(?P<body>.*?)\n\s+\}};',
+        project,
+        re.S,
+    )
+    check(target_match is not None, f"Project must keep the {target_name} target.")
+    if target_match:
+        config_list_match = re.search(r'buildConfigurationList = ([A-F0-9]{24}) /\*', target_match.group('body'))
+        check(config_list_match is not None, f"{target_name} target must have a build configuration list.")
+        if config_list_match:
+            config_list = re.search(
+                rf'^\t\t{config_list_match.group(1)} /\* .*? \*/ = \{{(?P<body>.*?)\n\s+\}};',
+                project,
+                re.S | re.M,
+            )
+            config_ids = re.findall(r'([A-F0-9]{24}) /\* (?:Debug|Release) \*/', config_list.group('body') if config_list else '')
+            check(len(config_ids) >= 2, f"{target_name} target must keep Debug and Release configurations.")
+            for config_id in config_ids:
+                config_match = re.search(
+                    rf'{config_id} /\* (?:Debug|Release) \*/ = \{{\n\s+isa = XCBuildConfiguration;(?P<body>.*?)\n\s+\}};',
+                    project,
+                    re.S,
+                )
+                if config_match:
+                    check('TARGETED_DEVICE_FAMILY = 1;' in config_match.group('body'),
+                          f"{target_name} Debug/Release configurations must stay iPhone-only while the app embeds a watch companion app.")
+
 # Future-proofing: if another XCTest target is added to the project later, require it to be added to this plan too.
 project_test_targets = {}
 for match in re.finditer(r'([A-F0-9]{24}) /\* ([^*]+) \*/ = \{\n\s+isa = PBXNativeTarget;(?P<body>.*?)\n\s+\};', project, re.S):
