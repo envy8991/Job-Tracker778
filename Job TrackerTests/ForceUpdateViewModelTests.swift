@@ -2,8 +2,8 @@ import XCTest
 import FirebaseFirestore
 @testable import Job_Tracker
 
-@MainActor
 final class ForceUpdateViewModelTests: XCTestCase {
+    @MainActor
     func testStartMonitoringRequiresUpdateWhenProviderPublishesNewerMinimumVersion() async {
         let provider = MockAppUpdateRequirementProvider()
         let viewModel = ForceUpdateViewModel(
@@ -23,6 +23,7 @@ final class ForceUpdateViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.lastErrorMessage)
     }
 
+    @MainActor
     func testStartMonitoringLeavesCurrentAppUpToDateWhenRequirementIsDisabled() async {
         let provider = MockAppUpdateRequirementProvider()
         let viewModel = ForceUpdateViewModel(
@@ -39,6 +40,7 @@ final class ForceUpdateViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.lastErrorMessage)
     }
 
+    @MainActor
     func testStartMonitoringStoresErrorWithoutChangingLastDecision() async {
         let provider = MockAppUpdateRequirementProvider()
         let viewModel = ForceUpdateViewModel(
@@ -59,6 +61,7 @@ final class ForceUpdateViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.lastErrorMessage, "offline")
     }
 
+    @MainActor
     func testStartMonitoringOnlyRegistersOneProviderListener() {
         let provider = MockAppUpdateRequirementProvider()
         let viewModel = ForceUpdateViewModel(provider: provider)

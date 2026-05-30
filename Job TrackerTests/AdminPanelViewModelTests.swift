@@ -2,7 +2,6 @@ import XCTest
 import Combine
 @testable import Job_Tracker
 
-@MainActor
 final class AdminPanelViewModelTests: XCTestCase {
     private let sampleUsers: [AppUser] = [
         AppUser(id: "1", firstName: "Alex", lastName: "Anderson", email: "alex@example.com", position: "Tech"),
@@ -10,6 +9,7 @@ final class AdminPanelViewModelTests: XCTestCase {
         AppUser(id: "3", firstName: "Casey", lastName: "Chambers", email: "casey@example.com", position: "Supervisor")
     ]
 
+    @MainActor
     func testRosterUpdatesFromPublisher() async {
         let subject = CurrentValueSubject<[AppUser], Never>([sampleUsers[1], sampleUsers[0]])
         let mockService = MockAdminPanelService()
@@ -28,6 +28,7 @@ final class AdminPanelViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.roster.map(\.id), [sampleUsers[1].id, sampleUsers[2].id])
     }
 
+    @MainActor
     func testToggleAdminSuccessUpdatesState() async {
         let user = AppUser(id: "42", firstName: "Jamie", lastName: "Quinn", email: "jamie@example.com", position: "Tech")
         let subject = CurrentValueSubject<[AppUser], Never>([user])
@@ -57,6 +58,7 @@ final class AdminPanelViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.alert)
     }
 
+    @MainActor
     func testToggleSupervisorFailureShowsAlert() async {
         var user = AppUser(id: "55", firstName: "Morgan", lastName: "Reeves", email: "morgan@example.com", position: "Supervisor")
         user.isSupervisor = true
@@ -79,6 +81,7 @@ final class AdminPanelViewModelTests: XCTestCase {
         XCTAssertFalse(mockService.didRefreshClaims)
     }
 
+    @MainActor
     func testDeleteUserSuccessRemovesUserFromRoster() async {
         let mockService = MockAdminPanelService()
         let viewModel = AdminPanelViewModel(
@@ -100,6 +103,7 @@ final class AdminPanelViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.alert?.kind, .success)
     }
 
+    @MainActor
     func testDeleteCurrentUserIsBlocked() {
         let mockService = MockAdminPanelService()
         let viewModel = AdminPanelViewModel(
@@ -116,6 +120,7 @@ final class AdminPanelViewModelTests: XCTestCase {
     }
 
 
+    @MainActor
     func testRemovingCurrentUsersAdminAccessIsBlocked() {
         var user = AppUser(id: "admin-1", firstName: "Riley", lastName: "Admin", email: "riley@example.com", position: "Admin")
         user.isAdmin = true
@@ -133,6 +138,7 @@ final class AdminPanelViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.alert?.title, "Update Blocked")
     }
 
+    @MainActor
     func testParticipantsBackfillPayloadMergesMissingLegacyUsers() {
         let payload = FirebaseService.participantsBackfillPayload(for: [
             "participants": ["existing"],
@@ -144,6 +150,7 @@ final class AdminPanelViewModelTests: XCTestCase {
         XCTAssertEqual(participants, ["creator", "existing"])
     }
 
+    @MainActor
     func testParticipantsBackfillPayloadSkipsAlreadyCompleteParticipants() {
         let payload = FirebaseService.participantsBackfillPayload(for: [
             "participants": ["assignee", "creator"],
@@ -154,6 +161,7 @@ final class AdminPanelViewModelTests: XCTestCase {
         XCTAssertNil(payload)
     }
 
+    @MainActor
     func testBackfillProgressAndCompletion() async {
         let mockService = MockAdminPanelService()
         let viewModel = AdminPanelViewModel(service: mockService)
