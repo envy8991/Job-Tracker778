@@ -38,14 +38,22 @@ scheme = Path("Job Tracker.xcodeproj/xcshareddata/xcschemes/Job Tracker.xcscheme
 plan_path = Path("Job Tracker Safety Net.xctestplan")
 plan = json.loads(plan_path.read_text())
 
+# Shared schemes live under Job Tracker.xcodeproj/xcshareddata/xcschemes.
+# Xcode resolves TestPlanReference container paths from the .xcodeproj bundle,
+# so the repository-root plan must be referenced with ../.
+expected_plan_reference = "container:../Job Tracker Safety Net.xctestplan"
+
 errors = []
 
 def check(condition, message):
     if not condition:
         errors.append(message)
 
-check('reference = "container:Job Tracker Safety Net.xctestplan"' in scheme,
-      "Shared Job Tracker scheme must use the safety-net test plan.")
+check(f'reference = "{expected_plan_reference}"' in scheme,
+      "Shared Job Tracker scheme must use the safety-net test plan via a path relative to the .xcodeproj container.")
+resolved_plan_reference = (Path("Job Tracker.xcodeproj") / expected_plan_reference.removeprefix("container:")).resolve()
+check(resolved_plan_reference == plan_path.resolve() and resolved_plan_reference.exists(),
+      f"Shared Job Tracker scheme test-plan reference must resolve to {plan_path}.")
 check('codeCoverageEnabled = "YES"' in scheme,
       "Shared Job Tracker scheme must keep code coverage enabled for tests.")
 check('BlueprintName = "Job TrackerTests"' in scheme and 'skipped = "NO"' in scheme,
