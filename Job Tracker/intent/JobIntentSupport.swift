@@ -167,15 +167,15 @@ enum JobIntentResolver {
     }
 
     static func nearestTodayJob() async throws -> JobIntentTarget? {
-        let jobs = try await todayJobs()
-        guard !jobs.isEmpty else { return nil }
+        let pendingJobs = try await todayJobs().filter(\.isPending)
+        guard !pendingJobs.isEmpty else { return nil }
 
         let locationProvider = await MainActor.run { JobIntentLocationProvider() }
         let locationResult = await locationProvider.currentLocation()
         let fallbackReason: String
         switch locationResult {
         case .success(let currentLocation):
-            let locatedJobs = jobs.compactMap { job -> (job: Job, distance: CLLocationDistance)? in
+            let locatedJobs = pendingJobs.compactMap { job -> (job: Job, distance: CLLocationDistance)? in
                 guard let jobLocation = job.clLocation else { return nil }
                 return (job, jobLocation.distance(from: currentLocation))
             }
@@ -194,12 +194,8 @@ enum JobIntentResolver {
             fallbackReason = locationResult.fallbackReason
         }
 
-        let fallback = jobs
-            .sorted { lhs, rhs in
-                if lhs.status.lowercased() == "done" && rhs.status.lowercased() != "done" { return false }
-                if lhs.status.lowercased() != "done" && rhs.status.lowercased() == "done" { return true }
-                return lhs.date < rhs.date
-            }
+        let fallback = pendingJobs
+            .sorted { lhs, rhs in lhs.date < rhs.date }
             .first
 
         guard let fallback else { return nil }
@@ -213,7 +209,7 @@ enum JobIntentResolver {
 
     static func nearestJobOrDialog() async throws -> JobIntentResolution {
         guard let target = try await nearestTodayJob() else {
-            return .failure(IntentDialog("You don't have any jobs scheduled for today."))
+            return .failure(IntentDialog("You don't have any pending jobs scheduled for today."))
         }
         return .success(target)
     }
