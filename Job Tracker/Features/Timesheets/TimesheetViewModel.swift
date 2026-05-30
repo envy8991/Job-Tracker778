@@ -16,8 +16,7 @@ class TimesheetViewModel: ObservableObject {
     
     /// Fetch the timesheet for the given week and user.
     func fetchTimesheet(for weekStart: Date, userId: String, partnerId: String? = nil) {
-        let partnerComponent = partnerId ?? ""
-        let docId = "\(userId)\(partnerComponent.isEmpty ? "" : "_\(partnerComponent)")_\(weekStartString(from: weekStart))"
+        let docId = Timesheet.documentID(userId: userId, partnerId: partnerId, weekStart: weekStart)
         db.collection("timesheets").document(docId).getDocument { snapshot, error in
             if let error = error {
                 print("Error fetching timesheet: \(error)")
@@ -42,15 +41,17 @@ class TimesheetViewModel: ObservableObject {
     
     /// Save (or update) the timesheet.
     func saveTimesheet(_ timesheet: Timesheet, completion: @escaping (Result<Void, Error>) -> Void = { _ in }) {
-        let partnerComponent = timesheet.partnerId ?? ""
-        let docId = "\(timesheet.userId)\(partnerComponent.isEmpty ? "" : "_\(partnerComponent)")_\(weekStartString(from: timesheet.weekStart))"
+        var sharedTimesheet = timesheet
+        sharedTimesheet.userId = Timesheet.canonicalOwnerID(userId: timesheet.userId, partnerId: timesheet.partnerId)
+        sharedTimesheet.partnerId = Timesheet.canonicalPartnerID(userId: timesheet.userId, partnerId: timesheet.partnerId)
+        let docId = Timesheet.documentID(userId: timesheet.userId, partnerId: timesheet.partnerId, weekStart: timesheet.weekStart)
         do {
-            try db.collection("timesheets").document(docId).setData(from: timesheet) { error in
+            try db.collection("timesheets").document(docId).setData(from: sharedTimesheet) { error in
                 DispatchQueue.main.async {
                     if let error = error {
                         completion(.failure(error))
                     } else {
-                        self.timesheet = timesheet
+                        self.timesheet = sharedTimesheet
                         completion(.success(()))
                     }
                 }
@@ -60,11 +61,5 @@ class TimesheetViewModel: ObservableObject {
                 completion(.failure(error))
             }
         }
-    }
-    
-    private func weekStartString(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
     }
 }

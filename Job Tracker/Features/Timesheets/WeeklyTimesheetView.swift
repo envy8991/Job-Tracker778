@@ -545,15 +545,17 @@ extension WeeklyTimesheetView {
 
     private func saveCurrentTimesheet() {
         guard !isSavingTimesheet else { return }
-        guard let ownerId = authViewModel.currentUser?.id else {
+        guard let currentUserID = authViewModel.currentUser?.id else {
             presentSaveStatus(title: "Not Signed In", message: "You must be signed in to save a timesheet.", isSuccess: false)
             return
         }
 
         let supervisorName = supervisor
         let partner = partnerUid
+        let ownerId = Timesheet.canonicalOwnerID(userId: currentUserID, partnerId: partner)
+        let sharedPartnerId = Timesheet.canonicalPartnerID(userId: currentUserID, partnerId: partner)
         let weekStartDate = startOfWeek
-        let weekIdentifier = weekStartString(from: weekStartDate)
+        let timesheetDocumentID = Timesheet.documentID(userId: currentUserID, partnerId: partner, weekStart: weekStartDate)
         let workerName1 = workers.indices.contains(0) ? workers[0].name : ""
         let workerName2 = workers.indices.contains(1) ? workers[1].name : ""
         let headerTotals = aggregatedWorkerTotals()
@@ -581,7 +583,7 @@ extension WeeklyTimesheetView {
                 return
             }
 
-            let storagePath = "timesheets/\(ownerId)_\(weekIdentifier).pdf"
+            let storagePath = "timesheets/\(timesheetDocumentID).pdf"
             let storageRef = Storage.storage().reference().child(storagePath)
             let metadata = StorageMetadata()
             metadata.contentType = "application/pdf"
@@ -606,7 +608,7 @@ extension WeeklyTimesheetView {
 
                         let timesheet = Timesheet(
                             userId: ownerId,
-                            partnerId: partner,
+                            partnerId: sharedPartnerId,
                             weekStart: weekStartDate,
                             supervisor: supervisorName,
                             name1: workerName1,
@@ -718,11 +720,6 @@ extension WeeklyTimesheetView {
         timesheetJobsVM.fetchJobsForWeek(selectedDate: selectedDate)
     }
     
-    private func weekStartString(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
-    }
 }
 
 // MARK: - PDF Preview Sheet
