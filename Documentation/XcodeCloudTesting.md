@@ -29,6 +29,10 @@ You can also run the configuration guardrail locally:
 ci_scripts/ci_pre_xcodebuild.sh
 ```
 
+## Safety-net expectations
+
+The `Job TrackerTests` bundle is intentionally part of the shared `Job Tracker` scheme so Xcode Cloud and local developers run the same tests. See [Testing Safety Net](TestingSafetyNet.md) for the coverage map and the minimum expectations for future changes.
+
 ## Recommended Xcode Cloud workflow
 
 Create or update the workflow in Xcode with these settings:

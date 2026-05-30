@@ -130,6 +130,9 @@ Automated tests live under `Job TrackerTests`. The suite exercises:
 - Deep link routing and job share payload parsing.
 - Job search matching heuristics and crew job summaries.
 - Yellow sheet and timesheet PDF generation pipelines.
+- App user decoding, crew-position normalization, and forced-update gating.
+
+The shared `Job Tracker` scheme includes the `Job TrackerTests` bundle through `Job Tracker Safety Net.xctestplan`, which is the baseline for local CI and Xcode Cloud. See [Testing Safety Net](Documentation/TestingSafetyNet.md) for the coverage map and future testing expectations.
 
 Run the full suite from Xcode (`⌘U`) or via command line:
 
