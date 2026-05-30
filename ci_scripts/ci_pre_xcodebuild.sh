@@ -3,6 +3,10 @@
 # Fails fast when future project changes leave the shared scheme/test plan behind.
 set -eu
 
+SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
+REPOSITORY_ROOT=$(CDPATH= cd "$SCRIPT_DIR/.." && pwd)
+cd "$REPOSITORY_ROOT"
+
 PROJECT_PATH="Job Tracker.xcodeproj"
 SCHEME_PATH="$PROJECT_PATH/xcshareddata/xcschemes/Job Tracker.xcscheme"
 TEST_PLAN_PATH="Job Tracker Safety Net.xctestplan"
