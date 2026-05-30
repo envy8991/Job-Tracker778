@@ -158,6 +158,40 @@ if errors:
     sys.exit(1)
 PY
 
+prepare_xcode_cloud_build_for_testing() {
+  # Xcode Cloud supplies the build-for-testing destinations from the workflow UI.
+  # When that list contains generic/unpaired iOS simulators, the embedded watch
+  # companion can make destination resolution fail with xcodebuild exit code 70
+  # before compilation starts. Unit tests do not exercise the packaged watch app,
+  # so remove only the app target's watch embed/dependency edges in Xcode Cloud's
+  # temporary checkout for this build-for-testing action. Archive/build actions
+  # keep the checked-in project graph unchanged and still package the watch app.
+  if [ "${CI_XCODE_CLOUD:-}" != "TRUE" ] || [ "${CI_XCODEBUILD_ACTION:-}" != "build-for-testing" ]; then
+    return 0
+  fi
+
+  log "Preparing Xcode Cloud build-for-testing project graph without embedded watch content."
+  python3 <<'PYINNER'
+from pathlib import Path
+
+project_path = Path("Job Tracker.xcodeproj/project.pbxproj")
+project = project_path.read_text()
+updated = project
+
+# Remove the companion watch app build phase from the host app target's phase list.
+updated = updated.replace('\n\t\t\t\tCD3158992E5BB5E00037DF29 /* Embed Watch Content */,', '')
+# Remove the explicit target dependency that forces watch app destination resolution.
+updated = updated.replace('\n\t\t\t\tCD1C8C802E5BBB150001CE7E /* PBXTargetDependency */,', '')
+
+if updated == project:
+    raise SystemExit("Expected to remove watch embed/dependency edges for Xcode Cloud testing, but project graph was unchanged.")
+
+project_path.write_text(updated)
+PYINNER
+}
+
+prepare_xcode_cloud_build_for_testing
+
 if command -v xcodebuild >/dev/null 2>&1; then
   log "Checking that Xcode can resolve the shared scheme."
   xcodebuild -list -project "$PROJECT_PATH" >/dev/null
