@@ -1,0 +1,26 @@
+{
+  "configurations" : [
+    {
+      "id" : "1C2DD7E4-8DA2-44E6-9751-1F5C6E28B9E0",
+      "name" : "Safety Net"
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Job Tracker.xcodeproj",
+      "identifier" : "CDDA111C2D579EC0007BADFF",
+      "name" : "Job Tracker"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Job Tracker.xcodeproj",
+        "identifier" : "CD7E57000000000000000106",
+        "name" : "Job TrackerTests"
+      }
+    }
+  ],
+  "version" : 1
+}
