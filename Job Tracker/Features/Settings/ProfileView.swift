@@ -323,6 +323,20 @@ private extension ProfileView {
                 JTPrimaryButton("Sign Out", systemImage: "rectangle.portrait.and.arrow.right") {
                     authViewModel.signOut()
                 }
+
+                VStack(alignment: .leading, spacing: JTSpacing.xs) {
+                    Text("Need support?")
+                        .font(JTTypography.captionEmphasized)
+                        .foregroundStyle(JTColors.textPrimary)
+
+                    Link("qathom8991@gmail.com", destination: URL(string: "mailto:qathom8991@gmail.com")!)
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.accent)
+                        .textSelection(.enabled)
+                        .accessibilityLabel("Email support at qathom8991@gmail.com")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, JTSpacing.xs)
             }
             .padding(JTSpacing.lg)
         }
