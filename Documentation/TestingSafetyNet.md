@@ -37,5 +37,5 @@ When Firestore or Storage rules files are added, keep `firebase-emulator-tests/f
 - Keep the scheme's Test action pointed at `Job Tracker Safety Net.xctestplan`.
 - Keep code coverage enabled in both the shared scheme and the test plan.
 - Add every new XCTest or UI-test target to `Job Tracker Safety Net.xctestplan` unless it is intentionally isolated in a separate documented workflow.
-- Run `ci_scripts/ci_pre_xcodebuild.sh` after changing the Xcode project, shared scheme, or test plan. The script fails when the scheme no longer references the plan, coverage is disabled, or an XCTest target is missing from the plan.
+- Run `ci_scripts/ci_pre_xcodebuild.sh` after changing the Xcode project, shared scheme, or test plan. The script fails when the scheme no longer references the plan, coverage is disabled, or an XCTest target is missing from the plan. In Xcode Cloud, the script exits before Archive/Build actions and runs only for Test actions.
 - Follow `.xcode-cloud/smoke-test-checklist.md` for the lightweight Xcode Cloud/manual build smoke checks that cover the iOS app, watch app, and iMessage extension surface.
