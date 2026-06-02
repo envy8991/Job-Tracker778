@@ -10,6 +10,21 @@ cd "$REPOSITORY_ROOT"
 PROJECT_PATH="Job Tracker.xcodeproj"
 SCHEME_PATH="$PROJECT_PATH/xcshareddata/xcschemes/Job Tracker.xcscheme"
 TEST_PLAN_PATH="Job Tracker Safety Net.xctestplan"
+
+# Xcode Cloud runs ci_pre_xcodebuild.sh before every workflow action, including
+# Archive. Keep these safety-net checks out of Archive/Build actions so release
+# packaging is not blocked by a test-only guardrail.
+if [ "${CI_XCODE_CLOUD:-}" = "TRUE" ]; then
+  case "${CI_XCODEBUILD_ACTION:-}" in
+    build-for-testing|test|test-without-building)
+      ;;
+    *)
+      printf '[xcode-cloud-safety-net] Skipping test-only safety-net script for Xcode Cloud action %s.\n' "${CI_XCODEBUILD_ACTION:-unknown}"
+      exit 0
+      ;;
+  esac
+fi
+
 log() {
   printf '[xcode-cloud-safety-net] %s\n' "$1"
 }
