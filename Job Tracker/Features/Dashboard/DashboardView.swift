@@ -134,8 +134,11 @@ struct DashboardView: View {
                             done: viewModel.syncDone,
                             total: viewModel.syncTotal,
                             inFlight: viewModel.syncInFlight,
+                            failed: viewModel.syncFailed,
+                            waitingForNetwork: viewModel.syncWaitingForNetwork,
                             phase: viewModel.wavePhase
                         )
+                        .onTapGesture { viewModel.presentSyncDetails() }
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
 
@@ -185,6 +188,8 @@ struct DashboardView: View {
                     DashboardDailyShareSheet(items: viewModel.shareItems, subject: viewModel.shareSubject)
                 case .createJob:
                     CreateJobView()
+                case .syncDetails:
+                    DashboardSyncDetailsSheet(jobsViewModel: jobsViewModel)
                 }
             }
             .sheet(isPresented: showSystemShareBinding) {
@@ -231,7 +236,15 @@ struct DashboardView: View {
                 let total = (info["total"] as? Int) ?? 0
                 let done = (info["uploaded"] as? Int) ?? (info["done"] as? Int) ?? 0
                 let inFlight = (info["inFlight"] as? Int) ?? 0
-                viewModel.handlePhotoUploadSyncStateChange(total: total, done: done, inFlight: inFlight)
+                let failed = (info["failed"] as? Int) ?? 0
+                let waitingForNetwork = (info["waitingForNetwork"] as? Bool) ?? false
+                viewModel.handlePhotoUploadSyncStateChange(
+                    total: total,
+                    done: done,
+                    inFlight: inFlight,
+                    failed: failed,
+                    waitingForNetwork: waitingForNetwork
+                )
             }
             .onChange(of: viewModel.showSyncBanner) { visible in
                 if visible {

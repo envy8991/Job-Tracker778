@@ -24,6 +24,7 @@ final class DashboardViewModel: ObservableObject {
         case datePicker
         case share
         case createJob
+        case syncDetails
 
         var id: Int { hashValue }
     }
@@ -50,6 +51,8 @@ final class DashboardViewModel: ObservableObject {
     @Published var syncTotal: Int = 0
     @Published var syncDone: Int = 0
     @Published var syncInFlight: Int = 0
+    @Published var syncFailed: Int = 0
+    @Published var syncWaitingForNetwork = false
     @Published var wavePhase: CGFloat = 0
 
     private var jobSyncTotal: Int = 0
@@ -58,6 +61,8 @@ final class DashboardViewModel: ObservableObject {
     private var photoSyncTotal: Int = 0
     private var photoSyncDone: Int = 0
     private var photoSyncInFlight: Int = 0
+    private var photoSyncFailed: Int = 0
+    private var photoSyncWaitingForNetwork = false
     @Published var nearestJobID: String?
     @Published var selectedJob: Job?
 
@@ -441,10 +446,12 @@ final class DashboardViewModel: ObservableObject {
         updateCombinedSyncState()
     }
 
-    func handlePhotoUploadSyncStateChange(total: Int, done: Int, inFlight: Int) {
+    func handlePhotoUploadSyncStateChange(total: Int, done: Int, inFlight: Int, failed: Int = 0, waitingForNetwork: Bool = false) {
         photoSyncTotal = max(total, 0)
         photoSyncDone = max(min(done, total), 0)
         photoSyncInFlight = max(inFlight, 0)
+        photoSyncFailed = max(failed, 0)
+        photoSyncWaitingForNetwork = waitingForNetwork
         updateCombinedSyncState()
     }
 
@@ -452,19 +459,45 @@ final class DashboardViewModel: ObservableObject {
         syncTotal = jobSyncTotal + photoSyncTotal
         syncDone = jobSyncDone + photoSyncDone
         syncInFlight = jobSyncInFlight + photoSyncInFlight
+        syncFailed = photoSyncFailed
+        syncWaitingForNetwork = photoSyncWaitingForNetwork
 
         withAnimation(.spring(response: 0.35, dampingFraction: 0.9)) {
-            showSyncBanner = (syncTotal > 0) && (syncDone < syncTotal)
+            showSyncBanner = syncTotal > 0 && (syncDone < syncTotal || syncFailed > 0)
         }
-        if syncTotal > 0 && syncDone >= syncTotal {
+        if syncTotal > 0 && syncDone >= syncTotal && syncFailed == 0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 guard let self else { return }
                 guard self.syncTotal > 0, self.syncDone >= self.syncTotal else { return }
                 withAnimation(.easeInOut(duration: 0.25)) {
                     self.showSyncBanner = false
                 }
+                self.resetCompletedSyncTotalsIfNeeded()
             }
         }
+    }
+
+    private func resetCompletedSyncTotalsIfNeeded() {
+        if jobSyncTotal > 0 && jobSyncDone >= jobSyncTotal {
+            jobSyncTotal = 0
+            jobSyncDone = 0
+            jobSyncInFlight = 0
+        }
+        if photoSyncTotal > 0 && photoSyncDone >= photoSyncTotal && photoSyncFailed == 0 {
+            photoSyncTotal = 0
+            photoSyncDone = 0
+            photoSyncInFlight = 0
+            photoSyncWaitingForNetwork = false
+        }
+        syncTotal = jobSyncTotal + photoSyncTotal
+        syncDone = jobSyncDone + photoSyncDone
+        syncInFlight = jobSyncInFlight + photoSyncInFlight
+        syncFailed = photoSyncFailed
+        syncWaitingForNetwork = photoSyncWaitingForNetwork
+    }
+
+    func presentSyncDetails() {
+        activeSheet = .syncDetails
     }
 
     func startWaveAnimation() {

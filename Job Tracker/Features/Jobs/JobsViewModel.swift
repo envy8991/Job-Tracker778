@@ -341,6 +341,16 @@ class JobsViewModel: ObservableObject {
         let docRef = db.collection("jobs").document()
         var newJob = job
         newJob.id = docRef.documentID
+        var initialParticipants = Set(newJob.participants ?? [])
+        if let creator = newJob.createdBy, !creator.isEmpty {
+            initialParticipants.insert(creator)
+        }
+        if let assignee = newJob.assignedTo, !assignee.isEmpty {
+            initialParticipants.insert(assignee)
+        }
+        if !initialParticipants.isEmpty {
+            newJob.participants = Array(initialParticipants).sorted()
+        }
 
         // Optimistically mark as pending so UI can show “Syncing…”
         DispatchQueue.main.async {
@@ -355,7 +365,12 @@ class JobsViewModel: ObservableObject {
                 DispatchQueue.main.async { completion(true) }
             case .failure(let error):
                 print("Error creating job via service: \(error)")
-                DispatchQueue.main.async { completion(false) }
+                DispatchQueue.main.async {
+                    self.pendingWriteIDs.remove(docRef.documentID)
+                    self.hasPendingWrites = !self.pendingWriteIDs.isEmpty
+                    self.postSyncStateChange()
+                    completion(false)
+                }
             }
             // Listener established by fetch methods will reconcile & clear pending when server ACKs
         }

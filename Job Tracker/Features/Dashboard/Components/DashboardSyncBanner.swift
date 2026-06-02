@@ -4,6 +4,8 @@ struct DashboardSyncBanner: View {
     let done: Int
     let total: Int
     let inFlight: Int
+    let failed: Int
+    let waitingForNetwork: Bool
     let phase: CGFloat
 
     private var progress: CGFloat {
@@ -12,6 +14,8 @@ struct DashboardSyncBanner: View {
     }
 
     private var title: String {
+        if failed > 0 { return "Upload needs attention" }
+        if waitingForNetwork { return "Waiting for connection" }
         if total == 0 { return "All changes are up to date" }
         if done >= total { return "All changes uploaded" }
         if inFlight > 0 { return "Uploading… (\(inFlight) in progress)" }
@@ -41,7 +45,7 @@ struct DashboardSyncBanner: View {
             }
 
             HStack(spacing: JTSpacing.sm) {
-                Image(systemName: "arrow.up.arrow.down.circle.fill")
+                Image(systemName: failed > 0 ? "exclamationmark.triangle.fill" : "arrow.up.arrow.down.circle.fill")
                     .imageScale(.medium)
                     .foregroundStyle(Color.white.opacity(0.95))
                 Text(title)
@@ -62,7 +66,7 @@ struct DashboardSyncBanner: View {
         .frame(height: 44)
         .padding(.horizontal, JTSpacing.lg)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(title)
+        .accessibilityLabel("\(title). Tap for details.")
     }
 }
 
@@ -101,13 +105,13 @@ struct WaterWave: Shape {
 }
 
 #Preview("Sync Banner – Uploading") {
-    DashboardSyncBanner(done: 2, total: 5, inFlight: 1, phase: 0.3)
+    DashboardSyncBanner(done: 2, total: 5, inFlight: 1, failed: 0, waitingForNetwork: false, phase: 0.3)
         .padding(.vertical)
         .background(JTGradients.background.ignoresSafeArea())
 }
 
 #Preview("Sync Banner – Complete") {
-    DashboardSyncBanner(done: 5, total: 5, inFlight: 0, phase: 0.9)
+    DashboardSyncBanner(done: 5, total: 5, inFlight: 0, failed: 0, waitingForNetwork: false, phase: 0.9)
         .padding(.vertical)
         .background(JTGradients.background.ignoresSafeArea())
         .frame(maxWidth: 600)

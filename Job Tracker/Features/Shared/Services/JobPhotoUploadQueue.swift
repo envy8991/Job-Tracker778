@@ -1,6 +1,8 @@
 import Foundation
 import Combine
 import FirebaseFirestore
+import FirebaseStorage
+import Network
 import UIKit
 
 /// Dedicated photo slots on a job document.
@@ -29,6 +31,84 @@ private struct PendingJobPhotoUpload: Identifiable, Codable, Equatable {
     let createdAt: Date
     var attempts: Int
     var lastErrorDescription: String?
+    var uploadedURL: String?
+    var isFailed: Bool
+
+    init(
+        id: String,
+        jobID: String,
+        slot: JobPhotoSlot,
+        fileName: String,
+        createdAt: Date,
+        attempts: Int,
+        lastErrorDescription: String?,
+        uploadedURL: String?,
+        isFailed: Bool
+    ) {
+        self.id = id
+        self.jobID = jobID
+        self.slot = slot
+        self.fileName = fileName
+        self.createdAt = createdAt
+        self.attempts = attempts
+        self.lastErrorDescription = lastErrorDescription
+        self.uploadedURL = uploadedURL
+        self.isFailed = isFailed
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        jobID = try container.decode(String.self, forKey: .jobID)
+        slot = try container.decode(JobPhotoSlot.self, forKey: .slot)
+        fileName = try container.decode(String.self, forKey: .fileName)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        attempts = try container.decodeIfPresent(Int.self, forKey: .attempts) ?? 0
+        lastErrorDescription = try container.decodeIfPresent(String.self, forKey: .lastErrorDescription)
+        uploadedURL = try container.decodeIfPresent(String.self, forKey: .uploadedURL)
+        isFailed = try container.decodeIfPresent(Bool.self, forKey: .isFailed) ?? false
+    }
+}
+
+struct JobPhotoUploadStatus: Identifiable, Equatable {
+    enum State: Equatable {
+        case pending
+        case uploading
+        case waitingForNetwork
+        case retrying
+        case failed
+    }
+
+    let id: String
+    let jobID: String
+    let slot: JobPhotoSlot
+    let createdAt: Date
+    let attempts: Int
+    let lastErrorDescription: String?
+    let state: State
+
+    var title: String {
+        switch slot {
+        case .house: return "House photo"
+        case .nid: return "NID photo"
+        case .can: return "Can photo"
+        }
+    }
+
+    var subtitle: String {
+        switch state {
+        case .pending:
+            return "Waiting to upload"
+        case .uploading:
+            return "Uploading now"
+        case .waitingForNetwork:
+            return "Waiting for connection"
+        case .retrying:
+            return "Will retry automatically"
+        case .failed:
+            return lastErrorDescription ?? "Upload failed"
+        }
+    }
 }
 
 /// Persists selected job photos locally, uploads them outside of the detail save flow,
@@ -45,6 +125,9 @@ final class JobPhotoUploadQueue: ObservableObject {
     @Published private(set) var pendingCount: Int = 0
     @Published private(set) var inFlightCount: Int = 0
     @Published private(set) var completedCount: Int = 0
+    @Published private(set) var failedCount: Int = 0
+    @Published private(set) var waitingForNetwork: Bool = false
+    @Published private(set) var uploadStatuses: [JobPhotoUploadStatus] = []
 
     private let fileManager: FileManager
     private let queueDirectory: URL
@@ -55,6 +138,10 @@ final class JobPhotoUploadQueue: ObservableObject {
     private var activeUploadID: String?
     private var retryTask: Task<Void, Never>?
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    private let pathMonitor = NWPathMonitor()
+    private let pathMonitorQueue = DispatchQueue(label: "com.jobtracker.photoUploadQueue.network")
+    private var isNetworkAvailable = true
+    private let maximumAttempts = 5
     private var cycleTotalCount: Int = 0
     private var cycleDoneCount: Int = 0
 
@@ -68,13 +155,15 @@ final class JobPhotoUploadQueue: ObservableObject {
         try? fileManager.createDirectory(at: queueDirectory, withIntermediateDirectories: true)
         loadManifest()
         cycleTotalCount = items.count
-        pendingCount = items.count
+        refreshPublishedCounts()
+        startNetworkMonitoring()
         publishSyncState()
         processQueue()
     }
 
     deinit {
         retryTask?.cancel()
+        pathMonitor.cancel()
 
         let taskID = backgroundTaskID
         if taskID != .invalid {
@@ -104,7 +193,9 @@ final class JobPhotoUploadQueue: ObservableObject {
                         fileName: fileName,
                         createdAt: Date(),
                         attempts: 0,
-                        lastErrorDescription: nil
+                        lastErrorDescription: nil,
+                        uploadedURL: nil,
+                        isFailed: false
                     )
                 )
             } catch {
@@ -118,7 +209,7 @@ final class JobPhotoUploadQueue: ObservableObject {
         items.append(contentsOf: addedItems)
         ensureBackgroundTaskIfNeeded()
         cycleTotalCount += addedItems.count
-        pendingCount = items.count
+        refreshPublishedCounts()
         saveManifest()
         publishSyncState()
         scheduleRetry(after: 1.0)
@@ -127,7 +218,47 @@ final class JobPhotoUploadQueue: ObservableObject {
     func retryPendingUploads() {
         retryTask?.cancel()
         retryTask = nil
+        refreshPublishedCounts()
+        publishSyncState()
         processQueue()
+    }
+
+    func retryFailedUploads() {
+        for index in items.indices where items[index].isFailed {
+            items[index].attempts = 0
+            items[index].isFailed = false
+            items[index].lastErrorDescription = nil
+        }
+        refreshPublishedCounts()
+        saveManifest()
+        publishSyncState()
+        processQueue()
+    }
+
+    func retryUpload(id: String) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        items[index].attempts = 0
+        items[index].isFailed = false
+        items[index].lastErrorDescription = nil
+        refreshPublishedCounts()
+        saveManifest()
+        publishSyncState()
+        processQueue()
+    }
+
+    func discardUpload(id: String) {
+        guard activeUploadID != id, let index = items.firstIndex(where: { $0.id == id }) else { return }
+        let removed = items.remove(at: index)
+        try? fileManager.removeItem(at: queueDirectory.appendingPathComponent(removed.fileName))
+        if items.isEmpty {
+            cycleTotalCount = 0
+            cycleDoneCount = 0
+            completedCount = 0
+        }
+        refreshPublishedCounts()
+        saveManifest()
+        publishSyncState()
+        endBackgroundTaskIfIdle()
     }
 
     func publishCurrentSyncState() {
@@ -136,7 +267,14 @@ final class JobPhotoUploadQueue: ObservableObject {
 
     private func processQueue() {
         guard activeUploadID == nil else { return }
-        guard let next = items.first else {
+        guard isNetworkAvailable else {
+            waitingForNetwork = items.contains { !$0.isFailed }
+            inFlightCount = 0
+            refreshPublishedCounts()
+            publishSyncState()
+            return
+        }
+        guard let next = items.first(where: { !$0.isFailed }) else {
             resetCycleIfFinished()
             return
         }
@@ -145,6 +283,11 @@ final class JobPhotoUploadQueue: ObservableObject {
         activeUploadID = next.id
         inFlightCount = 1
         publishSyncState()
+
+        if let uploadedURL = next.uploadedURL {
+            patchJob(next, photoURL: uploadedURL)
+            return
+        }
 
         let fileURL = queueDirectory.appendingPathComponent(next.fileName)
         guard let data = try? Data(contentsOf: fileURL) else {
@@ -157,7 +300,13 @@ final class JobPhotoUploadQueue: ObservableObject {
                 guard let self else { return }
                 switch result {
                 case .success(let urlString):
-                    self.patchJob(next, photoURL: urlString)
+                    if let index = self.items.firstIndex(where: { $0.id == next.id }) {
+                        self.items[index].uploadedURL = urlString
+                        self.saveManifest()
+                    }
+                    var uploadedItem = next
+                    uploadedItem.uploadedURL = urlString
+                    self.patchJob(uploadedItem, photoURL: urlString)
                 case .failure(let error):
                     self.handleFailure(for: next, error: error)
                 }
@@ -181,29 +330,57 @@ final class JobPhotoUploadQueue: ObservableObject {
     private func handleFailure(for item: PendingJobPhotoUpload, error: Error) {
         guard activeUploadID == item.id else { return }
 
-        if isFirestoreNotFound(error) {
-            finish(item, removingLocalFile: true)
-            return
-        }
-
         activeUploadID = nil
         inFlightCount = 0
+
+        var attempts = item.attempts + 1
+        var shouldFailPermanently = isNonRetryable(error)
+        if isFirestoreNotFound(error) {
+            // A photo can finish uploading before an offline-created job document is visible on the
+            // server. Keep the local file/manifest and retry the Firestore patch instead of deleting it.
+            shouldFailPermanently = attempts >= maximumAttempts
+        }
 
         if let index = items.firstIndex(where: { $0.id == item.id }) {
             items[index].attempts += 1
             items[index].lastErrorDescription = error.localizedDescription
+            items[index].isFailed = shouldFailPermanently || items[index].attempts >= maximumAttempts
+            attempts = items[index].attempts
         }
 
-        pendingCount = items.count
+        refreshPublishedCounts()
         saveManifest()
         publishSyncState()
-        ensureBackgroundTaskIfNeeded()
-        scheduleRetry(after: retryDelay(forAttempts: (items.first { $0.id == item.id }?.attempts ?? item.attempts + 1)))
+
+        if items.contains(where: { !$0.isFailed }) {
+            ensureBackgroundTaskIfNeeded()
+            scheduleRetry(after: retryDelay(forAttempts: attempts))
+        } else {
+            endBackgroundTaskIfIdle()
+        }
     }
 
     private func isFirestoreNotFound(_ error: Error) -> Bool {
         let nsError = error as NSError
         return nsError.domain == FirestoreErrorDomain && nsError.code == FirestoreErrorCode.notFound.rawValue
+    }
+
+    private func isNonRetryable(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == FirestoreErrorDomain {
+            return nsError.code == FirestoreErrorCode.permissionDenied.rawValue
+                || nsError.code == FirestoreErrorCode.unauthenticated.rawValue
+        }
+        if nsError.domain == StorageErrorDomain,
+           let code = StorageErrorCode(rawValue: nsError.code) {
+            switch code {
+            case .unauthenticated, .unauthorized, .invalidArgument, .objectNotFound, .quotaExceeded:
+                return true
+            default:
+                return false
+            }
+        }
+        return false
     }
 
     private func finish(_ item: PendingJobPhotoUpload, removingLocalFile: Bool) {
@@ -226,7 +403,7 @@ final class JobPhotoUploadQueue: ObservableObject {
 
         cycleDoneCount += 1
         completedCount = cycleDoneCount
-        pendingCount = items.count
+        refreshPublishedCounts()
         saveManifest()
         publishSyncState()
         processQueue()
@@ -250,19 +427,19 @@ final class JobPhotoUploadQueue: ObservableObject {
     }
 
     private func resetCycleIfFinished() {
-        guard activeUploadID == nil, items.isEmpty else { return }
+        guard activeUploadID == nil, !items.contains(where: { !$0.isFailed }) else { return }
         if cycleTotalCount > 0, cycleDoneCount >= cycleTotalCount {
             publishSyncState()
         }
         cycleTotalCount = 0
         cycleDoneCount = 0
         completedCount = 0
-        pendingCount = 0
+        refreshPublishedCounts()
         endBackgroundTaskIfIdle()
     }
 
     private func ensureBackgroundTaskIfNeeded() {
-        guard backgroundTaskID == .invalid, !items.isEmpty else { return }
+        guard backgroundTaskID == .invalid, items.contains(where: { !$0.isFailed }) else { return }
 
         backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "JobPhotoUploadQueue") { [weak self] in
             Task { @MainActor [weak self] in
@@ -276,14 +453,14 @@ final class JobPhotoUploadQueue: ObservableObject {
         retryTask = nil
         activeUploadID = nil
         inFlightCount = 0
-        pendingCount = items.count
+        refreshPublishedCounts()
         saveManifest()
         publishSyncState()
         endBackgroundTaskIfNeeded()
     }
 
     private func endBackgroundTaskIfIdle() {
-        guard activeUploadID == nil, items.isEmpty else { return }
+        guard activeUploadID == nil, !items.contains(where: { !$0.isFailed }) else { return }
         endBackgroundTaskIfNeeded()
     }
 
@@ -318,8 +495,56 @@ final class JobPhotoUploadQueue: ObservableObject {
         }
     }
 
+    private func startNetworkMonitoring() {
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor in
+                guard let self else { return }
+                let wasAvailable = self.isNetworkAvailable
+                self.isNetworkAvailable = path.status == .satisfied
+                self.waitingForNetwork = !self.isNetworkAvailable && self.items.contains { !$0.isFailed }
+                self.refreshPublishedCounts()
+                self.publishSyncState()
+                if !wasAvailable && self.isNetworkAvailable {
+                    self.retryPendingUploads()
+                }
+            }
+        }
+        pathMonitor.start(queue: pathMonitorQueue)
+    }
+
+    private func refreshPublishedCounts() {
+        failedCount = items.filter(\.isFailed).count
+        pendingCount = items.filter { !$0.isFailed }.count
+        waitingForNetwork = !isNetworkAvailable && pendingCount > 0
+        uploadStatuses = items.map { item in
+            let state: JobPhotoUploadStatus.State
+            if item.isFailed {
+                state = .failed
+            } else if activeUploadID == item.id {
+                state = .uploading
+            } else if waitingForNetwork {
+                state = .waitingForNetwork
+            } else if item.attempts > 0 {
+                state = .retrying
+            } else {
+                state = .pending
+            }
+            return JobPhotoUploadStatus(
+                id: item.id,
+                jobID: item.jobID,
+                slot: item.slot,
+                createdAt: item.createdAt,
+                attempts: item.attempts,
+                lastErrorDescription: item.lastErrorDescription,
+                state: state
+            )
+        }
+    }
+
     private func publishSyncState() {
-        let total = max(cycleTotalCount, items.count + cycleDoneCount)
+        refreshPublishedCounts()
+        let activeCount = items.filter { !$0.isFailed }.count
+        let total = max(cycleTotalCount, activeCount + failedCount + cycleDoneCount)
         let done = min(cycleDoneCount, total)
         NotificationCenter.default.post(
             name: .jobPhotoUploadsSyncStateDidChange,
@@ -329,7 +554,9 @@ final class JobPhotoUploadQueue: ObservableObject {
                 "done": done,
                 "uploaded": done,
                 "inFlight": inFlightCount,
-                "pending": items.count
+                "pending": pendingCount,
+                "failed": failedCount,
+                "waitingForNetwork": waitingForNetwork
             ]
         )
     }
