@@ -6,7 +6,7 @@ import Network
 import UIKit
 
 /// Dedicated photo slots on a job document.
-enum JobPhotoSlot: String, Codable, CaseIterable {
+enum JobPhotoSlot: String, Codable, CaseIterable, Hashable {
     case house
     case nid
     case can
@@ -33,6 +33,7 @@ private struct PendingJobPhotoUpload: Identifiable, Codable, Equatable {
     var lastErrorDescription: String?
     var uploadedURL: String?
     var isFailed: Bool
+    var deferredUntil: Date?
 
     init(
         id: String,
@@ -43,7 +44,8 @@ private struct PendingJobPhotoUpload: Identifiable, Codable, Equatable {
         attempts: Int,
         lastErrorDescription: String?,
         uploadedURL: String?,
-        isFailed: Bool
+        isFailed: Bool,
+        deferredUntil: Date? = nil
     ) {
         self.id = id
         self.jobID = jobID
@@ -54,6 +56,7 @@ private struct PendingJobPhotoUpload: Identifiable, Codable, Equatable {
         self.lastErrorDescription = lastErrorDescription
         self.uploadedURL = uploadedURL
         self.isFailed = isFailed
+        self.deferredUntil = deferredUntil
     }
 
     init(from decoder: Decoder) throws {
@@ -67,6 +70,7 @@ private struct PendingJobPhotoUpload: Identifiable, Codable, Equatable {
         lastErrorDescription = try container.decodeIfPresent(String.self, forKey: .lastErrorDescription)
         uploadedURL = try container.decodeIfPresent(String.self, forKey: .uploadedURL)
         isFailed = try container.decodeIfPresent(Bool.self, forKey: .isFailed) ?? false
+        deferredUntil = try container.decodeIfPresent(Date.self, forKey: .deferredUntil)
     }
 }
 
@@ -77,6 +81,7 @@ struct JobPhotoUploadStatus: Identifiable, Equatable {
         case waitingForNetwork
         case retrying
         case failed
+        case storedLocally
     }
 
     let id: String
@@ -107,6 +112,8 @@ struct JobPhotoUploadStatus: Identifiable, Equatable {
             return "Will retry automatically"
         case .failed:
             return lastErrorDescription ?? "Upload failed"
+        case .storedLocally:
+            return "Saved on this device for up to 14 days"
         }
     }
 }
@@ -142,6 +149,8 @@ final class JobPhotoUploadQueue: ObservableObject {
     private let pathMonitorQueue = DispatchQueue(label: "com.jobtracker.photoUploadQueue.network")
     private var isNetworkAvailable = true
     private let maximumAttempts = 5
+    private let localRetentionInterval: TimeInterval = 14 * 24 * 60 * 60
+    private let billingOutageRetryDelay: TimeInterval = 6 * 60 * 60
     private var cycleTotalCount: Int = 0
     private var cycleDoneCount: Int = 0
 
@@ -154,6 +163,7 @@ final class JobPhotoUploadQueue: ObservableObject {
 
         try? fileManager.createDirectory(at: queueDirectory, withIntermediateDirectories: true)
         loadManifest()
+        purgeExpiredLocalPhotos()
         cycleTotalCount = items.count
         refreshPublishedCounts()
         startNetworkMonitoring()
@@ -206,6 +216,7 @@ final class JobPhotoUploadQueue: ObservableObject {
         }
 
         guard !addedItems.isEmpty else { return }
+        purgeExpiredLocalPhotos()
         items.append(contentsOf: addedItems)
         ensureBackgroundTaskIfNeeded()
         cycleTotalCount += addedItems.count
@@ -224,10 +235,11 @@ final class JobPhotoUploadQueue: ObservableObject {
     }
 
     func retryFailedUploads() {
-        for index in items.indices where items[index].isFailed {
+        for index in items.indices where items[index].isFailed || items[index].deferredUntil != nil {
             items[index].attempts = 0
             items[index].isFailed = false
             items[index].lastErrorDescription = nil
+            items[index].deferredUntil = nil
         }
         refreshPublishedCounts()
         saveManifest()
@@ -240,6 +252,7 @@ final class JobPhotoUploadQueue: ObservableObject {
         items[index].attempts = 0
         items[index].isFailed = false
         items[index].lastErrorDescription = nil
+        items[index].deferredUntil = nil
         refreshPublishedCounts()
         saveManifest()
         publishSyncState()
@@ -265,16 +278,26 @@ final class JobPhotoUploadQueue: ObservableObject {
         publishSyncState()
     }
 
+    func localImage(for jobID: String, slot: JobPhotoSlot) -> UIImage? {
+        purgeExpiredLocalPhotos()
+        guard let item = items.last(where: { $0.jobID == jobID && $0.slot == slot }) else { return nil }
+        let fileURL = queueDirectory.appendingPathComponent(item.fileName)
+        guard let data = try? Data(contentsOf: fileURL) else { return nil }
+        return UIImage(data: data)
+    }
+
     private func processQueue() {
         guard activeUploadID == nil else { return }
         guard isNetworkAvailable else {
-            waitingForNetwork = items.contains { !$0.isFailed }
+            waitingForNetwork = items.contains { !$0.isFailed && !isDeferred($0) }
             inFlightCount = 0
             refreshPublishedCounts()
             publishSyncState()
             return
         }
-        guard let next = items.first(where: { !$0.isFailed }) else {
+        purgeExpiredLocalPhotos()
+        let now = Date()
+        guard let next = items.first(where: { !$0.isFailed && !isDeferred($0, now: now) }) else {
             resetCycleIfFinished()
             return
         }
@@ -334,6 +357,11 @@ final class JobPhotoUploadQueue: ObservableObject {
         inFlightCount = 0
 
         var attempts = item.attempts + 1
+        if isTemporaryStorageBillingOutage(error) {
+            deferLocally(for: item, error: error)
+            return
+        }
+
         var shouldFailPermanently = isNonRetryable(error)
         if isFirestoreNotFound(error) {
             // A photo can finish uploading before an offline-created job document is visible on the
@@ -352,7 +380,7 @@ final class JobPhotoUploadQueue: ObservableObject {
         saveManifest()
         publishSyncState()
 
-        if items.contains(where: { !$0.isFailed }) {
+        if items.contains(where: { !$0.isFailed && !isDeferred($0) }) {
             ensureBackgroundTaskIfNeeded()
             scheduleRetry(after: retryDelay(forAttempts: attempts))
         } else {
@@ -360,9 +388,32 @@ final class JobPhotoUploadQueue: ObservableObject {
         }
     }
 
+    private func deferLocally(for item: PendingJobPhotoUpload, error: Error) {
+        if let index = items.firstIndex(where: { $0.id == item.id }) {
+            items[index].lastErrorDescription = error.localizedDescription
+            let expirationDate = items[index].createdAt.addingTimeInterval(localRetentionInterval)
+            items[index].deferredUntil = min(Date().addingTimeInterval(billingOutageRetryDelay), expirationDate)
+        }
+        cycleDoneCount += 1
+        completedCount = cycleDoneCount
+
+        refreshPublishedCounts()
+        saveManifest()
+        publishSyncState()
+        endBackgroundTaskIfIdle()
+        processQueue()
+    }
+
     private func isFirestoreNotFound(_ error: Error) -> Bool {
         let nsError = error as NSError
         return nsError.domain == FirestoreErrorDomain && nsError.code == FirestoreErrorCode.notFound.rawValue
+    }
+
+    private func isTemporaryStorageBillingOutage(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        guard nsError.domain == StorageErrorDomain,
+              let code = StorageErrorCode(rawValue: nsError.code) else { return false }
+        return code == .quotaExceeded
     }
 
     private func isNonRetryable(_ error: Error) -> Bool {
@@ -427,7 +478,7 @@ final class JobPhotoUploadQueue: ObservableObject {
     }
 
     private func resetCycleIfFinished() {
-        guard activeUploadID == nil, !items.contains(where: { !$0.isFailed }) else { return }
+        guard activeUploadID == nil, !items.contains(where: { !$0.isFailed && !isDeferred($0) }) else { return }
         if cycleTotalCount > 0, cycleDoneCount >= cycleTotalCount {
             publishSyncState()
         }
@@ -439,7 +490,7 @@ final class JobPhotoUploadQueue: ObservableObject {
     }
 
     private func ensureBackgroundTaskIfNeeded() {
-        guard backgroundTaskID == .invalid, items.contains(where: { !$0.isFailed }) else { return }
+        guard backgroundTaskID == .invalid, items.contains(where: { !$0.isFailed && !isDeferred($0) }) else { return }
 
         backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "JobPhotoUploadQueue") { [weak self] in
             Task { @MainActor [weak self] in
@@ -460,7 +511,7 @@ final class JobPhotoUploadQueue: ObservableObject {
     }
 
     private func endBackgroundTaskIfIdle() {
-        guard activeUploadID == nil, !items.contains(where: { !$0.isFailed }) else { return }
+        guard activeUploadID == nil, !items.contains(where: { !$0.isFailed && !isDeferred($0) }) else { return }
         endBackgroundTaskIfNeeded()
     }
 
@@ -475,13 +526,40 @@ final class JobPhotoUploadQueue: ObservableObject {
         guard let data = try? Data(contentsOf: manifestURL) else { return }
         do {
             let decoded = try JSONDecoder().decode([PendingJobPhotoUpload].self, from: data)
-            items = decoded.filter { fileManager.fileExists(atPath: queueDirectory.appendingPathComponent($0.fileName).path) }
+            let now = Date()
+            items = decoded.filter { item in
+                fileManager.fileExists(atPath: queueDirectory.appendingPathComponent(item.fileName).path)
+                    && !isExpired(item, now: now)
+            }
         } catch {
             #if DEBUG
             print("[JobPhotoUploadQueue] Failed to load manifest: \(error.localizedDescription)")
             #endif
             items = []
         }
+    }
+
+    private func purgeExpiredLocalPhotos() {
+        let now = Date()
+        var removedFileNames: [String] = []
+        items.removeAll { item in
+            let shouldRemove = isExpired(item, now: now)
+            if shouldRemove { removedFileNames.append(item.fileName) }
+            return shouldRemove
+        }
+        for fileName in removedFileNames {
+            try? fileManager.removeItem(at: queueDirectory.appendingPathComponent(fileName))
+        }
+        if !removedFileNames.isEmpty { saveManifest() }
+    }
+
+    private func isExpired(_ item: PendingJobPhotoUpload, now: Date = Date()) -> Bool {
+        now >= item.createdAt.addingTimeInterval(localRetentionInterval)
+    }
+
+    private func isDeferred(_ item: PendingJobPhotoUpload, now: Date = Date()) -> Bool {
+        guard let deferredUntil = item.deferredUntil else { return false }
+        return now < deferredUntil
     }
 
     private func saveManifest() {
@@ -501,7 +579,7 @@ final class JobPhotoUploadQueue: ObservableObject {
                 guard let self else { return }
                 let wasAvailable = self.isNetworkAvailable
                 self.isNetworkAvailable = path.status == .satisfied
-                self.waitingForNetwork = !self.isNetworkAvailable && self.items.contains { !$0.isFailed }
+                self.waitingForNetwork = !self.isNetworkAvailable && self.items.contains { !$0.isFailed && !self.isDeferred($0) }
                 self.refreshPublishedCounts()
                 self.publishSyncState()
                 if !wasAvailable && self.isNetworkAvailable {
@@ -513,13 +591,16 @@ final class JobPhotoUploadQueue: ObservableObject {
     }
 
     private func refreshPublishedCounts() {
+        purgeExpiredLocalPhotos()
         failedCount = items.filter(\.isFailed).count
-        pendingCount = items.filter { !$0.isFailed }.count
+        pendingCount = items.filter { !$0.isFailed && !isDeferred($0) }.count
         waitingForNetwork = !isNetworkAvailable && pendingCount > 0
         uploadStatuses = items.map { item in
             let state: JobPhotoUploadStatus.State
             if item.isFailed {
                 state = .failed
+            } else if isDeferred(item) {
+                state = .storedLocally
             } else if activeUploadID == item.id {
                 state = .uploading
             } else if waitingForNetwork {
@@ -543,8 +624,8 @@ final class JobPhotoUploadQueue: ObservableObject {
 
     private func publishSyncState() {
         refreshPublishedCounts()
-        let activeCount = items.filter { !$0.isFailed }.count
-        let total = max(cycleTotalCount, activeCount + failedCount + cycleDoneCount)
+        let activeCount = items.filter { !$0.isFailed && !isDeferred($0) }.count
+        let total = activeCount + failedCount + cycleDoneCount
         let done = min(cycleDoneCount, total)
         NotificationCenter.default.post(
             name: .jobPhotoUploadsSyncStateDidChange,
@@ -556,7 +637,8 @@ final class JobPhotoUploadQueue: ObservableObject {
                 "inFlight": inFlightCount,
                 "pending": pendingCount,
                 "failed": failedCount,
-                "waitingForNetwork": waitingForNetwork
+                "waitingForNetwork": waitingForNetwork,
+                "storedLocally": items.filter { !isExpired($0) && isDeferred($0) }.count
             ]
         )
     }
