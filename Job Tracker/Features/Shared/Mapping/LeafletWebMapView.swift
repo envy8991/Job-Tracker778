@@ -12,7 +12,7 @@ struct LeafletWebMapView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
-        configuration.preferences.javaScriptEnabled = true
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.userContentController.add(context.coordinator, name: Coordinator.messageHandlerName)
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
@@ -127,7 +127,7 @@ struct LeafletWebMapView: UIViewRepresentable {
             guard let json = encode(command) else { return }
             let js = "FiberBridge.handleCommand({type: 'centerMap', payload: \(json)});"
             webView.evaluateJavaScript(js) { [weak self] _, _ in
-                Task { await self?.viewModel.acknowledgeCenterCommand() }
+                Task { @MainActor in self?.viewModel.acknowledgeCenterCommand() }
             }
         }
 

@@ -91,8 +91,6 @@ final class PhoneWatchSyncManager: NSObject {
         guard let me = currentUserId() else { return [] }
 
         let today = Date()
-        let cal = Calendar.current
-
         return makeSnapshotItems(jobs: source, currentUserID: me, today: today)
     }
 

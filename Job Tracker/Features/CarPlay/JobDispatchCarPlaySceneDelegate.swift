@@ -15,7 +15,7 @@ final class JobDispatchCarPlaySceneDelegate: NSObject, CPTemplateApplicationScen
         didConnect interfaceController: CPInterfaceController
     ) {
         self.interfaceController = interfaceController
-        interfaceController.setRootTemplate(loadingTemplate(), animated: false)
+        interfaceController.setRootTemplate(loadingTemplate(), animated: false, completion: nil)
         Task { await reloadJobs(animated: true) }
     }
 
@@ -47,7 +47,7 @@ final class JobDispatchCarPlaySceneDelegate: NSObject, CPTemplateApplicationScen
             )
         }
 
-        interfaceController?.setRootTemplate(template, animated: animated)
+        interfaceController?.setRootTemplate(template, animated: animated, completion: nil)
     }
 
     private func loadingTemplate() -> CPListTemplate {
@@ -160,7 +160,7 @@ final class JobDispatchCarPlaySceneDelegate: NSObject, CPTemplateApplicationScen
             title: display.title,
             sections: [CPListSection(items: details)]
         )
-        interfaceController?.pushTemplate(template, animated: true)
+        interfaceController?.pushTemplate(template, animated: true, completion: nil)
     }
 
     private func informationalItem(title: String, detail: String?) -> CPListItem {
