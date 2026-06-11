@@ -7,7 +7,7 @@ The CarPlay experience is intentionally limited to safe, driving-focused job dis
 - Show only today's dashboard jobs created by the signed-in technician, matching the phone dashboard's ownership scope rather than exposing another user's jobs.
 - Sort jobs by current distance when location is available, honoring the dashboard routing preference for closest-first or furthest-first; fall back to scheduled time and address when distance is unavailable.
 - Limit the CarPlay list to twelve jobs after applying the routing preference so the in-car UI stays focused.
-- Provide a read-only job detail screen with a primary **Start Directions** action and the same core job reference fields the dashboard cards expose. Editing and adding info stay on the phone for CarPlay safety.
+- Provide a read-only job detail screen with a primary **Start Directions** action and only compact driving-relevant reference fields. Editing and adding info stay on the phone for CarPlay safety.
 - Open driving directions with the dashboard's selected map provider: Google Maps when selected and available, otherwise Apple Maps, using stored job coordinates and geocoding the address only when needed.
 - Keep editing, photos, chat, timesheets, admin tools, and long-form search out of CarPlay.
 
@@ -22,7 +22,9 @@ The CarPlay experience is intentionally limited to safe, driving-focused job dis
 
 ## Entitlement Strategy
 
-Apple grants CarPlay through managed capabilities after reviewing the app category and use case. The project now includes the CarPlay scene and implementation code, but the app entitlements file should not add a CarPlay entitlement until Apple approves the managed capability and the provisioning profile is regenerated.
+Apple grants CarPlay through managed capabilities after reviewing the app category and use case. The project includes the CarPlay scene and implementation code, but the app entitlements file must not add a CarPlay entitlement until Apple approves the managed capability and the provisioning profile is regenerated.
+
+Request the **Driving Task** category because Job Tracker provides a limited dispatch workflow for choosing a job destination and starting directions; it is not a turn-by-turn navigation app. Use the complete request packet in [CarPlayEntitlementRequest.md](../CarPlayEntitlementRequest.md) when submitting the request.
 
 Recommended request positioning:
 
