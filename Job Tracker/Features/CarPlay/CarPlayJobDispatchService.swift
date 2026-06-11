@@ -57,33 +57,53 @@ final class CarPlayJobDispatchService {
 
     private let locationProvider: CarPlayLocationProvider
     private let firebaseService: FirebaseService
+    private let defaults: UserDefaults
     private let maxJobs = 12
 
     init(
         locationProvider: CarPlayLocationProvider = .shared,
-        firebaseService: FirebaseService = .shared
+        firebaseService: FirebaseService = .shared,
+        defaults: UserDefaults = .standard
     ) {
         self.locationProvider = locationProvider
         self.firebaseService = firebaseService
+        self.defaults = defaults
     }
 
-    func loadTodayPendingJobs() async -> SnapshotState {
-        guard firebaseService.currentUserID() != nil else {
+    func loadTodayDashboardJobs() async -> SnapshotState {
+        guard let currentUserID = firebaseService.currentUserID() else {
             return .signedOut
         }
 
         do {
             let here = await locationProvider.currentLocation()
             let jobs = try await firebaseService.fetchJobsAsync(for: Date())
-            let pending = jobs.filter { $0.isPending }
-            let displays = sortedDisplays(for: pending, currentLocation: here)
+            let ownJobs = jobs.filter { $0.createdBy == currentUserID }
+            let displays = sortedDisplays(
+                for: ownJobs,
+                currentLocation: here,
+                sortClosest: shouldSortClosest
+            )
             return .jobs(Array(displays.prefix(maxJobs)), locationAvailable: here != nil)
         } catch {
             return .error(error.localizedDescription)
         }
     }
 
-    private func sortedDisplays(for jobs: [Job], currentLocation: CLLocation?) -> [CarPlayJobDisplay] {
+    private var shouldSortClosest: Bool {
+        switch defaults.string(forKey: "routingOptimizeBy") {
+        case "farthest", "furthest":
+            return false
+        default:
+            return true
+        }
+    }
+
+    private func sortedDisplays(
+        for jobs: [Job],
+        currentLocation: CLLocation?,
+        sortClosest: Bool
+    ) -> [CarPlayJobDisplay] {
         let displays = jobs.map { job -> CarPlayJobDisplay in
             let distance = currentLocation.flatMap { here in job.clLocation?.distance(from: here) }
             return CarPlayJobDisplay(job: job, distance: distance)
@@ -92,7 +112,7 @@ final class CarPlayJobDispatchService {
         return displays.sorted { lhs, rhs in
             switch (lhs.distance, rhs.distance) {
             case let (left?, right?):
-                if left != right { return left < right }
+                if left != right { return sortClosest ? left < right : left > right }
             case (_?, nil):
                 return true
             case (nil, _?):
