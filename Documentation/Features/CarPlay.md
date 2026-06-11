@@ -1,14 +1,14 @@
 # CarPlay Job Dispatch
 
-The CarPlay experience is intentionally limited to safe, driving-focused job dispatch tasks. It is not a turn-by-turn navigation app; it surfaces the technician's current pending jobs and hands route guidance to Maps.
+The CarPlay experience is intentionally limited to safe, driving-focused job dispatch tasks. It is not a turn-by-turn navigation app; it surfaces the technician's current dashboard jobs and hands route guidance to Maps.
 
 ## Responsibilities
 
-- Show only today's pending jobs for the signed-in technician.
-- Sort jobs by current distance when location is available, falling back to scheduled time and address when it is not.
-- Limit the CarPlay list to the closest twelve pending jobs so the in-car UI stays focused.
-- Provide a job detail screen with a primary **Start Directions** action.
-- Open Apple Maps driving directions using stored job coordinates, geocoding the address only when coordinates are missing.
+- Show only today's dashboard jobs created by the signed-in technician, matching the phone dashboard's ownership scope rather than exposing another user's jobs.
+- Sort jobs by current distance when location is available, honoring the dashboard routing preference for closest-first or furthest-first; fall back to scheduled time and address when distance is unavailable.
+- Limit the CarPlay list to twelve jobs after applying the routing preference so the in-car UI stays focused.
+- Provide a read-only job detail screen with a primary **Start Directions** action and the same core job reference fields the dashboard cards expose. Editing and adding info stay on the phone for CarPlay safety.
+- Open driving directions with the dashboard's selected map provider: Google Maps when selected and available, otherwise Apple Maps, using stored job coordinates and geocoding the address only when needed.
 - Keep editing, photos, chat, timesheets, admin tools, and long-form search out of CarPlay.
 
 ## Key Types
@@ -16,7 +16,7 @@ The CarPlay experience is intentionally limited to safe, driving-focused job dis
 | Type | Role |
 | --- | --- |
 | `JobDispatchCarPlaySceneDelegate` | CarPlay scene delegate that owns the template stack, loading states, refresh actions, job details, and Maps handoff. |
-| `CarPlayJobDispatchService` | Loads today's jobs from `FirebaseService`, filters pending jobs, and prepares closest-first display models. |
+| `CarPlayJobDispatchService` | Loads today's jobs from `FirebaseService`, filters to jobs created by the current user, and prepares routing-preference-aware display models. |
 | `CarPlayLocationProvider` | Requests a short-lived location fix when the app already has location authorization. It does not request new permissions from CarPlay. |
 | `CarPlayJobDisplay` | Lightweight presentation wrapper for address title, status, job number, coordinates, and formatted distance. |
 
@@ -26,7 +26,7 @@ Apple grants CarPlay through managed capabilities after reviewing the app catego
 
 Recommended request positioning:
 
-> Job Tracker is a private field-service dispatch app for technicians who drive between assigned job sites. The CarPlay experience shows today's pending jobs, sorts them by proximity, and lets the technician start driving directions without using the phone. It excludes editing, media capture, messaging, timesheets, admin workflows, and other non-driving tasks.
+> Job Tracker is a private field-service dispatch app for technicians who drive between assigned job sites. The CarPlay experience shows today's dashboard jobs created by the signed-in technician, sorts them by the user's routing preference, and lets the technician start driving directions without using the phone. It excludes editing, media capture, messaging, timesheets, admin workflows, and other non-driving tasks.
 
 ## Testing Notes
 
