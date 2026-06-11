@@ -137,23 +137,11 @@ final class JobDispatchCarPlaySceneDelegate: NSObject, CPTemplateApplicationScen
         if let portalID = display.job.portalID?.trimmingCharacters(in: .whitespacesAndNewlines), !portalID.isEmpty {
             details.append(informationalItem(title: "Portal ID", detail: portalID))
         }
-        if let assignments = display.job.assignments?.trimmingCharacters(in: .whitespacesAndNewlines), !assignments.isEmpty {
+        if let assignments = compactDrivingDetail(display.job.assignments) {
             details.append(informationalItem(title: "Assignment", detail: assignments))
         }
-        if let materials = display.job.materialsUsed?.trimmingCharacters(in: .whitespacesAndNewlines), !materials.isEmpty {
-            details.append(informationalItem(title: "Materials", detail: materials))
-        }
-        if let nidFootage = display.job.nidFootage?.trimmingCharacters(in: .whitespacesAndNewlines), !nidFootage.isEmpty {
-            details.append(informationalItem(title: "NID Footage", detail: nidFootage))
-        }
-        if let canFootage = display.job.canFootage?.trimmingCharacters(in: .whitespacesAndNewlines), !canFootage.isEmpty {
-            details.append(informationalItem(title: "Can Footage", detail: canFootage))
-        }
-        if let placement = display.job.jobPlacement?.trimmingCharacters(in: .whitespacesAndNewlines), !placement.isEmpty {
+        if let placement = compactDrivingDetail(display.job.jobPlacement) {
             details.append(informationalItem(title: "Placement", detail: placement))
-        }
-        if let notes = display.job.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
-            details.append(informationalItem(title: "Notes", detail: notes))
         }
 
         let template = CPListTemplate(
@@ -161,6 +149,19 @@ final class JobDispatchCarPlaySceneDelegate: NSObject, CPTemplateApplicationScen
             sections: [CPListSection(items: details)]
         )
         interfaceController?.pushTemplate(template, animated: true, completion: nil)
+    }
+
+    private func compactDrivingDetail(_ value: String?, maxCharacters: Int = 80) -> String? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+
+        if trimmed.count <= maxCharacters {
+            return trimmed
+        }
+
+        let cutoff = trimmed.index(trimmed.startIndex, offsetBy: maxCharacters)
+        return String(trimmed[..<cutoff]).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
     }
 
     private func informationalItem(title: String, detail: String?) -> CPListItem {
