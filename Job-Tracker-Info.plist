@@ -17,6 +17,32 @@
 			</array>
 		</dict>
 	</array>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<true/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIApplicationSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+				</dict>
+			</array>
+			<key>CPTemplateApplicationSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>CPTemplateApplicationScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>JobDispatchCarPlay</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).JobDispatchCarPlaySceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 <key>OPENAI_API_KEY</key>
 <string>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</string>
 <key>GEMINI_API_KEY</key>
