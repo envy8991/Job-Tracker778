@@ -61,11 +61,11 @@ final class CarPlayJobDispatchService {
     private let maxJobs = 12
 
     init(
-        locationProvider: CarPlayLocationProvider = .shared,
+        locationProvider: CarPlayLocationProvider? = nil,
         firebaseService: FirebaseService = .shared,
         defaults: UserDefaults = .standard
     ) {
-        self.locationProvider = locationProvider
+        self.locationProvider = locationProvider ?? .shared
         self.firebaseService = firebaseService
         self.defaults = defaults
     }
@@ -130,7 +130,7 @@ final class CarPlayJobDispatchService {
 }
 
 @MainActor
-final class CarPlayLocationProvider: NSObject, CLLocationManagerDelegate {
+final class CarPlayLocationProvider: NSObject, @preconcurrency CLLocationManagerDelegate {
     static let shared = CarPlayLocationProvider()
 
     private let manager = CLLocationManager()
