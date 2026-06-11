@@ -28,4 +28,6 @@ This folder collects long-form guides for each feature area in Job Tracker. The 
 - The [Design System guide](../Job%20Tracker/DesignSystem/DesignSystem.md) documents shared colors, typography, glass cards, and button styles.
 - Tests under `Job TrackerTests/` demonstrate integration points for Firestore, search matching, and PDF exports. Reviewing the tests is a fast way to see expected behaviours for each feature's view model.
 
+- The [iOS 17–26 Opportunity Review](iOS26OpportunityReview.md) captures post-iOS-16 platform features that could benefit the app.
+
 When you add a new feature module, place a matching Markdown file under `Documentation/Features/` and link it above. This keeps the engineering and product teams aligned on workflows, data contracts, and UI responsibilities.
