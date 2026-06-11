@@ -6,6 +6,7 @@ This folder collects long-form guides for each feature area in Job Tracker. The 
 
 - [Admin](Features/Admin.md)
 - [Authentication](Features/Authentication.md)
+- [CarPlay Job Dispatch](Features/CarPlay.md)
 - [Forced App Updates](Features/AppUpdate.md)
 - [Dashboard](Features/Dashboard.md)
 - [Help](Features/Help.md)
