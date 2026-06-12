@@ -17,6 +17,7 @@
 		CD7E5700000000000000010C /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA116F2D579F85007BADFF /* FirebaseFirestore */; };
 		CDDA11722D579F85007BADFF /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA11712D579F85007BADFF /* FirebaseStorage */; };
 		CDFE39FE2FA3624A00AEEAAB /* WebMaps in Resources */ = {isa = PBXBuildFile; fileRef = CDFE39FD2FA3624A00AEEAAB /* WebMaps */; };
+		AA0000000000000000000003 /* Job Tracker Widgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000002 /* Job Tracker Widgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,6 +42,13 @@
 			remoteGlobalIDString = CDDA111C2D579EC0007BADFF;
 			remoteInfo = "Job Tracker";
 		};
+		AA000000000000000000000C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CDDA11152D579EC0007BADFF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA0000000000000000000008;
+			remoteInfo = "Job Tracker Widgets";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -61,6 +69,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
+				AA0000000000000000000003 /* Job Tracker Widgets.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -76,6 +85,7 @@
 		CDFE39FD2FA3624A00AEEAAB /* WebMaps */ = {isa = PBXFileReference; lastKnownFileType = folder; name = WebMaps; path = "Job Tracker/Resources/WebMaps"; sourceTree = SOURCE_ROOT; };
 		CD7E57000000000000000101 /* Job TrackerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Job TrackerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CD9A00000000000000000001 /* Job TrackerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Job TrackerUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000002 /* Job Tracker Widgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Job Tracker Widgets.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -97,6 +107,11 @@
 		CD9A00000000000000000002 /* Job TrackerUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "Job TrackerUITests";
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000004 /* Job Tracker Widgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Job Tracker Widgets";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -138,6 +153,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA0000000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -164,6 +186,7 @@
 			children = (
 				CDDA111F2D579EC0007BADFF /* Job Tracker */,
 				CD1C8C782E5BBB140001CE7E /* Job Tracker Companion Watch App */,
+				AA0000000000000000000004 /* Job Tracker Widgets */,
 				CD7E57000000000000000102 /* Job TrackerTests */,
 				CD9A00000000000000000002 /* Job TrackerUITests */,
 				CD1C8C642E5BB9390001CE7E /* Frameworks */,
@@ -177,6 +200,7 @@
 			children = (
 				CDDA111D2D579EC0007BADFF /* Job Tracker.app */,
 				CD1C8C772E5BBB140001CE7E /* Job Tracker Companion Watch App.app */,
+				AA0000000000000000000002 /* Job Tracker Widgets.appex */,
 				CD7E57000000000000000101 /* Job TrackerTests.xctest */,
 				CD9A00000000000000000001 /* Job TrackerUITests.xctest */,
 			);
@@ -222,6 +246,7 @@
 			);
 			dependencies = (
 				CD1C8C802E5BBB150001CE7E /* PBXTargetDependency */,
+				AA000000000000000000000D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				CDDA111F2D579EC0007BADFF /* Job Tracker */,
@@ -237,6 +262,28 @@
 			productName = "Job Tracker";
 			productReference = CDDA111D2D579EC0007BADFF /* Job Tracker.app */;
 			productType = "com.apple.product-type.application";
+		};
+		AA0000000000000000000008 /* Job Tracker Widgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA000000000000000000000B /* Build configuration list for PBXNativeTarget "Job Tracker Widgets" */;
+			buildPhases = (
+				AA0000000000000000000005 /* Sources */,
+				AA0000000000000000000006 /* Frameworks */,
+				AA0000000000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000000000000000000004 /* Job Tracker Widgets */,
+			);
+			name = "Job Tracker Widgets";
+			packageProductDependencies = (
+			);
+			productName = "Job Tracker Widgets";
+			productReference = AA0000000000000000000002 /* Job Tracker Widgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		CD7E57000000000000000106 /* Job TrackerTests */ = {
 			isa = PBXNativeTarget;
@@ -301,6 +348,9 @@
 					CDDA111C2D579EC0007BADFF = {
 						CreatedOnToolsVersion = 16.2;
 					};
+					AA0000000000000000000008 = {
+						CreatedOnToolsVersion = 16.4;
+					};
 					CD7E57000000000000000106 = {
 						CreatedOnToolsVersion = 16.4;
 						TestTargetID = CDDA111C2D579EC0007BADFF;
@@ -330,6 +380,7 @@
 			targets = (
 				CDDA111C2D579EC0007BADFF /* Job Tracker */,
 				CD1C8C762E5BBB140001CE7E /* Job Tracker Companion Watch App */,
+				AA0000000000000000000008 /* Job Tracker Widgets */,
 				CD7E57000000000000000106 /* Job TrackerTests */,
 				CD9A00000000000000000006 /* Job TrackerUITests */,
 			);
@@ -360,6 +411,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		CD9A00000000000000000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0000000000000000000007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -397,6 +455,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA0000000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -414,6 +479,11 @@
 			isa = PBXTargetDependency;
 			target = CDDA111C2D579EC0007BADFF /* Job Tracker */;
 			targetProxy = CD9A00000000000000000007 /* PBXContainerItemProxy */;
+		};
+		AA000000000000000000000D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA0000000000000000000008 /* Job Tracker Widgets */;
+			targetProxy = AA000000000000000000000C /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -618,6 +688,7 @@
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "We need your location to sort jobs for route tracking";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to sort jobs for automatic routing";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Choose existing job photos for house, NID, and CAN records.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = location;
@@ -662,6 +733,7 @@
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "We need your location to sort jobs for route tracking";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to sort jobs for automatic routing";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Choose existing job photos for house, NID, and CAN records.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = location;
@@ -681,6 +753,62 @@
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		AA0000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = "Job Tracker Widgets/Job Tracker Widgets.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 73;
+				DEVELOPMENT_TEAM = Z2Z5T47373;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Configuration/JobTrackerWidgets-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 3.0.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.quinton.Job-Tracker-CS25.widgets";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AA000000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = "Job Tracker Widgets/Job Tracker Widgets.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 73;
+				DEVELOPMENT_TEAM = Z2Z5T47373;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Configuration/JobTrackerWidgets-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 3.0.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.quinton.Job-Tracker-CS25.widgets";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -805,6 +933,15 @@
 			buildConfigurations = (
 				CDDA112C2D579EC2007BADFF /* Debug */,
 				CDDA112D2D579EC2007BADFF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA000000000000000000000B /* Build configuration list for PBXNativeTarget "Job Tracker Widgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000009 /* Debug */,
+				AA000000000000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -116,6 +116,11 @@ struct DashboardView: View {
                         onMapTap: { job in viewModel.openJobInMaps(job, suggestionProviderRaw: suggestionProviderRaw) },
                         onStatusChange: { job, status in
                             DispatchQueue.main.async {
+                                JobSystemExperienceService.shared.publishStatusChange(
+                                    job: job,
+                                    status: status,
+                                    distanceText: sections.distanceStrings[job.id]
+                                )
                                 jobsViewModel.updateJobStatus(job: job, newStatus: status)
                             }
                         },
@@ -200,15 +205,18 @@ struct DashboardView: View {
             .onAppear {
                 viewModel.configureIfNeeded(jobsViewModel: jobsViewModel)
                 viewModel.updateNearestJob(with: jobsViewModel.jobs, currentLocation: locationService.current)
+                publishSystemExperiencesSnapshot()
                 if !ProcessInfo.processInfo.isJobTrackerUITesting {
                     JobPhotoUploadQueue.shared.publishCurrentSyncState()
                 }
             }
             .onReceive(locationService.$current) { location in
                 viewModel.updateNearestJob(with: jobsViewModel.jobs, currentLocation: location)
+                publishSystemExperiencesSnapshot()
             }
             .onReceive(jobsViewModel.$jobs) { newJobs in
                 viewModel.handleJobsListChange(newJobs, currentLocation: locationService.current)
+                publishSystemExperiencesSnapshot()
             }
             .onReceive(NotificationCenter.default.publisher(for: .jobImportSucceeded)) { _ in
                 viewModel.presentImportSuccessToast()
@@ -246,6 +254,9 @@ struct DashboardView: View {
                     waitingForNetwork: waitingForNetwork
                 )
             }
+            .onChange(of: viewModel.selectedDate) { _ in
+                publishSystemExperiencesSnapshot()
+            }
             .onChange(of: viewModel.showSyncBanner) { visible in
                 if visible {
                     viewModel.startWaveAnimation()
@@ -254,5 +265,14 @@ struct DashboardView: View {
                 }
             }
         }
+    }
+
+    private func publishSystemExperiencesSnapshot() {
+        let currentSections = sections
+        JobSystemExperienceService.shared.publish(
+            jobs: currentSections.allJobs,
+            selectedDate: viewModel.selectedDate,
+            distanceStrings: currentSections.distanceStrings
+        )
     }
 }

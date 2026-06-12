@@ -115,15 +115,18 @@ struct JobTrackerApp: App {
                             // Ensure the watch has the latest on first appearance
                             PhoneWatchSyncManager.shared.pushSnapshotToWatch()
                             arrivalAlertManager.updateJobs(jobsViewModel.jobs)
+                            JobSystemExperienceService.shared.publish(jobs: jobsViewModel.jobs, selectedDate: Date())
                             JobPhotoUploadQueue.shared.retryPendingUploads()
                         }
                         .onReceive(jobsViewModel.$jobs) { jobs in
                             PhoneWatchSyncManager.shared.pushSnapshotToWatch()
                             arrivalAlertManager.updateJobs(jobs)
+                            JobSystemExperienceService.shared.publish(jobs: jobs, selectedDate: Date())
                         }
                         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
                             PhoneWatchSyncManager.shared.pushSnapshotToWatch()
                             arrivalAlertManager.updateJobs(jobsViewModel.jobs)
+                            JobSystemExperienceService.shared.publish(jobs: jobsViewModel.jobs, selectedDate: Date())
                         }
                 }
                 .opacity(showSplash ? 0 : 1)
@@ -192,6 +195,8 @@ struct JobTrackerApp: App {
                 guard let route = DeepLinkRouter.handle(url) else { return }
 
                 switch route {
+                case .dashboard, .job(_):
+                    break
                 case let .importJob(token):
                     Task {
                         await MainActor.run {
