@@ -6,6 +6,8 @@
 import Foundation
 
 enum DeepLinkRoute: Equatable {
+    case dashboard
+    case job(id: String)
     case importJob(token: String)
 }
 
@@ -38,6 +40,16 @@ enum DeepLinkRouter {
             .split(separator: "/")
             .map { $0.lowercased() }
         let lastSegment = pathSegments.last
+        let isDashboard = (host == "dashboard") || (lastSegment == "dashboard")
+        if isDashboard { return .dashboard }
+
+        let isJob = (host == "job") || (lastSegment == "job")
+        if isJob,
+           let id = components.queryItems?.first(where: { $0.name.lowercased() == "id" })?.value,
+           !id.isEmpty {
+            return .job(id: id)
+        }
+
         let isImport = (host == "importjob") || (lastSegment == "importjob")
 
         guard isImport else {
