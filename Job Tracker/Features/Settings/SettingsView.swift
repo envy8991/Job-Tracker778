@@ -68,7 +68,7 @@ struct SettingsView: View {
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 28) // room for the hamburger overlay (iOS 16-safe)
+                    .padding(.top, 28) // room for the hamburger overlay (iOS 26-safe)
 
                     GlassCard {
                         VStack(alignment: .leading, spacing: 12) {
@@ -240,6 +240,30 @@ struct SettingsView: View {
                     }
                     .padding(.horizontal, 16)
 
+                    // Platform
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            SectionHeader(title: "iOS & iPadOS 26")
+
+                            VStack(alignment: .leading, spacing: 10) {
+                                PlatformCapabilityRow(
+                                    title: "Liquid Glass surfaces",
+                                    detail: "Cards, panels, and controls now use system Liquid Glass on iOS 26."
+                                )
+                                PlatformCapabilityRow(
+                                    title: "Adaptive iPad navigation",
+                                    detail: "The primary tabs can float at the top of iPad screens or expand into a sidebar."
+                                )
+                                PlatformCapabilityRow(
+                                    title: "Current platform baseline",
+                                    detail: "The app now targets iOS 26, iPadOS 26, and watchOS 26 across app, tests, and companion targets."
+                                )
+                            }
+                        }
+                        .padding(16)
+                    }
+                    .padding(.horizontal, 16)
+
                     // About
                     GlassCard {
                         VStack(alignment: .leading, spacing: 10) {
@@ -288,6 +312,31 @@ private extension SettingsView {
         case .inactive:
             return .secondary
         }
+    }
+}
+
+private struct PlatformCapabilityRow: View {
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(JTColors.success)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(JTColors.textPrimary)
+                Text(detail)
+                    .font(.footnote)
+                    .foregroundStyle(JTColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

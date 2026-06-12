@@ -2,7 +2,7 @@ import AppIntents
 import CoreLocation
 import Foundation
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 struct JobIntentTarget {
     let job: Job
     let locationWasUsed: Bool
@@ -10,7 +10,7 @@ struct JobIntentTarget {
     let fallbackReason: String?
 }
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 enum JobIntentFormatter {
     static func shortAddress(_ full: String) -> String {
         if let comma = full.firstIndex(of: ",") { return String(full[..<comma]) }
@@ -40,7 +40,7 @@ enum JobIntentFormatter {
     }
 }
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 enum JobIntentLocationResult {
     case success(CLLocation)
     case locationServicesDisabled
@@ -86,7 +86,7 @@ enum JobIntentLocationResult {
     }
 }
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 @MainActor
 final class JobIntentLocationProvider: NSObject, @preconcurrency CLLocationManagerDelegate {
     private let manager = CLLocationManager()
@@ -154,13 +154,13 @@ final class JobIntentLocationProvider: NSObject, @preconcurrency CLLocationManag
     }
 }
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 enum JobIntentResolution {
     case success(JobIntentTarget)
     case failure(IntentDialog)
 }
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 enum JobIntentResolver {
     static func todayJobs() async throws -> [Job] {
         try await FirebaseService.shared.fetchJobsAsync(for: Date())

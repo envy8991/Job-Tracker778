@@ -52,7 +52,7 @@ struct ExtraWorkView: View {
                     }
                 }
                 .listStyle(GroupedListStyle())
-                // (iOS 16+): Remove the default list background.
+                // (iOS 26+): Remove the default list background.
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle("Extra Work")

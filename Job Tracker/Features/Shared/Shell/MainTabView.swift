@@ -24,47 +24,41 @@ private struct PrimaryTabContainer: View {
 
     var body: some View {
         TabView(selection: selection) {
-            Group {
-                if authViewModel.isSupervisorFlag {
-                    SupervisorHomeDashboardView()
-                } else {
-                    DashboardView()
+            Tab(AppNavigationViewModel.PrimaryDestination.dashboard.title,
+                systemImage: AppNavigationViewModel.PrimaryDestination.dashboard.systemImage,
+                value: AppNavigationViewModel.PrimaryDestination.dashboard) {
+                Group {
+                    if authViewModel.isSupervisorFlag {
+                        SupervisorHomeDashboardView()
+                    } else {
+                        DashboardView()
+                    }
                 }
             }
-            .tag(AppNavigationViewModel.PrimaryDestination.dashboard)
-            .tabItem {
-                Label(AppNavigationViewModel.PrimaryDestination.dashboard.title,
-                      systemImage: AppNavigationViewModel.PrimaryDestination.dashboard.systemImage)
+
+            Tab(AppNavigationViewModel.PrimaryDestination.timesheets.title,
+                systemImage: AppNavigationViewModel.PrimaryDestination.timesheets.systemImage,
+                value: AppNavigationViewModel.PrimaryDestination.timesheets) {
+                WeeklyTimesheetView()
             }
 
-            WeeklyTimesheetView()
-                .tag(AppNavigationViewModel.PrimaryDestination.timesheets)
-                .tabItem {
-                    Label(AppNavigationViewModel.PrimaryDestination.timesheets.title,
-                          systemImage: AppNavigationViewModel.PrimaryDestination.timesheets.systemImage)
-                }
+            Tab(AppNavigationViewModel.PrimaryDestination.yellowSheet.title,
+                systemImage: AppNavigationViewModel.PrimaryDestination.yellowSheet.systemImage,
+                value: AppNavigationViewModel.PrimaryDestination.yellowSheet) {
+                YellowSheetView()
+            }
 
-            YellowSheetView()
-                .tag(AppNavigationViewModel.PrimaryDestination.yellowSheet)
-                .tabItem {
-                    Label(AppNavigationViewModel.PrimaryDestination.yellowSheet.title,
-                          systemImage: AppNavigationViewModel.PrimaryDestination.yellowSheet.systemImage)
-                }
+            Tab(value: AppNavigationViewModel.PrimaryDestination.search, role: .search) {
+                JobSearchView(viewModel: JobSearchViewModel(jobsViewModel: jobsViewModel, usersViewModel: usersViewModel))
+            }
 
-            JobSearchView(viewModel: JobSearchViewModel(jobsViewModel: jobsViewModel, usersViewModel: usersViewModel))
-                .tag(AppNavigationViewModel.PrimaryDestination.search)
-                .tabItem {
-                    Label(AppNavigationViewModel.PrimaryDestination.search.title,
-                          systemImage: AppNavigationViewModel.PrimaryDestination.search.systemImage)
-                }
-
-            MoreTabView()
-                .tag(AppNavigationViewModel.PrimaryDestination.more)
-                .tabItem {
-                    Label(AppNavigationViewModel.PrimaryDestination.more.title,
-                          systemImage: AppNavigationViewModel.PrimaryDestination.more.systemImage)
-                }
+            Tab(AppNavigationViewModel.PrimaryDestination.more.title,
+                systemImage: AppNavigationViewModel.PrimaryDestination.more.systemImage,
+                value: AppNavigationViewModel.PrimaryDestination.more) {
+                MoreTabView()
+            }
         }
+        .tabViewStyle(.sidebarAdaptable)
         .jtNavigationBarStyle()
     }
 }

@@ -217,7 +217,7 @@ struct FindPartnerView: View {
             .scrollContentBackground(.hidden)
             .listStyle(.insetGrouped)
             .searchable(text: $searchText, prompt: Text("Search teammates"))
-            .padding(.top, 28) // spacing for hamburger overlay (iOS 16-safe)
+            .padding(.top, 28) // spacing for hamburger overlay (iOS 26-safe)
         }
         .overlay(alignment: .center) {
             if isLoading { ProgressView().scaleEffect(1.2) }

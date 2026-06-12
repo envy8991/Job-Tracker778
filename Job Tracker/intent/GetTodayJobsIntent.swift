@@ -10,7 +10,7 @@
 import AppIntents
 import Foundation
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 struct GetTodayJobsIntent: AppIntent {
     static var title: LocalizedStringResource = "Get Today's Jobs"
     static var description = IntentDescription("Speaks a quick list of today's jobs.")

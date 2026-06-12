@@ -16,7 +16,7 @@
 import AppIntents
 import Foundation
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 struct CreateJobIntent: AppIntent {
     static var title: LocalizedStringResource = "Create Job"
     static var description =

@@ -10,7 +10,7 @@ import AppIntents
 import Foundation
 import CoreLocation
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 enum JobStatusIntentEnum: String, AppEnum {
     case pending = "Pending"
     case needsOH = "Needs OH"
@@ -35,7 +35,7 @@ enum JobStatusIntentEnum: String, AppEnum {
     ]
 }
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 struct UpdateJobStatusIntent: AppIntent {
     static var openAppWhenRun: Bool = false
 

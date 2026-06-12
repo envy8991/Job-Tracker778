@@ -1,7 +1,7 @@
 import AppIntents
 import Foundation
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 struct GetNearestJobAssignmentIntent: AppIntent {
     static var openAppWhenRun: Bool = false
     static var title: LocalizedStringResource = "Get Current Job Assignment"
@@ -28,7 +28,7 @@ struct GetNearestJobAssignmentIntent: AppIntent {
     }
 }
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 struct SetNearestJobAssignmentIntent: AppIntent {
     static var openAppWhenRun: Bool = false
     static var title: LocalizedStringResource = "Set Current Job Assignment"
@@ -66,7 +66,7 @@ struct SetNearestJobAssignmentIntent: AppIntent {
     }
 }
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 struct SetNearestJobFootageIntent: AppIntent {
     static var openAppWhenRun: Bool = false
     static var title: LocalizedStringResource = "Add Current Job Footage"
@@ -112,7 +112,7 @@ struct SetNearestJobFootageIntent: AppIntent {
     }
 }
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 struct GetNearestJobFootageIntent: AppIntent {
     static var openAppWhenRun: Bool = false
     static var title: LocalizedStringResource = "Get Current Job Footage"
@@ -143,7 +143,7 @@ struct GetNearestJobFootageIntent: AppIntent {
     }
 }
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 struct GetNearestJobSummaryIntent: AppIntent {
     static var openAppWhenRun: Bool = false
     static var title: LocalizedStringResource = "Get Current Job Details"
