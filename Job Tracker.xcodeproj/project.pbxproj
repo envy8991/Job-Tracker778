@@ -88,6 +88,16 @@
 		AA0000000000000000000002 /* Job Tracker Widgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Job Tracker Widgets.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		AA000000000000000000000C /* Exceptions for "Job Tracker Widgets" folder in "Job Tracker Widgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AA0000000000000000000008 /* Job Tracker Widgets */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CD1C8C782E5BBB140001CE7E /* Job Tracker Companion Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -111,6 +121,9 @@
 		};
 		AA0000000000000000000004 /* Job Tracker Widgets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA000000000000000000000C /* Exceptions for "Job Tracker Widgets" folder in "Job Tracker Widgets" target */,
+			);
 			path = "Job Tracker Widgets";
 			sourceTree = "<group>";
 		};
