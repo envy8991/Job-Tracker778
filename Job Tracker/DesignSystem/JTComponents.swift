@@ -5,15 +5,25 @@ private struct JTGlassBackgroundModifier<S: Shape>: ViewModifier {
     let strokeColor: Color
     let strokeWidth: CGFloat
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content
-            .background {
-                shape.fill(.ultraThinMaterial)
-            }
-            .overlay {
-                shape.stroke(strokeColor, lineWidth: strokeWidth)
-            }
-            .clipShape(shape)
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular.interactive(true).tint(strokeColor.opacity(0.16)), in: shape)
+                .overlay {
+                    shape.stroke(strokeColor.opacity(0.9), lineWidth: strokeWidth)
+                }
+                .clipShape(shape)
+        } else {
+            content
+                .background {
+                    shape.fill(.ultraThinMaterial)
+                }
+                .overlay {
+                    shape.stroke(strokeColor, lineWidth: strokeWidth)
+                }
+                .clipShape(shape)
+        }
     }
 }
 

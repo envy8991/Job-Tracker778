@@ -12,7 +12,7 @@ import CoreLocation
 import UIKit
 import MapKit
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 struct DirectionsToNextJobIntent: AppIntent {
     static var title: LocalizedStringResource = "Directions to Next Job"
     static var description = IntentDescription("Opens Maps to your next pending job today.")
@@ -65,7 +65,7 @@ struct DirectionsToNextJobIntent: AppIntent {
 
 
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 struct NextJobAddressIntent: AppIntent {
     static var title: LocalizedStringResource = "Next Job Address"
     static var description = IntentDescription("Speaks the address of your next pending job today.")

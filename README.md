@@ -2,7 +2,7 @@
 
 Job Tracker is a SwiftUI application for fiber technicians and supervisors. It centralizes daily job assignments, collaborative tools, compliance paperwork, and supervisor controls in a single workspace backed by Firebase. The repository also contains a watchOS companion for quick-glance updates and an iMessage extension for sharing assignments in conversation.
 
-The app targets modern Apple platforms (iOS 17+ and watchOS 10+) and leans on Combine, MapKit, and the system share APIs to deliver live collaboration features such as partner chat, location-aware routing, and document exports.
+The app targets the current Apple platform generation (iOS 26+, iPadOS 26+, and watchOS 26+) and leans on Combine, MapKit, Liquid Glass surfaces, adaptive iPad navigation, and the system share APIs to deliver live collaboration features such as partner chat, location-aware routing, and document exports.
 
 ## Feature Highlights
 
@@ -56,7 +56,7 @@ Job Tracker778
 ## Getting Started
 
 1. **Prerequisites**
-   - Xcode 15 or newer.
+   - Xcode 26 or newer with the iOS 26, iPadOS 26, and watchOS 26 SDKs installed.
    - A Firebase project with Firestore, Authentication (email/password), and Storage enabled.
    - Optional: A Gemini API key for Splice Assist.
 
@@ -76,7 +76,7 @@ Job Tracker778
 
 ## Siri / Shortcuts Commands
 
-Job Tracker includes App Intents (iOS 16+) so technicians can run voice commands through Siri or configure automations in the Shortcuts app.
+Job Tracker includes App Intents on the iOS 26 baseline so technicians can run voice commands through Siri or configure automations in the Shortcuts app.
 
 ### Available actions
 
@@ -132,12 +132,12 @@ Automated tests live under `Job TrackerTests`. The suite exercises:
 - Yellow sheet and timesheet PDF generation pipelines.
 - App user decoding, crew-position normalization, and forced-update gating.
 
-The shared `Job Tracker` scheme includes the `Job TrackerTests` bundle through `Job Tracker Safety Net.xctestplan`, which is the baseline for local CI and Xcode Cloud. See [Testing Safety Net](Documentation/TestingSafetyNet.md) for the coverage map and future testing expectations.
+The shared `Job Tracker` scheme includes the `Job TrackerTests` bundle through `Job Tracker Safety Net.xctestplan`, which is the iOS 26 baseline for local CI and Xcode Cloud. See [Testing Safety Net](Documentation/TestingSafetyNet.md) for the coverage map and future testing expectations.
 
 Run the full suite from Xcode (`⌘U`) or via command line:
 
 ```sh
-xcodebuild test -scheme "Job Tracker" -destination 'platform=iOS Simulator,name=iPhone 15'
+xcodebuild test -scheme "Job Tracker" -destination 'platform=iOS Simulator,OS=latest,name=iPhone 15'
 ```
 
 The shared `Job Tracker` scheme includes the `Job TrackerTests` XCTest bundle, so Xcode Cloud can use the same scheme for its Test action. See [Xcode Cloud Testing Setup](Documentation/XcodeCloudTesting.md) for workflow guidance.

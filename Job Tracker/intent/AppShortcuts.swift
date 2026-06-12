@@ -8,7 +8,7 @@
 // AppShortcuts.swift
 import AppIntents
 
-@available(iOS 16.0, *)
+@available(iOS 26.0, *)
 struct JobTrackerShortcuts: AppShortcutsProvider {
     static var shortcutTileColor: ShortcutTileColor = .teal
 
