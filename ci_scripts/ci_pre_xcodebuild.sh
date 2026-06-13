@@ -15,6 +15,83 @@ log() {
   printf '[xcode-cloud-safety-net] %s\n' "$1"
 }
 
+normalize_xcode_cloud_bundle_identifiers() {
+  # Xcode Cloud exposes the selected product bundle ID as CI_BUNDLE_ID. Keep the
+  # checked-out project aligned with that product before xcodebuild runs so every
+  # embedded product uses the required parent-prefix relationship, even if the
+  # App Store Connect workflow points at a product bundle ID that differs from
+  # the repository default.
+  if [ "${CI_XCODE_CLOUD:-}" != "TRUE" ] || [ -z "${CI_BUNDLE_ID:-}" ]; then
+    return 0
+  fi
+
+  log "Normalizing embedded bundle identifiers for Xcode Cloud product ${CI_BUNDLE_ID}."
+  python3 <<'PYNORMALIZE'
+import os
+import re
+from pathlib import Path
+
+project_path = Path("Job Tracker.xcodeproj/project.pbxproj")
+project = project_path.read_text()
+product_bundle_id = os.environ["CI_BUNDLE_ID"]
+
+# Known app/embedded target configuration IDs. Updating these in the temporary
+# Xcode Cloud checkout avoids archive validation failures such as:
+# "Embedded binary's bundle identifier is not prefixed with the parent app's
+# bundle identifier."
+replacements = {
+    # Parent iOS app target.
+    "CDDA112C2D579EC2007BADFF": {
+        "PRODUCT_BUNDLE_IDENTIFIER": product_bundle_id,
+    },
+    "CDDA112D2D579EC2007BADFF": {
+        "PRODUCT_BUNDLE_IDENTIFIER": product_bundle_id,
+    },
+    # watchOS companion app embedded in the iOS app's Watch folder.
+    "CD1C8C832E5BBB150001CE7E": {
+        "PRODUCT_BUNDLE_IDENTIFIER": f"{product_bundle_id}.watchkitapp",
+        "INFOPLIST_KEY_WKCompanionAppBundleIdentifier": product_bundle_id,
+    },
+    "CD1C8C842E5BBB150001CE7E": {
+        "PRODUCT_BUNDLE_IDENTIFIER": f"{product_bundle_id}.watchkitapp",
+        "INFOPLIST_KEY_WKCompanionAppBundleIdentifier": product_bundle_id,
+    },
+    # Widget extension embedded in the iOS app's PlugIns folder.
+    "AA0000000000000000000009": {
+        "PRODUCT_BUNDLE_IDENTIFIER": f"{product_bundle_id}.widgets",
+    },
+    "AA000000000000000000000A": {
+        "PRODUCT_BUNDLE_IDENTIFIER": f"{product_bundle_id}.widgets",
+    },
+}
+
+updated = project
+for config_id, settings in replacements.items():
+    config_pattern = re.compile(
+        rf"({config_id} /\* (?:Debug|Release) \*/ = \{{\n\s+isa = XCBuildConfiguration;\n\s+buildSettings = \{{)(?P<body>.*?)(\n\s+\}};\n\s+name = (?:Debug|Release);\n\s+\}};)",
+        re.S,
+    )
+    match = config_pattern.search(updated)
+    if not match:
+        raise SystemExit(f"Missing expected build configuration {config_id} while normalizing bundle identifiers.")
+
+    body = match.group("body")
+    for key, value in settings.items():
+        escaped = value.replace('"', '\\"')
+        assignment_pattern = re.compile(rf"(\n\s+{re.escape(key)} = )[^;]+;")
+        if assignment_pattern.search(body):
+            body = assignment_pattern.sub(lambda match, escaped=escaped: f'{match.group(1)}"{escaped}";', body, count=1)
+        else:
+            body = f'{body}\n\t\t\t\t{key} = "{escaped}";'
+
+    updated = updated[:match.start()] + match.group(1) + body + match.group(3) + updated[match.end():]
+
+if updated != project:
+    project_path.write_text(updated)
+    print("[xcode-cloud-safety-net] Updated parent app, watch app, and widget extension bundle identifiers for this checkout.")
+PYNORMALIZE
+}
+
 restore_xcode_cloud_archive_graph() {
   # Test actions temporarily remove the embedded watch app from Xcode Cloud's
   # checkout so generic iOS simulator destinations can resolve. Xcode Cloud can
@@ -49,6 +126,7 @@ PYRESTORE
 # Archive. Keep these safety-net checks out of Archive/Build actions so release
 # packaging is not blocked by a test-only guardrail.
 if [ "${CI_XCODE_CLOUD:-}" = "TRUE" ]; then
+  normalize_xcode_cloud_bundle_identifiers
   case "${CI_XCODEBUILD_ACTION:-}" in
     build-for-testing|test|test-without-building)
       ;;
