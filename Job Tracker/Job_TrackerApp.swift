@@ -195,8 +195,15 @@ struct JobTrackerApp: App {
                 guard let route = DeepLinkRouter.handle(url) else { return }
 
                 switch route {
-                case .dashboard, .job(_):
-                    break
+                case .dashboard:
+                    navigationViewModel.navigate(to: .dashboard)
+                case let .job(id):
+                    navigationViewModel.navigate(to: .dashboard)
+                    NotificationCenter.default.post(
+                        name: .jobDeepLinkRequested,
+                        object: nil,
+                        userInfo: ["jobID": id]
+                    )
                 case let .importJob(token):
                     Task {
                         await MainActor.run {

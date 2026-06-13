@@ -27,6 +27,11 @@ final class DeepLinkRouterTests: XCTestCase {
         XCTAssertEqual(DeepLinkRouter.handle(url), .job(id: "job-123"))
     }
 
+    func testHandlesSingleSlashJobURL() throws {
+        let url = try XCTUnwrap(URL(string: "jobtracker:/job?id=job-456"))
+        XCTAssertEqual(DeepLinkRouter.handle(url), .job(id: "job-456"))
+    }
+
     func testRejectsUnknownRoute() throws {
         let url = try XCTUnwrap(URL(string: "jobtracker://help?token=ABC123"))
         XCTAssertNil(DeepLinkRouter.handle(url))
