@@ -20,6 +20,23 @@ struct JobSystemSnapshot: Codable, Hashable {
         }
     }
 
+    struct ArrivalMonitoring: Codable, Hashable {
+        enum State: String, Codable, Hashable {
+            case inactive
+            case active
+            case warning
+            case error
+        }
+
+        var state: State
+        var message: String
+
+        static let inactive = ArrivalMonitoring(
+            state: .inactive,
+            message: "Arrival monitoring is off."
+        )
+    }
+
     var generatedAt: Date
     var selectedDate: Date
     var totalCount: Int
@@ -27,6 +44,7 @@ struct JobSystemSnapshot: Codable, Hashable {
     var completedCount: Int
     var nextJob: Item?
     var activeJob: Item?
+    var arrivalMonitoring: ArrivalMonitoring
     var jobs: [Item]
 
     static let empty = JobSystemSnapshot(
@@ -37,6 +55,7 @@ struct JobSystemSnapshot: Codable, Hashable {
         completedCount: 0,
         nextJob: nil,
         activeJob: nil,
+        arrivalMonitoring: .inactive,
         jobs: []
     )
 }
@@ -46,6 +65,8 @@ struct JobLiveActivityAttributes: ActivityAttributes {
         var status: String
         var etaText: String?
         var distanceText: String?
+        var arrivalMonitoringState: String?
+        var arrivalMonitoringMessage: String?
         var lastUpdated: Date
     }
 
@@ -64,6 +85,9 @@ private enum SharedStore {
         let defaults = UserDefaults(suiteName: appGroupIdentifier) ?? .standard
         guard let data = defaults.data(forKey: snapshotKey),
               let snapshot = try? JSONDecoder.jobTrackerSystemExperiences.decode(JobSystemSnapshot.self, from: data) else {
+            return .empty
+        }
+        if Date().timeIntervalSince(snapshot.generatedAt) > 6 * 60 * 60 {
             return .empty
         }
         return snapshot
@@ -194,9 +218,15 @@ struct CurrentJobWidgetView: View {
                             .lineLimit(1)
                     }
                     Spacer(minLength: 0)
-                    Text("Open Job Tracker")
-                        .font(.caption2.bold())
-                        .foregroundStyle(.tint)
+                    if entry.snapshot.arrivalMonitoring.state == .active {
+                        Label("Monitoring arrivals", systemImage: "location.badge.checkmark")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.green)
+                    } else {
+                        Text("Open Job Tracker")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.tint)
+                    }
                 }
                 .widgetURL(URL(string: "jobtracker://job?id=\(job.id)"))
             } else {
@@ -263,12 +293,17 @@ struct LiveActivityLockScreenView: View {
                 Text(context.attributes.shortAddress)
                     .font(.headline)
                     .lineLimit(1)
-                Text([context.attributes.assignment, context.state.distanceText, context.state.etaText]
-                    .compactMap { $0 }
-                    .joined(separator: " • "))
+                Text(routeStatusText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                if let monitoringMessage = context.state.arrivalMonitoringMessage,
+                   context.state.arrivalMonitoringState == "active" {
+                    Label(monitoringMessage, systemImage: "location.badge.checkmark")
+                        .font(.caption2)
+                        .foregroundStyle(.green)
+                        .lineLimit(1)
+                }
             }
             Spacer()
             Text(context.state.status)
@@ -279,6 +314,13 @@ struct LiveActivityLockScreenView: View {
         }
         .padding()
         .widgetURL(URL(string: "jobtracker://job?id=\(context.attributes.jobID)"))
+    }
+
+    private var routeStatusText: String {
+        let text = [context.attributes.assignment, context.state.distanceText, context.state.etaText]
+            .compactMap { $0 }
+            .joined(separator: " • ")
+        return text.isEmpty ? context.state.status : text
     }
 }
 

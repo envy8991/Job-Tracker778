@@ -16,7 +16,7 @@ final class JobSystemExperienceService {
     func publish(snapshot: JobSystemSnapshot) {
         persist(snapshot)
         WidgetCenter.shared.reloadAllTimelines()
-        Task { await updateLiveActivity(using: snapshot.activeJob ?? snapshot.nextJob) }
+        Task { await updateLiveActivity(using: snapshot.activeJob ?? snapshot.nextJob, monitoring: snapshot.arrivalMonitoring) }
     }
 
     func publish(jobs: [Job], selectedDate: Date, distanceStrings: [String: String] = [:]) {
@@ -26,6 +26,7 @@ final class JobSystemExperienceService {
         let items = dayJobs.map { JobSystemSnapshot.Item(job: $0, distanceText: distanceStrings[$0.id]) }
         let pending = items.filter(\.isPending)
         let completed = max(0, items.count - pending.count)
+        let existingMonitoring = loadSnapshot()?.arrivalMonitoring ?? .inactive
         let snapshot = JobSystemSnapshot(
             generatedAt: Date(),
             selectedDate: selectedDate,
@@ -34,6 +35,7 @@ final class JobSystemExperienceService {
             completedCount: completed,
             nextJob: pending.first ?? items.first,
             activeJob: pending.first,
+            arrivalMonitoring: existingMonitoring,
             jobs: Array(items.prefix(8))
         )
         publish(snapshot: snapshot)
@@ -42,8 +44,37 @@ final class JobSystemExperienceService {
     func publishStatusChange(job: Job, status: String, distanceText: String? = nil) {
         var item = JobSystemSnapshot.Item(job: job, distanceText: distanceText)
         item.status = CrewPosition.statusDisplayName(from: status)
-        Task { await updateLiveActivity(using: item) }
+        Task { await updateLiveActivity(using: item, monitoring: loadSnapshot()?.arrivalMonitoring ?? .inactive) }
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    func publishArrivalMonitoring(state: JobSystemSnapshot.ArrivalMonitoring.State, message: String) {
+        let monitoring = JobSystemSnapshot.ArrivalMonitoring(state: state, message: message)
+        var snapshot = loadSnapshot() ?? .empty
+        snapshot.arrivalMonitoring = monitoring
+        snapshot.generatedAt = Date()
+        persist(snapshot)
+        WidgetCenter.shared.reloadAllTimelines()
+        Task { await updateLiveActivity(using: snapshot.activeJob ?? snapshot.nextJob, monitoring: monitoring) }
+    }
+
+    func clearSensitiveSystemExperienceData() {
+        let defaults = UserDefaults(suiteName: Self.appGroupIdentifier) ?? .standard
+        defaults.removeObject(forKey: Self.snapshotKey)
+        defaults.synchronize()
+        WidgetCenter.shared.reloadAllTimelines()
+        Task {
+            for activity in Activity<JobLiveActivityAttributes>.activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+            activeActivityID = nil
+        }
+    }
+
+    private func loadSnapshot() -> JobSystemSnapshot? {
+        let defaults = UserDefaults(suiteName: Self.appGroupIdentifier) ?? .standard
+        guard let data = defaults.data(forKey: Self.snapshotKey) else { return nil }
+        return try? JSONDecoder.jobTrackerSystemExperiences.decode(JobSystemSnapshot.self, from: data)
     }
 
     private func persist(_ snapshot: JobSystemSnapshot) {
@@ -52,7 +83,10 @@ final class JobSystemExperienceService {
         defaults.set(data, forKey: Self.snapshotKey)
     }
 
-    private func updateLiveActivity(using item: JobSystemSnapshot.Item?) async {
+    private func updateLiveActivity(
+        using item: JobSystemSnapshot.Item?,
+        monitoring: JobSystemSnapshot.ArrivalMonitoring = .inactive
+    ) async {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         let existing = Activity<JobLiveActivityAttributes>.activities.first
         guard let item else {
@@ -67,6 +101,8 @@ final class JobSystemExperienceService {
             status: item.status,
             etaText: nil,
             distanceText: item.distanceText,
+            arrivalMonitoringState: monitoring.state.rawValue,
+            arrivalMonitoringMessage: monitoring.message,
             lastUpdated: Date()
         )
 
@@ -96,6 +132,14 @@ final class JobSystemExperienceService {
             print("[SystemExperiences] Live Activity request failed: \(error.localizedDescription)")
             #endif
         }
+    }
+}
+
+private extension JSONDecoder {
+    static var jobTrackerSystemExperiences: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }
 }
 

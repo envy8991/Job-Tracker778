@@ -6,6 +6,8 @@ struct JobLiveActivityAttributes: ActivityAttributes {
         var status: String
         var etaText: String?
         var distanceText: String?
+        var arrivalMonitoringState: String?
+        var arrivalMonitoringMessage: String?
         var lastUpdated: Date
     }
 

@@ -17,6 +17,23 @@ struct JobSystemSnapshot: Codable, Hashable {
         }
     }
 
+    struct ArrivalMonitoring: Codable, Hashable {
+        enum State: String, Codable, Hashable {
+            case inactive
+            case active
+            case warning
+            case error
+        }
+
+        var state: State
+        var message: String
+
+        static let inactive = ArrivalMonitoring(
+            state: .inactive,
+            message: "Arrival monitoring is off."
+        )
+    }
+
     var generatedAt: Date
     var selectedDate: Date
     var totalCount: Int
@@ -24,6 +41,7 @@ struct JobSystemSnapshot: Codable, Hashable {
     var completedCount: Int
     var nextJob: Item?
     var activeJob: Item?
+    var arrivalMonitoring: ArrivalMonitoring
     var jobs: [Item]
 
     static let empty = JobSystemSnapshot(
@@ -34,6 +52,7 @@ struct JobSystemSnapshot: Codable, Hashable {
         completedCount: 0,
         nextJob: nil,
         activeJob: nil,
+        arrivalMonitoring: .inactive,
         jobs: []
     )
 }
