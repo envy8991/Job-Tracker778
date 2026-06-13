@@ -104,6 +104,7 @@ private let jobPlacementChoices = ["OH", "UG"]
     @State private var housePhotoImage: UIImage?
     @State private var nidPhotoImage: UIImage?
     @State private var canPhotoImage: UIImage?
+    @State private var locallyRestoredPhotoSlots = Set<JobPhotoSlot>()
 
     // Full-screen viewer state
     @State private var fullScreenImageURL: URL? = nil
@@ -405,10 +406,13 @@ private let jobPlacementChoices = ["OH", "UG"]
                             switch activePhotoSlot {
                             case .house:
                                 housePhotoImage = newImage
+                                locallyRestoredPhotoSlots.remove(.house)
                             case .nid:
                                 nidPhotoImage = newImage
+                                locallyRestoredPhotoSlots.remove(.nid)
                             case .can:
                                 canPhotoImage = newImage
+                                locallyRestoredPhotoSlots.remove(.can)
                             case .none:
                                 break
                             }
@@ -488,6 +492,7 @@ private let jobPlacementChoices = ["OH", "UG"]
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     disableSuggestions = false
                 }
+                restoreQueuedLocalPhotos()
                 // Initialize editable fields
                 let displayStatus = CrewPosition.statusDisplayName(from: job.status)
                 editedStatus = displayStatus
@@ -990,12 +995,29 @@ extension JobDetailView {
         }
     }
 
+    private func restoreQueuedLocalPhotos() {
+        let queue = JobPhotoUploadQueue.shared
+        if housePhotoImage == nil, let image = queue.localImage(for: job.id, slot: .house) {
+            housePhotoImage = image
+            locallyRestoredPhotoSlots.insert(.house)
+        }
+        if nidPhotoImage == nil, let image = queue.localImage(for: job.id, slot: .nid) {
+            nidPhotoImage = image
+            locallyRestoredPhotoSlots.insert(.nid)
+        }
+        if canPhotoImage == nil, let image = queue.localImage(for: job.id, slot: .can) {
+            canPhotoImage = image
+            locallyRestoredPhotoSlots.insert(.can)
+        }
+    }
+
     private func enqueuePendingPhotosIfNeeded() {
         let pending: [(slot: JobPhotoSlot, image: UIImage)] = [
             housePhotoImage.map { (.house, $0) },
             nidPhotoImage.map { (.nid, $0) },
             canPhotoImage.map { (.can, $0) }
         ].compactMap { $0 }
+            .filter { !locallyRestoredPhotoSlots.contains($0.slot) }
 
         guard !pending.isEmpty else { return }
         savingProgress = 0.42

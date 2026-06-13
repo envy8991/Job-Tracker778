@@ -13,6 +13,9 @@ struct DashboardSyncDetailsSheet: View {
     private var failedPhotoStatuses: [JobPhotoUploadStatus] {
         activePhotoStatuses.filter { $0.state == .failed }
     }
+    private var locallyStoredPhotoStatuses: [JobPhotoUploadStatus] {
+        activePhotoStatuses.filter { $0.state == .storedLocally }
+    }
 
     var body: some View {
         NavigationStack {
@@ -35,12 +38,12 @@ struct DashboardSyncDetailsSheet: View {
                     }
                 }
 
-                if !failedPhotoStatuses.isEmpty {
+                if !failedPhotoStatuses.isEmpty || !locallyStoredPhotoStatuses.isEmpty {
                     Section("Recovery") {
                         Button {
                             photoUploadQueue.retryFailedUploads()
                         } label: {
-                            Label("Retry all failed uploads", systemImage: "arrow.clockwise")
+                            Label("Retry all photo uploads", systemImage: "arrow.clockwise")
                         }
                     }
                 }
@@ -67,6 +70,8 @@ private struct DashboardPhotoUploadStatusRow: View {
             return "arrow.clockwise.circle"
         case .failed:
             return "exclamationmark.triangle.fill"
+        case .storedLocally:
+            return "externaldrive.badge.checkmark"
         }
     }
 
@@ -76,7 +81,7 @@ private struct DashboardPhotoUploadStatusRow: View {
             return .orange
         case .uploading:
             return .accentColor
-        case .waitingForNetwork:
+        case .waitingForNetwork, .storedLocally:
             return .secondary
         default:
             return .secondary
@@ -104,7 +109,7 @@ private struct DashboardPhotoUploadStatusRow: View {
                 Spacer(minLength: 0)
             }
 
-            if status.state == .failed {
+            if status.state == .failed || status.state == .storedLocally {
                 HStack {
                     Button("Retry") { photoUploadQueue.retryUpload(id: status.id) }
                         .buttonStyle(.borderedProminent)
