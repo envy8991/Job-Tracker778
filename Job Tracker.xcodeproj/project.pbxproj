@@ -243,7 +243,7 @@
 			);
 			productName = "Job Tracker Companion Watch App";
 			productReference = CD1C8C772E5BBB140001CE7E /* Job Tracker Companion Watch App.app */;
-			productType = "com.apple.product-type.application";
+			productType = "com.apple.product-type.application.watchapp2";
 		};
 		CDDA111C2D579EC0007BADFF /* Job Tracker */ = {
 			isa = PBXNativeTarget;
@@ -843,7 +843,7 @@
 					"@loader_path/Frameworks",
 				);
 				MARKETING_VERSION = 3.0.2;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.quinton.Job-Tracker-CS25Tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.quinton.Job-Tracker-CS25.tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -869,7 +869,7 @@
 					"@loader_path/Frameworks",
 				);
 				MARKETING_VERSION = 3.0.2;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.quinton.Job-Tracker-CS25Tests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.quinton.Job-Tracker-CS25.tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -889,7 +889,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 3.0.2;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.quinton.Job-Tracker-CS25UITests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.quinton.Job-Tracker-CS25.ui-tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -909,7 +909,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 3.0.2;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.quinton.Job-Tracker-CS25UITests";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.quinton.Job-Tracker-CS25.ui-tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
