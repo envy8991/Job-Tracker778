@@ -33,7 +33,7 @@ struct AddMetaSmartGlassesJobNoteIntent: AppIntent {
     var details: String
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Add \(AddMetaSmartGlassesJobNoteIntent.$evidenceType) note: \(AddMetaSmartGlassesJobNoteIntent.$details)")
+        Summary("Add \(\AddMetaSmartGlassesJobNoteIntent.$evidenceType) note: \(\AddMetaSmartGlassesJobNoteIntent.$details)")
     }
 
     func perform() async throws -> some ProvidesDialog {
