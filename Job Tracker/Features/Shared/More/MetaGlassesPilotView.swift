@@ -1,8 +1,32 @@
 import SwiftUI
 
 struct MetaGlassesPilotView: View {
-    private let useCases = MetaGlassesUseCase.all
+    @State private var selectedWorkflow: MetaGlassesWorkflow = .jobPhotoCapture
+    @State private var isGlassesConnected = false
+    @State private var isJobLinked = true
+    @State private var isConsentConfirmed = false
+
+    private let benefits = MetaGlassesBenefit.all
+    private let workflows = MetaGlassesWorkflow.allCases
     private let checklist = MetaGlassesPilotChecklistItem.all
+
+    private var pilotReadiness: Double {
+        let completed = [isGlassesConnected, isJobLinked, isConsentConfirmed].filter { $0 }.count
+        return Double(completed) / 3.0
+    }
+
+    private var readinessLabel: String {
+        if pilotReadiness == 1.0 {
+            return "Ready for a controlled field pilot"
+        }
+        if pilotReadiness >= 2.0 / 3.0 {
+            return "Almost ready"
+        }
+        if pilotReadiness >= 1.0 / 3.0 {
+            return "Needs setup"
+        }
+        return "Start with policy and device setup"
+    }
 
     var body: some View {
         ZStack {
@@ -10,7 +34,9 @@ struct MetaGlassesPilotView: View {
 
             List {
                 heroSection
-                useCaseSection
+                benefitSection
+                workflowSection
+                readinessSection
                 setupSection
                 privacySection
             }
@@ -42,12 +68,58 @@ struct MetaGlassesPilotView: View {
         .listRowBackground(JTColors.glassHighlight)
     }
 
-    private var useCaseSection: some View {
-        Section("Useful Job Tracker pilots") {
-            ForEach(useCases) { useCase in
-                MetaGlassesUseCaseRow(useCase: useCase)
+    private var benefitSection: some View {
+        Section("How this helps technicians") {
+            ForEach(benefits) { benefit in
+                MetaGlassesBenefitRow(benefit: benefit)
             }
         }
+    }
+
+    private var workflowSection: some View {
+        Section("Prototype workflow") {
+            Picker("Workflow", selection: $selectedWorkflow) {
+                ForEach(workflows) { workflow in
+                    Label(workflow.title, systemImage: workflow.systemImage)
+                        .tag(workflow)
+                }
+            }
+            .pickerStyle(.menu)
+
+            MetaGlassesWorkflowCard(workflow: selectedWorkflow)
+        }
+    }
+
+    private var readinessSection: some View {
+        Section("Pilot readiness") {
+            VStack(alignment: .leading, spacing: JTSpacing.sm) {
+                HStack {
+                    Text(readinessLabel)
+                        .font(JTTypography.subheadline.weight(.semibold))
+                        .foregroundStyle(JTColors.textPrimary)
+                    Spacer()
+                    Text(pilotReadiness, format: .percent.precision(.fractionLength(0)))
+                        .font(JTTypography.caption.weight(.bold))
+                        .foregroundStyle(readinessTint)
+                }
+
+                ProgressView(value: pilotReadiness)
+                    .tint(readinessTint)
+            }
+            .padding(.vertical, JTSpacing.xs)
+
+            Toggle("Glasses paired with the tester's phone", isOn: $isGlassesConnected)
+            Toggle("Active job selected in Job Tracker", isOn: $isJobLinked)
+            Toggle("Camera and microphone consent confirmed", isOn: $isConsentConfirmed)
+        }
+        .font(JTTypography.caption)
+        .foregroundStyle(JTColors.textSecondary)
+    }
+
+    private var readinessTint: Color {
+        if pilotReadiness == 1.0 { return JTColors.success }
+        if pilotReadiness >= 2.0 / 3.0 { return JTColors.warning }
+        return JTColors.accent
     }
 
     private var setupSection: some View {
@@ -82,67 +154,151 @@ struct MetaGlassesPilotView: View {
     }
 }
 
-private struct MetaGlassesUseCaseRow: View {
-    let useCase: MetaGlassesUseCase
+private struct MetaGlassesBenefitRow: View {
+    let benefit: MetaGlassesBenefit
 
     var body: some View {
-        VStack(alignment: .leading, spacing: JTSpacing.xs) {
-            HStack(alignment: .firstTextBaseline) {
-                Label(useCase.title, systemImage: useCase.systemImage)
-                    .font(JTTypography.subheadline.weight(.semibold))
-                    .foregroundStyle(JTColors.textPrimary)
-                Spacer()
-                Text(useCase.priority)
-                    .font(JTTypography.caption.weight(.semibold))
-                    .foregroundStyle(useCase.tint)
-            }
+        HStack(alignment: .top, spacing: JTSpacing.sm) {
+            Image(systemName: benefit.systemImage)
+                .foregroundStyle(benefit.tint)
+                .frame(width: 24)
 
-            Text(useCase.detail)
-                .font(JTTypography.caption)
-                .foregroundStyle(JTColors.textSecondary)
+            VStack(alignment: .leading, spacing: JTSpacing.xs) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(benefit.title)
+                        .font(JTTypography.subheadline.weight(.semibold))
+                        .foregroundStyle(JTColors.textPrimary)
+                    Spacer()
+                    Text(benefit.impact)
+                        .font(JTTypography.caption.weight(.semibold))
+                        .foregroundStyle(benefit.tint)
+                }
+
+                Text(benefit.detail)
+                    .font(JTTypography.caption)
+                    .foregroundStyle(JTColors.textSecondary)
+            }
         }
         .padding(.vertical, JTSpacing.xs)
     }
 }
 
-private struct MetaGlassesUseCase: Identifiable {
+private struct MetaGlassesWorkflowCard: View {
+    let workflow: MetaGlassesWorkflow
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: JTSpacing.sm) {
+            Label(workflow.title, systemImage: workflow.systemImage)
+                .font(JTTypography.subheadline.weight(.semibold))
+                .foregroundStyle(JTColors.textPrimary)
+
+            Text(workflow.userBenefit)
+                .font(JTTypography.caption)
+                .foregroundStyle(JTColors.textSecondary)
+
+            Divider()
+
+            ForEach(workflow.steps, id: \.self) { step in
+                Label(step, systemImage: "checkmark.circle")
+                    .font(JTTypography.caption)
+                    .foregroundStyle(JTColors.textSecondary)
+            }
+        }
+        .padding(.vertical, JTSpacing.xs)
+    }
+}
+
+private struct MetaGlassesBenefit: Identifiable {
     let id = UUID()
     let title: String
     let detail: String
     let systemImage: String
-    let priority: String
+    let impact: String
     let tint: Color
 
-    static let all: [MetaGlassesUseCase] = [
-        MetaGlassesUseCase(
-            title: "Job photo capture",
-            detail: "Attach hands-free POV photos to the current job for before/after proof, pole tags, splice trays, and damage evidence.",
-            systemImage: "camera.viewfinder",
-            priority: "High",
+    static let all: [MetaGlassesBenefit] = [
+        MetaGlassesBenefit(
+            title: "Less phone handling",
+            detail: "Technicians can keep gloves on and continue working while documenting pole tags, splice trays, and job progress.",
+            systemImage: "hand.tap",
+            impact: "High",
             tint: JTColors.success
         ),
-        MetaGlassesUseCase(
-            title: "Live splice assistance",
-            detail: "Feed the glasses view into Splice Assist so a tech can ask for fiber identification, safety reminders, or next-step guidance without picking up the phone.",
-            systemImage: "wand.and.stars.inverse",
-            priority: "High",
+        MetaGlassesBenefit(
+            title: "Cleaner job records",
+            detail: "POV media can be attached to the active job immediately, reducing missing before/after photos and end-of-day admin cleanup.",
+            systemImage: "folder.badge.plus",
+            impact: "High",
             tint: JTColors.success
         ),
-        MetaGlassesUseCase(
-            title: "Voice notes for timesheets",
-            detail: "Record quick completion notes, material usage, blockers, or arrival/departure context through the glasses microphones.",
-            systemImage: "waveform",
-            priority: "Medium",
+        MetaGlassesBenefit(
+            title: "Faster assist requests",
+            detail: "A captured view can become the input for Splice Assist or a supervisor review without asking the technician to stop and re-frame the scene on a phone.",
+            systemImage: "person.wave.2",
+            impact: "Medium",
             tint: JTColors.warning
         ),
-        MetaGlassesUseCase(
-            title: "Audio job prompts",
-            detail: "Play turn-by-turn job prompts, safety checklists, or assignment updates through the glasses speakers while the phone stays pocketed.",
+        MetaGlassesBenefit(
+            title: "Safer audio prompts",
+            detail: "Route summaries, checklist reminders, and assignment updates can be played through glasses speakers so the phone stays pocketed.",
             systemImage: "speaker.wave.2",
-            priority: "Medium",
+            impact: "Medium",
             tint: JTColors.warning
         )
     ]
+}
+
+private enum MetaGlassesWorkflow: String, CaseIterable, Identifiable {
+    case jobPhotoCapture
+    case spliceAssist
+    case voiceTimesheet
+    case audioPrompts
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .jobPhotoCapture: return "Job photo capture"
+        case .spliceAssist: return "Live Splice Assist"
+        case .voiceTimesheet: return "Voice timesheet notes"
+        case .audioPrompts: return "Audio job prompts"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .jobPhotoCapture: return "camera.viewfinder"
+        case .spliceAssist: return "wand.and.stars.inverse"
+        case .voiceTimesheet: return "waveform"
+        case .audioPrompts: return "speaker.wave.2"
+        }
+    }
+
+    var userBenefit: String {
+        switch self {
+        case .jobPhotoCapture:
+            return "Capture proof while the work is happening and save it against the current job before the technician leaves the site."
+        case .spliceAssist:
+            return "Use the glasses view as context for fiber identification, troubleshooting, and supervisor escalation."
+        case .voiceTimesheet:
+            return "Dictate materials, blockers, and completion notes in the moment so the weekly timesheet is easier to finish."
+        case .audioPrompts:
+            return "Hear next steps, safety reminders, and route changes without unlocking the phone."
+        }
+    }
+
+    var steps: [String] {
+        switch self {
+        case .jobPhotoCapture:
+            return ["Confirm the active job", "Capture POV photo or clip", "Attach media to job history"]
+        case .spliceAssist:
+            return ["Stream or capture the splice view", "Send the image to Splice Assist", "Show or read back the recommended next step"]
+        case .voiceTimesheet:
+            return ["Record short field note", "Transcribe and tag it to the job", "Offer it during timesheet review"]
+        case .audioPrompts:
+            return ["Detect next job or checklist step", "Prepare concise audio prompt", "Play through glasses speakers"]
+        }
+    }
 }
 
 private struct MetaGlassesPilotChecklistItem: Identifiable {
