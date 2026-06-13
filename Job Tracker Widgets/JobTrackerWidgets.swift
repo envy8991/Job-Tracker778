@@ -77,6 +77,24 @@ struct JobLiveActivityAttributes: ActivityAttributes {
     var scheduledDate: Date
 }
 
+private enum WidgetDeepLink {
+    static func dashboard() -> URL {
+        URL(string: "jobtracker://dashboard")!
+    }
+
+    static func job(_ id: String) -> URL {
+        let encodedID = id.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? id
+        return URL(string: "jobtracker://job?id=\(encodedID)") ?? dashboard()
+    }
+
+    static func directions(to address: String) -> URL {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=?")
+        let encodedAddress = address.addingPercentEncoding(withAllowedCharacters: allowed) ?? address
+        return URL(string: "https://maps.apple.com/?daddr=\(encodedAddress)&dirflg=d") ?? dashboard()
+    }
+}
+
 private enum SharedStore {
     static let appGroupIdentifier = "group.com.quinton.Job-Tracker-CS25"
     static let snapshotKey = "com.jobtracker.systemExperiences.snapshot"
@@ -131,9 +149,7 @@ struct OpenWidgetJobIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & OpensIntent {
-        let encodedID = jobID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? jobID
-        let url = URL(string: "jobtracker://job?id=\(encodedID)") ?? URL(string: "jobtracker://dashboard")!
-        return .result(opensIntent: OpenURLIntent(url))
+        return .result(opensIntent: OpenURLIntent(WidgetDeepLink.job(jobID)))
     }
 }
 
@@ -143,7 +159,7 @@ struct OpenDashboardWidgetIntent: AppIntent {
     static var openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult & OpensIntent {
-        return .result(opensIntent: OpenURLIntent(URL(string: "jobtracker://dashboard")!))
+        return .result(opensIntent: OpenURLIntent(WidgetDeepLink.dashboard()))
     }
 }
 
@@ -164,9 +180,7 @@ struct OpenWidgetDirectionsIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & OpensIntent {
-        let encodedAddress = address.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? address
-        let url = URL(string: "http://maps.apple.com/?daddr=\(encodedAddress)&dirflg=d") ?? URL(string: "jobtracker://dashboard")!
-        return .result(opensIntent: OpenURLIntent(url))
+        return .result(opensIntent: OpenURLIntent(WidgetDeepLink.directions(to: address)))
     }
 }
 
@@ -238,7 +252,7 @@ struct TodayJobsWidgetView: View {
                     .contentTransition(.numericText())
                 Text("left")
                     .font(.caption.bold())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.72))
             }
             progressBar
             if let next = entry.snapshot.nextJob {
@@ -247,7 +261,7 @@ struct TodayJobsWidgetView: View {
                 emptyState
             }
         }
-        .widgetURL(URL(string: "jobtracker://dashboard"))
+        .widgetURL(WidgetDeepLink.dashboard())
     }
 
     private var mediumBody: some View {
@@ -258,7 +272,7 @@ struct TodayJobsWidgetView: View {
                     .font(.title2.bold())
                 Text("\(entry.snapshot.completedCount) done • \(entry.snapshot.totalCount) total")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.72))
                 progressBar
                 arrivalMonitoringBadge
             }
@@ -268,14 +282,13 @@ struct TodayJobsWidgetView: View {
                 if let next = entry.snapshot.nextJob {
                     Text("NEXT STOP")
                         .font(.caption2.bold())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.72))
                     nextStopSummary(next)
                     VStack(spacing: 4) {
                         ForEach(Array(entry.snapshot.jobs.prefix(3))) { job in
-                            Button(intent: OpenWidgetJobIntent(jobID: job.id)) {
+                            Link(destination: WidgetDeepLink.job(job.id)) {
                                 jobQueueRow(job)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 } else {
@@ -284,7 +297,7 @@ struct TodayJobsWidgetView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .widgetURL(URL(string: "jobtracker://dashboard"))
+        .widgetURL(WidgetDeepLink.dashboard())
     }
 
     private var accessoryBody: some View {
@@ -295,12 +308,12 @@ struct TodayJobsWidgetView: View {
                     .font(.headline)
                 Text(entry.snapshot.nextJob?.shortAddress ?? "All caught up")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.72))
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
         }
-        .widgetURL(URL(string: "jobtracker://dashboard"))
+        .widgetURL(WidgetDeepLink.dashboard())
     }
 
     private func jobQueueRow(_ job: JobSystemSnapshot.Item) -> some View {
@@ -314,13 +327,13 @@ struct TodayJobsWidgetView: View {
                     .lineLimit(1)
                 Text([job.scheduledDate.formatted(date: .omitted, time: .shortened), job.assignment, job.distanceText].compactMap { $0 }.joined(separator: " • "))
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.72))
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
             Image(systemName: "chevron.forward")
                 .font(.caption2.bold())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.72))
         }
         .contentShape(Rectangle())
     }
@@ -332,7 +345,7 @@ struct TodayJobsWidgetView: View {
             Spacer(minLength: 0)
             Text(entry.snapshot.generatedAt, style: .time)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.72))
         }
     }
 
@@ -372,7 +385,7 @@ struct TodayJobsWidgetView: View {
                 .lineLimit(2)
             Text([job.assignment, job.distanceText, job.jobNumber].compactMap { $0 }.joined(separator: " • "))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.72))
                 .lineLimit(1)
         }
     }
@@ -385,7 +398,7 @@ struct TodayJobsWidgetView: View {
                 .font(.headline)
             Text("No pending jobs for this day")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.72))
         }
     }
 }
@@ -432,13 +445,13 @@ struct CurrentJobWidgetView: View {
                 .lineLimit(2)
             Text(primaryDetailText(for: job))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.72))
                 .lineLimit(2)
             notesPreview(job)
             Spacer(minLength: 0)
             actionButtons(for: job, compact: true)
         }
-        .widgetURL(URL(string: "jobtracker://job?id=\(job.id)"))
+        .widgetURL(WidgetDeepLink.job(job.id))
     }
 
     private func mediumBody(_ job: JobSystemSnapshot.Item) -> some View {
@@ -450,7 +463,7 @@ struct CurrentJobWidgetView: View {
                     .lineLimit(2)
                 Text([job.assignment, job.jobNumber].compactMap { $0 }.joined(separator: " • "))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.72))
                     .lineLimit(1)
                 notesPreview(job)
                 actionButtons(for: job, compact: false)
@@ -458,38 +471,40 @@ struct CurrentJobWidgetView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 7) {
-                metricTile(icon: "point.topleft.down.curvedto.point.bottomright.up", title: "Distance", value: job.distanceText ?? "Open map")
+                Link(destination: WidgetDeepLink.directions(to: job.address)) {
+                    metricTile(icon: "point.topleft.down.curvedto.point.bottomright.up", title: "Distance", value: job.distanceText ?? "Open map")
+                }
                 metricTile(icon: "clock", title: "Scheduled", value: job.scheduledDate.formatted(.dateTime.hour().minute()))
                 metricTile(icon: "number", title: "Job #", value: job.jobNumber ?? "Not set")
                 metricTile(icon: "bell.badge", title: "Alerts", value: alertSummary)
             }
             .frame(width: 125)
         }
-        .widgetURL(URL(string: "jobtracker://job?id=\(job.id)"))
+        .widgetURL(WidgetDeepLink.job(job.id))
     }
 
     private func accessoryBody(_ job: JobSystemSnapshot.Item) -> some View {
         HStack(spacing: 8) {
             Image(systemName: entry.snapshot.arrivalMonitoring.state == .active ? "location.badge.checkmark" : "location.fill")
-                .foregroundStyle(statusColor)
+                .foregroundStyle(.white)
             VStack(alignment: .leading, spacing: 1) {
                 Text(job.shortAddress)
                     .font(.headline)
                     .lineLimit(1)
                 Text([job.status, job.distanceText].compactMap { $0 }.joined(separator: " • "))
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.72))
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
         }
-        .widgetURL(URL(string: "jobtracker://job?id=\(job.id)"))
+        .widgetURL(WidgetDeepLink.job(job.id))
     }
 
     private func statusPill(_ job: JobSystemSnapshot.Item) -> some View {
         Label(job.status, systemImage: job.isPending ? "figure.walk" : "checkmark.circle.fill")
             .font(.caption.bold())
-            .foregroundStyle(statusColor)
+            .foregroundStyle(.white)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(statusColor.opacity(0.16), in: Capsule())
@@ -499,11 +514,11 @@ struct CurrentJobWidgetView: View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .frame(width: 18)
-                .foregroundStyle(statusColor)
+                .foregroundStyle(.white)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.72))
                 Text(value)
                     .font(.caption.bold())
                     .lineLimit(1)
@@ -524,30 +539,48 @@ struct CurrentJobWidgetView: View {
         if let notes = job.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
             Label(notes, systemImage: "note.text")
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.72))
                 .lineLimit(2)
         }
     }
 
     private func actionButtons(for job: JobSystemSnapshot.Item, compact: Bool) -> some View {
         HStack(spacing: 6) {
-            Button(intent: OpenWidgetJobIntent(jobID: job.id)) {
-                Label(compact ? "Open" : "Open job", systemImage: "arrow.up.forward.app")
-                    .lineLimit(1)
-            }
-            Button(intent: OpenWidgetDirectionsIntent(address: job.address)) {
-                Label(compact ? "Route" : "Directions", systemImage: "map")
-                    .lineLimit(1)
-            }
+            widgetActionLink(
+                title: compact ? "Open" : "Open job",
+                systemImage: "arrow.up.forward.app",
+                destination: WidgetDeepLink.job(job.id)
+            )
+            widgetActionLink(
+                title: compact ? "Route" : "Directions",
+                systemImage: "map",
+                destination: WidgetDeepLink.directions(to: job.address)
+            )
             if !compact {
-                Button(intent: OpenDashboardWidgetIntent()) {
-                    Label("Today", systemImage: "rectangle.grid.2x2")
-                        .lineLimit(1)
-                }
+                widgetActionLink(
+                    title: "Today",
+                    systemImage: "rectangle.grid.2x2",
+                    destination: WidgetDeepLink.dashboard()
+                )
             }
         }
         .font(.caption2.bold())
-        .buttonStyle(.bordered)
+    }
+
+    private func widgetActionLink(title: String, systemImage: String, destination: URL) -> some View {
+        Link(destination: destination) {
+            Label(title, systemImage: systemImage)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .frame(maxWidth: .infinity)
+                .background(.black.opacity(0.24), in: Capsule())
+                .overlay(
+                    Capsule().strokeBorder(.white.opacity(0.35), lineWidth: 1)
+                )
+        }
     }
 
     private var alertSummary: String {
@@ -568,13 +601,13 @@ struct CurrentJobWidgetView: View {
                 .font(.headline)
             Text("No active or pending job")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.72))
             Spacer(minLength: 0)
             Text("Updated \(entry.snapshot.generatedAt.formatted(date: .omitted, time: .shortened))")
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.72))
         }
-        .widgetURL(URL(string: "jobtracker://dashboard"))
+        .widgetURL(WidgetDeepLink.dashboard())
     }
 }
 
@@ -592,7 +625,7 @@ struct JobLiveActivityWidget: Widget {
                             .font(.caption.bold())
                         Text(context.attributes.scheduledDate, style: .time)
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.72))
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
@@ -601,7 +634,7 @@ struct JobLiveActivityWidget: Widget {
                             .font(.caption.bold())
                         Text(context.state.lastUpdated, style: .time)
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.72))
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
@@ -612,7 +645,7 @@ struct JobLiveActivityWidget: Widget {
                         HStack(spacing: 8) {
                             Text(context.attributes.assignment ?? context.attributes.jobNumber ?? "Open Job Tracker")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.72))
                                 .lineLimit(1)
                             Spacer(minLength: 0)
                             Label(liveActivityAlertText(for: context), systemImage: "bell.badge")
@@ -632,7 +665,7 @@ struct JobLiveActivityWidget: Widget {
                 Image(systemName: liveActivityIcon(for: context))
                     .foregroundStyle(liveActivityTint(for: context))
             }
-            .widgetURL(URL(string: "jobtracker://job?id=\(context.attributes.jobID)"))
+            .widgetURL(WidgetDeepLink.job(context.attributes.jobID))
         }
     }
 }
@@ -654,7 +687,7 @@ struct LiveActivityLockScreenView: View {
                         .lineLimit(1)
                     Text(routeStatusText)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.72))
                         .lineLimit(1)
                 }
                 Spacer()
@@ -673,10 +706,10 @@ struct LiveActivityLockScreenView: View {
                 Text("Updated \(context.state.lastUpdated.formatted(date: .omitted, time: .shortened))")
             }
             .font(.caption2.bold())
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.white.opacity(0.72))
         }
         .padding()
-        .widgetURL(URL(string: "jobtracker://job?id=\(context.attributes.jobID)"))
+        .widgetURL(WidgetDeepLink.job(context.attributes.jobID))
     }
 
     private var routeStatusText: String {
