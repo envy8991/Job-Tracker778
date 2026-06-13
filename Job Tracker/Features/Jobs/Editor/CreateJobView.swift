@@ -110,8 +110,8 @@ final class AddressSearchCompleter: NSObject, ObservableObject, MKLocalSearchCom
             let request = MKLocalSearch.Request(completion: item)
             let search = MKLocalSearch(request: request)
             search.start { [weak self] response, _ in
-                guard let coordinate = response?.mapItems.first?.placemark.location else { return }
-                let meters = coordinate.distance(from: userLocation)
+                guard let coordinate = response?.mapItems.compactMap(MapKitGeocoding.coordinate(for:)).first else { return }
+                let meters = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude).distance(from: userLocation)
                 let miles = meters / 1609.344
                 DispatchQueue.main.async {
                     self?.distances[key] = miles
@@ -330,7 +330,7 @@ struct CreateJobView: View {
                                         .keyboardType(.decimalPad)
                                         .textInputAutocapitalization(.never)
                                         .focused($isAssignmentsFocused)
-                                        .onChange(of: assignmentsText) { newValue in
+                                        .onChange(of: assignmentsText) { _, newValue in
                                             assignmentsText = sanitizeAssignmentTyping(newValue)
                                         }
                                         .padding(12)
@@ -439,13 +439,13 @@ struct CreateJobView: View {
                     }
                 }
             }
-            .onChange(of: addressSearch.results) { _ in
+            .onChange(of: addressSearch.results) { _, _ in
                 addressSearch.updateDistances(from: locationProvider.location)
             }
-            .onChange(of: locationProvider.location) { _ in
+            .onChange(of: locationProvider.location) { _, _ in
                 addressSearch.updateDistances(from: locationProvider.location)
             }
-            .onChange(of: focusedAddressID) { newValue in
+            .onChange(of: focusedAddressID) { _, newValue in
                 guard let newValue else {
                     addressSearch.results = []
                     return
@@ -501,8 +501,6 @@ struct CreateJobView: View {
         let portalIDValue = Job.normalizedPortalID(from: portalID)
         let locationNumberValue = Job.normalizedLocationNumber(from: locationNumber)
 
-        let geocoder = CLGeocoder()
-
         func processAddress(at index: Int) {
             if index >= addressesToSave.count {
                 DispatchQueue.main.async { dismiss() }
@@ -510,8 +508,8 @@ struct CreateJobView: View {
             }
 
             let currentAddress = addressesToSave[index]
-            geocoder.geocodeAddressString(currentAddress) { placemarks, _ in
-                let coord = placemarks?.first?.location?.coordinate
+            Task {
+                let coord = await MapKitGeocoding.coordinate(for: currentAddress)
 
                 let job = Job(
                     address: currentAddress,

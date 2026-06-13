@@ -238,7 +238,7 @@ struct JobTrackerApp: App {
                 PhoneWatchSyncManager.shared.pushSnapshotToWatch()
             }
             // Switch location strategy based on lifecycle
-            .onChange(of: scenePhase) { phase in
+            .onChange(of: scenePhase) { _, phase in
                 switch phase {
                 case .active:
                     locationService.startStandardUpdates()

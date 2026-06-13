@@ -443,9 +443,9 @@ struct JobSearchDetailView: View {
             }
         }
 
-        CLGeocoder().geocodeAddressString(combinedAddress) { placemarks, _ in
-            let coordinate = placemarks?.first?.location?.coordinate
-            DispatchQueue.main.async {
+        Task {
+            let coordinate = await MapKitGeocoding.coordinate(for: combinedAddress)
+            await MainActor.run {
                 finishCreation(coordinate)
             }
         }

@@ -179,7 +179,7 @@ struct PDFViewer: View {
         }
         .navigationTitle("PDF Viewer")
         .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: url) { _ in
+        .onChange(of: url) { _, _ in
             loadingState = .loading
         }
     }

@@ -211,21 +211,11 @@ final class JobDispatchCarPlaySceneDelegate: NSObject, CPTemplateApplicationScen
     }
 
     private func geocode(_ address: String) async -> CLLocationCoordinate2D? {
-        await withCheckedContinuation { continuation in
-            CLGeocoder().geocodeAddressString(address) { placemarks, _ in
-                continuation.resume(returning: placemarks?.first?.location?.coordinate)
-            }
-        }
+        await MapKitGeocoding.coordinate(for: address)
     }
 
     private func openAppleMaps(coordinate: CLLocationCoordinate2D, name: String) {
-        let source = MKMapItem.forCurrentLocation()
-        let destination = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
-        destination.name = name
-        MKMapItem.openMaps(
-            with: [source, destination],
-            launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving]
-        )
+        MapKitGeocoding.openDrivingDirections(to: coordinate)
     }
 
     private func openAppleMapsAddress(_ address: String) {

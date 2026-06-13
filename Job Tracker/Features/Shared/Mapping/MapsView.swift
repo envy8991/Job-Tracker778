@@ -332,10 +332,10 @@ struct AppleMapSearchProvider: MapSearchProviding {
         let search = MKLocalSearch(request: request)
         let response = try await search.start()
         return response.mapItems.compactMap { item in
-            guard let coordinate = item.placemark.location?.coordinate else { return nil }
+            guard let coordinate = MapKitGeocoding.coordinate(for: item) else { return nil }
             return MapSearchResult(
                 title: item.name ?? query,
-                subtitle: item.placemark.title ?? "",
+                subtitle: "",
                 coordinate: coordinate
             )
         }
@@ -1221,7 +1221,7 @@ private struct MapControlsExpandedDrawer: View {
             GeometryReader { geometry in
                 Color.clear
                     .onAppear { updateWidth(geometry.size.width) }
-                    .onChange(of: geometry.size) { newSize in updateWidth(newSize.width) }
+                    .onChange(of: geometry.size) { _, newSize in updateWidth(newSize.width) }
             }
         )
     }
@@ -1272,7 +1272,7 @@ private struct MapControlsCollapsedHandle: View {
             GeometryReader { geometry in
                 Color.clear
                     .onAppear { updateWidth(geometry.size.width) }
-                    .onChange(of: geometry.size) { newSize in updateWidth(newSize.width) }
+                    .onChange(of: geometry.size) { _, newSize in updateWidth(newSize.width) }
             }
         )
     }

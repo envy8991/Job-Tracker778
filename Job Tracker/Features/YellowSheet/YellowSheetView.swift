@@ -100,7 +100,7 @@ struct YellowSheetView: View {
                 }
                 jobsViewModel.fetchJobsForWeek(selectedDate)
             }
-            .onChange(of: selectedDate) { _ in
+            .onChange(of: selectedDate) { _, _ in
                 jobsViewModel.fetchJobsForWeek(selectedDate)
             }
             .onReceive(authViewModel.$currentUser) { _ in

@@ -35,7 +35,7 @@ struct SupervisorHomeDashboardView: View {
             .navigationBarTitleDisplayMode(.inline)
             .jtNavigationBarStyle()
             .onAppear { viewModel.start(for: selectedDate) }
-            .onChange(of: selectedDate) { newDate in viewModel.start(for: newDate) }
+            .onChange(of: selectedDate) { _, newDate in viewModel.start(for: newDate) }
             .onDisappear { viewModel.stop() }
         }
     }

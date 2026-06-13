@@ -15,7 +15,7 @@ struct DashboardDatePickerSheet: View {
             .labelsHidden()
         }
         .padding()
-        .onChange(of: selectedDate) { newValue in
+        .onChange(of: selectedDate) { _, newValue in
             onSelection(newValue)
         }
     }

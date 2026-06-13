@@ -110,7 +110,7 @@ struct TutorialHighlightOverlay: View {
                 cachedIDs = Set(items.map(\.id))
             }
         }
-        .onChange(of: items) { newValue in
+        .onChange(of: items) { _, newValue in
             let newIDs = Set(newValue.map(\.id))
             guard newIDs != cachedIDs else { return }
             cachedIDs = newIDs

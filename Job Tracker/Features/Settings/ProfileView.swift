@@ -43,7 +43,7 @@ struct ProfileView: View {
                 loadHistory(for: user)
             }
         }
-        .onChange(of: authViewModel.currentUser?.id) { _ in
+        .onChange(of: authViewModel.currentUser?.id) { _, _ in
             if let user = authViewModel.currentUser {
                 loadHistory(for: user, forceReload: true)
             } else {

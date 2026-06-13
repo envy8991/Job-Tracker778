@@ -17,7 +17,7 @@ struct DateRangePicker: View {
         VStack {
             DatePicker("Start Date", selection: $internalStartDate, displayedComponents:.date)
               .padding()
-              .onChange(of: internalStartDate) { newValue in
+              .onChange(of: internalStartDate) { _, newValue in
                     startDate = newValue
                     if let endDate = endDate, newValue > endDate {
                         internalEndDate = newValue
@@ -27,7 +27,7 @@ struct DateRangePicker: View {
 
             DatePicker("End Date", selection: $internalEndDate, displayedComponents:.date)
               .padding()
-              .onChange(of: internalEndDate) { newValue in
+              .onChange(of: internalEndDate) { _, newValue in
                     endDate = newValue
                     if let startDate = startDate, newValue < startDate {
                         internalStartDate = newValue

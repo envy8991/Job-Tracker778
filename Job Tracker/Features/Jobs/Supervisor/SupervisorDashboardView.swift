@@ -213,7 +213,7 @@ struct SupervisorDashboardView: View {
         }
         .onAppear { vm.start(range: dateRange) }
         .onDisappear { vm.stop() }
-        .onChange(of: dateRange) { _ in vm.start(range: dateRange) }
+        .onChange(of: dateRange) { _, _ in vm.start(range: dateRange) }
         .jtNavigationBarStyle()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -733,7 +733,7 @@ struct SupervisorCreateJobView: View {
                                 .disableAutocorrection(true)
                                 .textInputAutocapitalization(.never)
                                 .focused($isAddressFocused)
-                                .onChange(of: address) { newValue in
+                                .onChange(of: address) { _, newValue in
                                     if newValue.trimmingCharacters(in: .whitespaces).count >= 3 {
                                         addressSearch.update(query: newValue)
                                     } else {
@@ -741,10 +741,10 @@ struct SupervisorCreateJobView: View {
                                     }
                                 }
                                 .onAppear { locationProvider.request() }
-                                .onChange(of: addressSearch.results) { _ in
+                                .onChange(of: addressSearch.results) { _, _ in
                                     addressSearch.updateDistances(from: locationProvider.location)
                                 }
-                                .onChange(of: locationProvider.location) { _ in
+                                .onChange(of: locationProvider.location) { _, _ in
                                     addressSearch.updateDistances(from: locationProvider.location)
                                 }
 
@@ -892,8 +892,8 @@ struct SupervisorCreateJobView: View {
         // New jobs created by supervisors always start as Pending
         let finalStatus = "Pending"
 
-        CLGeocoder().geocodeAddressString(address) { placemarks, _ in
-            let coord = placemarks?.first?.location?.coordinate
+        Task {
+            let coord = await MapKitGeocoding.coordinate(for: address)
 
             let job = Job(
                 address: address,
@@ -910,7 +910,7 @@ struct SupervisorCreateJobView: View {
                 latitude: coord?.latitude,
                 longitude: coord?.longitude
             )
-            DispatchQueue.main.async {
+            await MainActor.run {
                 jobsViewModel.createJob(job)
                 dismiss()
             }
