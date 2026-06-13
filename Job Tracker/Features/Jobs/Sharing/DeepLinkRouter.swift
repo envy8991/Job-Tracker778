@@ -86,6 +86,7 @@ enum DeepLinkRouter {
 }
 
 extension Notification.Name {
+    static let jobDeepLinkRequested = Notification.Name("jobDeepLinkRequested")
     static let jobImportSucceeded = Notification.Name("jobImportSucceeded")
     static let jobImportFailed = Notification.Name("jobImportFailed")
 }

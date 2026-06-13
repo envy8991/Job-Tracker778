@@ -147,6 +147,29 @@ struct OpenDashboardWidgetIntent: AppIntent {
     }
 }
 
+struct OpenWidgetDirectionsIntent: AppIntent {
+    static var title: LocalizedStringResource = "Directions to Job"
+    static var description = IntentDescription("Opens Apple Maps directions to the selected job address.")
+    static var openAppWhenRun: Bool = true
+
+    @Parameter(title: "Address")
+    var address: String
+
+    init() {
+        self.address = ""
+    }
+
+    init(address: String) {
+        self.address = address
+    }
+
+    func perform() async throws -> some IntentResult & OpensIntent {
+        let encodedAddress = address.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? address
+        let url = URL(string: "http://maps.apple.com/?daddr=\(encodedAddress)&dirflg=d") ?? URL(string: "jobtracker://dashboard")!
+        return .result(opensIntent: OpenURLIntent(url))
+    }
+}
+
 struct TodayJobsWidget: Widget {
     let kind = "TodayJobsWidget"
 
@@ -512,9 +535,15 @@ struct CurrentJobWidgetView: View {
                 Label(compact ? "Open" : "Open job", systemImage: "arrow.up.forward.app")
                     .lineLimit(1)
             }
-            Button(intent: OpenDashboardWidgetIntent()) {
-                Label("Today", systemImage: "rectangle.grid.2x2")
+            Button(intent: OpenWidgetDirectionsIntent(address: job.address)) {
+                Label(compact ? "Route" : "Directions", systemImage: "map")
                     .lineLimit(1)
+            }
+            if !compact {
+                Button(intent: OpenDashboardWidgetIntent()) {
+                    Label("Today", systemImage: "rectangle.grid.2x2")
+                        .lineLimit(1)
+                }
             }
         }
         .font(.caption2.bold())

@@ -218,6 +218,11 @@ struct DashboardView: View {
                 viewModel.handleJobsListChange(newJobs, currentLocation: locationService.current)
                 publishSystemExperiencesSnapshot()
             }
+
+            .onReceive(NotificationCenter.default.publisher(for: .jobDeepLinkRequested)) { note in
+                guard let jobID = note.userInfo?["jobID"] as? String else { return }
+                viewModel.selectedJob = jobsViewModel.jobs.first { $0.id == jobID }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .jobImportSucceeded)) { _ in
                 viewModel.presentImportSuccessToast()
             }
