@@ -25,6 +25,9 @@ struct SettingsView: View {
     @AppStorage("routingOptimizeBy")   private var optimizeByRaw      = "closest" // or "farthest"
     @AppStorage("arrivalAlertsEnabledToday") private var arrivalAlertsEnabledToday = true
     @AppStorage("addressSuggestionProvider") private var suggestionProviderRaw = "apple" // "apple" or "google"
+    @AppStorage(MetaSmartGlassesSettings.enabledKey) private var metaGlassesEnabled = false
+    @AppStorage(MetaSmartGlassesSettings.requireReviewKey) private var metaGlassesRequireReview = true
+    @AppStorage(MetaSmartGlassesSettings.useNearestJobKey) private var metaGlassesUseNearestJob = true
 
     private enum OptimizeBy: String, CaseIterable, Identifiable {
         case closest, farthest
@@ -37,6 +40,7 @@ struct SettingsView: View {
     @State private var isDeleting = false
     @State private var deleteError: String? = nil
     @State private var showThemeEditor = false
+    @ObservedObject private var metaGlassesService = MetaSmartGlassesService.shared
 
     // Update these to your real URLs/emails
     private let privacyURL = URL(string: "https://gist.github.com/Qathom89911/82366354d14a9283d9d1c49f601c8f93")!
@@ -145,6 +149,70 @@ struct SettingsView: View {
                                 ? "Using Google for address lookups."
                                 : "Using Apple Maps for address suggestions."
                             )
+                        }
+                        .padding(16)
+                    }
+                    .padding(.horizontal, 16)
+
+
+                    // Meta Smart Glasses
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            SectionHeader(title: "Meta Smart Glasses")
+
+                            Toggle("Enable capture assistant", isOn: $metaGlassesEnabled)
+                                .toggleStyle(.switch)
+                                .onChange(of: metaGlassesEnabled) { _, _ in
+                                    MetaSmartGlassesSettings.publishChange()
+                                }
+                                .accessibilityHint("Allows job detail screens to route glasses or phone fallback captures into job photo slots.")
+
+                            Toggle("Review before upload", isOn: $metaGlassesRequireReview)
+                                .toggleStyle(.switch)
+                                .onChange(of: metaGlassesRequireReview) { _, _ in
+                                    MetaSmartGlassesSettings.publishChange()
+                                }
+                                .accessibilityHint("Keep photos on the job screen for review until you tap Save.")
+
+                            Toggle("Prefer nearest/current job", isOn: $metaGlassesUseNearestJob)
+                                .toggleStyle(.switch)
+                                .onChange(of: metaGlassesUseNearestJob) { _, _ in
+                                    MetaSmartGlassesSettings.publishChange()
+                                }
+                                .accessibilityHint("Voice and glasses workflows should choose the current or nearest job when possible.")
+
+                            HStack(alignment: .top, spacing: 10) {
+                                Image(systemName: metaGlassesEnabled ? "eyeglasses" : "eyeglasses.slash")
+                                    .foregroundStyle(metaGlassesEnabled ? JTColors.accent : .secondary)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(metaGlassesService.connectionState.title)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(metaGlassesService.connectionState.detail)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+
+                            HStack {
+                                Button("Connect") {
+                                    Task { await metaGlassesService.connect() }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(!metaGlassesEnabled)
+
+                                Button("Disconnect") {
+                                    Task { await metaGlassesService.disconnect() }
+                                }
+                                .buttonStyle(.bordered)
+                            }
+
+                            if let lastError = metaGlassesService.lastErrorMessage {
+                                Text(lastError)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                         .padding(16)
                     }
