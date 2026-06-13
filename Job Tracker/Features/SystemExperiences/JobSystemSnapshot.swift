@@ -9,6 +9,10 @@ struct JobSystemSnapshot: Codable, Hashable {
         var assignment: String?
         var jobNumber: String?
         var notes: String?
+        var materialsUsed: String?
+        var nidFootage: String?
+        var canFootage: String?
+        var jobPlacement: String?
         var scheduledDate: Date
         var distanceText: String?
 
@@ -67,6 +71,10 @@ extension JobSystemSnapshot.Item {
             assignment: job.assignments,
             jobNumber: job.jobNumber,
             notes: job.notes,
+            materialsUsed: job.materialsUsed,
+            nidFootage: job.nidFootage,
+            canFootage: job.canFootage,
+            jobPlacement: job.jobPlacement,
             scheduledDate: job.date,
             distanceText: distanceText
         )
