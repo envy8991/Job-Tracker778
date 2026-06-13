@@ -243,7 +243,7 @@
 			);
 			productName = "Job Tracker Companion Watch App";
 			productReference = CD1C8C772E5BBB140001CE7E /* Job Tracker Companion Watch App.app */;
-			productType = "com.apple.product-type.application.watchapp2";
+			productType = "com.apple.product-type.application";
 		};
 		CDDA111C2D579EC0007BADFF /* Job Tracker */ = {
 			isa = PBXNativeTarget;
