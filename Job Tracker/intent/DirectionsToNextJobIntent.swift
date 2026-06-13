@@ -34,30 +34,15 @@ struct DirectionsToNextJobIntent: AppIntent {
         if let lat = target.latitude, let lon = target.longitude {
             targetCoordinate = CLLocationCoordinate2D(latitude: lat, longitude: lon)
         } else {
-            // Geocode synchronously for a single best result (non-throwing continuation)
-            let geocoded: CLPlacemark? = await withCheckedContinuation { (cont: CheckedContinuation<CLPlacemark?, Never>) in
-                CLGeocoder().geocodeAddressString(target.address) { placemarks, _ in
-                    cont.resume(returning: placemarks?.first)
-                }
-            }
-            if let loc = geocoded?.location?.coordinate {
-                targetCoordinate = loc
-            }
+            targetCoordinate = await MapKitGeocoding.coordinate(for: target.address)
         }
 
         guard let coord = targetCoordinate else {
             return .result(dialog: IntentDialog("Couldn't determine a location for that address."))
         }
 
-        // Open Apple Maps using MKMapItem (allowed from App Intents when app is foregrounded)
         await MainActor.run {
-            let src = MKMapItem.forCurrentLocation()
-            let dst = MKMapItem(placemark: MKPlacemark(coordinate: coord))
-            dst.name = short
-            MKMapItem.openMaps(
-                with: [src, dst],
-                launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving]
-            )
+            MapKitGeocoding.openDrivingDirections(to: coord)
         }
         return .result(dialog: IntentDialog("Opening directions to \(short)."))
         }

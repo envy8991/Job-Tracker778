@@ -145,7 +145,9 @@ class AuthViewModel: ObservableObject {
 
     func signOut() {
         if ProcessInfo.processInfo.isJobTrackerUITesting {
-            JobSystemExperienceService.shared.clearSensitiveSystemExperienceData()
+            Task { @MainActor in
+                JobSystemExperienceService.shared.clearSensitiveSystemExperienceData()
+            }
             applyUser(nil)
             return
         }
@@ -153,7 +155,9 @@ class AuthViewModel: ObservableObject {
         do {
             stopCurrentUserListener()
             try FirebaseService.shared.signOutUser()
-            JobSystemExperienceService.shared.clearSensitiveSystemExperienceData()
+            Task { @MainActor in
+                JobSystemExperienceService.shared.clearSensitiveSystemExperienceData()
+            }
             applyUser(nil)
         } catch {
             print("Sign-out error: \(error)")

@@ -266,22 +266,7 @@ protocol SharedJobGeocoding: AnyObject {
 }
 
 final class CLSharedJobGeocoder: SharedJobGeocoding {
-    private let geocoder = CLGeocoder()
-
     func coordinate(for address: String) async throws -> CLLocationCoordinate2D? {
-        try await withCheckedThrowingContinuation { continuation in
-            geocoder.geocodeAddressString(address) { placemarks, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-
-                if let coordinate = placemarks?.first?.location?.coordinate {
-                    continuation.resume(returning: coordinate)
-                } else {
-                    continuation.resume(returning: nil)
-                }
-            }
-        }
+        await MapKitGeocoding.coordinate(for: address)
     }
 }

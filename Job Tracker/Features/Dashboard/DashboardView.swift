@@ -254,10 +254,10 @@ struct DashboardView: View {
                     waitingForNetwork: waitingForNetwork
                 )
             }
-            .onChange(of: viewModel.selectedDate) { _ in
+            .onChange(of: viewModel.selectedDate) { _, _ in
                 publishSystemExperiencesSnapshot()
             }
-            .onChange(of: viewModel.showSyncBanner) { visible in
+            .onChange(of: viewModel.showSyncBanner) { _, visible in
                 if visible {
                     viewModel.startWaveAnimation()
                 } else {

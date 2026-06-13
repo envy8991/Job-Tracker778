@@ -553,10 +553,9 @@ private struct RecentCrewJobDetailSheet: View {
             }
         }
 
-        CLGeocoder().geocodeAddressString(job.address) { placemarks, _ in
-            let coordinate = placemarks?.first?.location?.coordinate
-
-            DispatchQueue.main.async {
+        Task {
+            let coordinate = await MapKitGeocoding.coordinate(for: job.address)
+            await MainActor.run {
                 finishCreation(coordinate)
             }
         }

@@ -143,7 +143,7 @@ private let jobPlacementChoices = ["OH", "UG"]
                         .textContentType(.fullStreetAddress)
                         .textInputAutocapitalization(.never)
                         .focused($isAddressFocused)
-                        .onChange(of: addressText) { newValue in
+                        .onChange(of: addressText) { _, newValue in
                             guard !disableSuggestions, isAddressFocused else { return }
                             job.address = newValue
                             let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -197,7 +197,7 @@ private let jobPlacementChoices = ["OH", "UG"]
                             ForEach(statusOptions, id: \.self) { Text($0) }
                         }
                         .pickerStyle(.menu)
-                        .onChange(of: editedStatus) { newValue in
+                        .onChange(of: editedStatus) { _, newValue in
                             // If user chose a predefined status, push it immediately
                             if newValue != "Custom" {
                                 jobsViewModel.updateJobStatus(job: job, newStatus: newValue)
@@ -212,7 +212,7 @@ private let jobPlacementChoices = ["OH", "UG"]
                                     let newStatus = customStatusText.trimmingCharacters(in: .whitespacesAndNewlines)
                                     if !newStatus.isEmpty { jobsViewModel.updateJobStatus(job: job, newStatus: newStatus) }
                                 }
-                                .onChange(of: customStatusText) { text in
+                                .onChange(of: customStatusText) { _, text in
                                     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                                     // Optionally push live as they type once it's non-empty
                                     if !trimmed.isEmpty { jobsViewModel.updateJobStatus(job: job, newStatus: trimmed) }
@@ -234,7 +234,7 @@ private let jobPlacementChoices = ["OH", "UG"]
                                     .keyboardType(.decimalPad)
                                     .textInputAutocapitalization(.never)
                                     .focused($isAssignmentsFocused)
-                                    .onChange(of: assignmentsText) { newValue in
+                                    .onChange(of: assignmentsText) { _, newValue in
                                         // Use typing-safe sanitizer so a trailing dot is allowed while composing
                                         assignmentsText = sanitizeAssignmentTyping(newValue)
                                     }
@@ -978,13 +978,15 @@ extension JobDetailView {
         // 2) Reverse-geocode address → coordinates
         savingProgress = 0.24
         savingStatus = "Saving materials"
-        CLGeocoder().geocodeAddressString(job.address) { placemarks, _ in
-            let coord = placemarks?.first?.location?.coordinate
-            job.latitude  = coord?.latitude
-            job.longitude = coord?.longitude
+        Task {
+            let coord = await MapKitGeocoding.coordinate(for: job.address)
+            await MainActor.run {
+                job.latitude = coord?.latitude
+                job.longitude = coord?.longitude
 
-            enqueuePendingPhotosIfNeeded()
-            finalizeJobSave()
+                enqueuePendingPhotosIfNeeded()
+                finalizeJobSave()
+            }
         }
     }
 

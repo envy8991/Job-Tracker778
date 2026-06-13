@@ -428,8 +428,8 @@ struct SupervisorJobImportView: View {
         let entryToken = token(for: entry)
         pending.insert(entryToken)
 
-        CLGeocoder().geocodeAddressString(job.address) { placemarks, _ in
-            let coord = placemarks?.first?.location?.coordinate
+        Task {
+            let coord = await MapKitGeocoding.coordinate(for: job.address)
             let jobWithCoords = Job(
                 address: job.address,
                 date: job.date,
@@ -444,10 +444,12 @@ struct SupervisorJobImportView: View {
                 longitude: coord?.longitude
             )
 
-            jobsViewModel.createJob(jobWithCoords)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                confirmed.insert(entryToken)
-                pending.remove(entryToken)
+            await MainActor.run {
+                jobsViewModel.createJob(jobWithCoords)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    confirmed.insert(entryToken)
+                    pending.remove(entryToken)
+                }
             }
         }
     }

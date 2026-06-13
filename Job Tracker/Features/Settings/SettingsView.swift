@@ -106,7 +106,7 @@ struct SettingsView: View {
                             SectionHeader(title: "Notifications")
                             Toggle("Notify me on arrival (today only)", isOn: $arrivalAlertsEnabledToday)
                                 .toggleStyle(.switch)
-                                .onChange(of: arrivalAlertsEnabledToday) { enabled in
+                                .onChange(of: arrivalAlertsEnabledToday) { _, enabled in
                                     guard enabled else { return }
                                     locationService.requestAlwaysAuthorizationIfNeeded()
                                 }

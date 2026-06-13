@@ -389,10 +389,10 @@ struct InteractiveTutorialView: View {
             .onAppear {
                 syncStageModelsIfNeeded()
             }
-            .onChange(of: viewModel.currentStageIndex) { newValue in
+            .onChange(of: viewModel.currentStageIndex) { _, newValue in
                 storedStageIndex = newValue
             }
-            .onChange(of: viewModel.completion) { newValue in
+            .onChange(of: viewModel.completion) { _, newValue in
                 storedCompletedStages = encodeCompletedStages(newValue)
             }
         }
@@ -803,10 +803,10 @@ private struct DashboardTutorialStageView: View {
                 }
             }
         }
-        .onChange(of: model.didChangeStatus) { newValue in
+        .onChange(of: model.didChangeStatus) { _, newValue in
             completionChanged(model.isActionComplete)
         }
-        .onChange(of: model.didTapShare) { _ in
+        .onChange(of: model.didTapShare) { _, _ in
             completionChanged(model.isActionComplete)
         }
         .onAppear {

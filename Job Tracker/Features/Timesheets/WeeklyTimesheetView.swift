@@ -307,10 +307,10 @@ struct WeeklyTimesheetView: View {
                     loadTimesheet()
                 }
             }
-            .onChange(of: selectedDate) { _ in
+            .onChange(of: selectedDate) { _, _ in
                 loadTimesheet()
             }
-            .onChange(of: partnerUid) { _ in
+            .onChange(of: partnerUid) { _, _ in
                 loadTimesheet()
             }
             .onReceive(timesheetVM.$timesheet) { newTimesheet in

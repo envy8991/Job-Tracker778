@@ -59,7 +59,7 @@ struct JobSearchView: View {
             jobsViewModel.startSearchIndexForAllJobs()
             updateChrome()
         }
-        .onChange(of: navigationPath) { _ in
+        .onChange(of: navigationPath) { _, _ in
             updateChrome()
         }
         .onDisappear {

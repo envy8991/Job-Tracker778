@@ -208,12 +208,12 @@ private struct AuthLoginForm: View {
                 }
             }
         }
-        .onChange(of: email) { _ in
+        .onChange(of: email) { _, _ in
             guard hasAttemptedSubmit else { return }
             emailError = email.validationEmailError
             authError = nil
         }
-        .onChange(of: password) { _ in
+        .onChange(of: password) { _, _ in
             guard hasAttemptedSubmit else { return }
             passwordError = password.validationRequiredError(label: "password")
             authError = nil
@@ -371,22 +371,22 @@ private struct AuthSignUpForm: View {
             .font(JTTypography.subheadline)
             .foregroundStyle(JTColors.textSecondary)
         }
-        .onChange(of: firstName) { _ in
+        .onChange(of: firstName) { _, _ in
             guard hasAttemptedSubmit else { return }
             firstNameError = firstName.validationRequiredError(label: "first name")
             signUpError = nil
         }
-        .onChange(of: lastName) { _ in
+        .onChange(of: lastName) { _, _ in
             guard hasAttemptedSubmit else { return }
             lastNameError = lastName.validationRequiredError(label: "last name")
             signUpError = nil
         }
-        .onChange(of: email) { _ in
+        .onChange(of: email) { _, _ in
             guard hasAttemptedSubmit else { return }
             emailError = email.validationEmailError
             signUpError = nil
         }
-        .onChange(of: password) { _ in
+        .onChange(of: password) { _, _ in
             guard hasAttemptedSubmit else { return }
             passwordError = password.validationPasswordError
             signUpError = nil
@@ -502,7 +502,7 @@ private struct PasswordResetForm: View {
             .font(JTTypography.subheadline)
             .foregroundStyle(JTColors.textSecondary)
         }
-        .onChange(of: email) { _ in
+        .onChange(of: email) { _, _ in
             guard hasAttemptedSubmit else { return }
             emailError = email.validationEmailError
             statusMessage = nil
