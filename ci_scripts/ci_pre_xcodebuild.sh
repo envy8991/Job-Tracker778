@@ -11,6 +11,40 @@ PROJECT_PATH="Job Tracker.xcodeproj"
 SCHEME_PATH="$PROJECT_PATH/xcshareddata/xcschemes/Job Tracker.xcscheme"
 TEST_PLAN_PATH="Job Tracker Safety Net.xctestplan"
 
+log() {
+  printf '[xcode-cloud-safety-net] %s\n' "$1"
+}
+
+restore_xcode_cloud_archive_graph() {
+  # Test actions temporarily remove the embedded watch app from Xcode Cloud's
+  # checkout so generic iOS simulator destinations can resolve. Xcode Cloud can
+  # invoke this script multiple times in the same working copy, so make non-test
+  # actions explicitly restore those edges before Archive/Build packaging.
+  python3 <<'PYRESTORE'
+from pathlib import Path
+
+project_path = Path("Job Tracker.xcodeproj/project.pbxproj")
+project = project_path.read_text()
+updated = project
+
+if 'CD3158992E5BB5E00037DF29 /* Embed Watch Content */,' not in updated:
+    updated = updated.replace(
+        '\n\t\t\t\tCDDA111B2D579EC0007BADFF /* Resources */,\n\t\t\t\tCDA5314B2E6CDE5600F5E950 /* Embed Foundation Extensions */,',
+        '\n\t\t\t\tCDDA111B2D579EC0007BADFF /* Resources */,\n\t\t\t\tCD3158992E5BB5E00037DF29 /* Embed Watch Content */,\n\t\t\t\tCDA5314B2E6CDE5600F5E950 /* Embed Foundation Extensions */,',
+    )
+
+if 'CD1C8C802E5BBB150001CE7E /* PBXTargetDependency */,' not in updated:
+    updated = updated.replace(
+        '\n\t\t\tdependencies = (\n\t\t\t\tAA000000000000000000000D /* PBXTargetDependency */,',
+        '\n\t\t\tdependencies = (\n\t\t\t\tCD1C8C802E5BBB150001CE7E /* PBXTargetDependency */,\n\t\t\t\tAA000000000000000000000D /* PBXTargetDependency */,',
+    )
+
+if updated != project:
+    project_path.write_text(updated)
+    print("[xcode-cloud-safety-net] Restored embedded watch content for packaging action.")
+PYRESTORE
+}
+
 # Xcode Cloud runs ci_pre_xcodebuild.sh before every workflow action, including
 # Archive. Keep these safety-net checks out of Archive/Build actions so release
 # packaging is not blocked by a test-only guardrail.
@@ -19,15 +53,12 @@ if [ "${CI_XCODE_CLOUD:-}" = "TRUE" ]; then
     build-for-testing|test|test-without-building)
       ;;
     *)
-      printf '[xcode-cloud-safety-net] Skipping test-only safety-net script for Xcode Cloud action %s.\n' "${CI_XCODEBUILD_ACTION:-unknown}"
+      restore_xcode_cloud_archive_graph
+      log "Skipping test-only safety-net script for Xcode Cloud action ${CI_XCODEBUILD_ACTION:-unknown}."
       exit 0
       ;;
   esac
 fi
-
-log() {
-  printf '[xcode-cloud-safety-net] %s\n' "$1"
-}
 
 fail() {
   printf '[xcode-cloud-safety-net] ERROR: %s\n' "$1" >&2
@@ -212,9 +243,9 @@ updated = updated.replace('\n\t\t\t\tCD3158992E5BB5E00037DF29 /* Embed Watch Con
 updated = updated.replace('\n\t\t\t\tCD1C8C802E5BBB150001CE7E /* PBXTargetDependency */,', '')
 
 if updated == project:
-    raise SystemExit("Expected to remove watch embed/dependency edges for Xcode Cloud testing, but project graph was unchanged.")
-
-project_path.write_text(updated)
+    print("[xcode-cloud-safety-net] Embedded watch content was already removed for this Xcode Cloud test checkout.")
+else:
+    project_path.write_text(updated)
 PYINNER
 }
 
