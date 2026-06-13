@@ -134,6 +134,10 @@ private struct MoreMenuList: View {
                     Label(AppNavigationViewModel.Destination.spliceAssist.title,
                           systemImage: AppNavigationViewModel.Destination.spliceAssist.systemImage)
                 }
+                NavigationLink(value: AppNavigationViewModel.Destination.metaGlassesPilot) {
+                    Label(AppNavigationViewModel.Destination.metaGlassesPilot.title,
+                          systemImage: AppNavigationViewModel.Destination.metaGlassesPilot.systemImage)
+                }
             }
 
             if authViewModel.isAdminFlag {
@@ -188,6 +192,8 @@ private struct MoreDestinationView: View {
             RecentCrewJobsView()
         case .spliceAssist:
             SpliceAssistView()
+        case .metaGlassesPilot:
+            MetaGlassesPilotView()
         case .more:
             MoreMenuList()
         default:
