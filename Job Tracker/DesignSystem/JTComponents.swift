@@ -78,6 +78,41 @@ private struct JTNavigationBarModifier: ViewModifier {
     }
 }
 
+
+/// A reusable iOS 26 Liquid Glass surface for cards, HUDs, and action clusters.
+/// Keep custom glass centralized here so screens inherit system behavior consistently.
+@MainActor
+struct JTGlassSurface<Content: View>: View {
+    private let cornerRadius: CGFloat
+    private let strokeColor: Color
+    private let strokeWidth: CGFloat
+    private let shadow: JTShadow?
+    private let content: () -> Content
+
+    init(cornerRadius: CGFloat = JTShapes.cardCornerRadius,
+         strokeColor: Color? = nil,
+         strokeWidth: CGFloat = 1,
+         shadow: JTShadow? = JTElevations.card,
+         @ViewBuilder content: @escaping () -> Content) {
+        self.cornerRadius = cornerRadius
+        self.strokeColor = strokeColor ?? JTColors.glassStroke
+        self.strokeWidth = strokeWidth
+        self.shadow = shadow
+        self.content = content
+    }
+
+    var body: some View {
+        let surface = content()
+            .jtGlassBackground(cornerRadius: cornerRadius, strokeColor: strokeColor, strokeWidth: strokeWidth)
+
+        if let shadow {
+            surface.jtShadow(shadow)
+        } else {
+            surface
+        }
+    }
+}
+
 /// Glass-morphism surface used for dashboard cards and detail panels.
 @MainActor
 struct GlassCard<Content: View>: View {
@@ -100,9 +135,13 @@ struct GlassCard<Content: View>: View {
     }
 
     var body: some View {
-        content()
-            .jtGlassBackground(cornerRadius: cornerRadius, strokeColor: strokeColor, strokeWidth: strokeWidth)
-            .jtShadow(shadow)
+        JTGlassSurface(
+            cornerRadius: cornerRadius,
+            strokeColor: strokeColor,
+            strokeWidth: strokeWidth,
+            shadow: shadow,
+            content: content
+        )
     }
 }
 
