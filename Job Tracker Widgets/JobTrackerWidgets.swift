@@ -114,6 +114,39 @@ struct JobSnapshotProvider: TimelineProvider {
     }
 }
 
+struct OpenWidgetJobIntent: AppIntent {
+    static var title: LocalizedStringResource = "Open Job"
+    static var description = IntentDescription("Opens the selected job in Job Tracker.")
+    static var openAppWhenRun: Bool = true
+
+    @Parameter(title: "Job ID")
+    var jobID: String
+
+    init() {
+        self.jobID = ""
+    }
+
+    init(jobID: String) {
+        self.jobID = jobID
+    }
+
+    func perform() async throws -> some IntentResult & OpensIntent {
+        let encodedID = jobID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? jobID
+        let url = URL(string: "jobtracker://job?id=\(encodedID)") ?? URL(string: "jobtracker://dashboard")!
+        return .result(opensIntent: OpenURLIntent(url))
+    }
+}
+
+struct OpenDashboardWidgetIntent: AppIntent {
+    static var title: LocalizedStringResource = "Open Dashboard"
+    static var description = IntentDescription("Opens the Job Tracker dashboard.")
+    static var openAppWhenRun: Bool = true
+
+    func perform() async throws -> some IntentResult & OpensIntent {
+        return .result(opensIntent: OpenURLIntent(URL(string: "jobtracker://dashboard")!))
+    }
+}
+
 struct TodayJobsWidget: Widget {
     let kind = "TodayJobsWidget"
 
@@ -214,16 +247,13 @@ struct TodayJobsWidgetView: View {
                         .font(.caption2.bold())
                         .foregroundStyle(.secondary)
                     nextStopSummary(next)
-                    if let second = entry.snapshot.jobs.dropFirst().first {
-                        Divider()
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.turn.down.right")
-                                .font(.caption2)
-                            Text(second.shortAddress)
-                                .font(.caption)
-                                .lineLimit(1)
+                    VStack(spacing: 4) {
+                        ForEach(Array(entry.snapshot.jobs.prefix(3))) { job in
+                            Button(intent: OpenWidgetJobIntent(jobID: job.id)) {
+                                jobQueueRow(job)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .foregroundStyle(.secondary)
                     }
                 } else {
                     emptyState
@@ -248,6 +278,28 @@ struct TodayJobsWidgetView: View {
             Spacer(minLength: 0)
         }
         .widgetURL(URL(string: "jobtracker://dashboard"))
+    }
+
+    private func jobQueueRow(_ job: JobSystemSnapshot.Item) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: job.isPending ? "circle" : "checkmark.circle.fill")
+                .font(.caption2)
+                .foregroundStyle(job.isPending ? .orange : .green)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(job.shortAddress)
+                    .font(.caption.bold())
+                    .lineLimit(1)
+                Text([job.scheduledDate.formatted(date: .omitted, time: .shortened), job.assignment, job.distanceText].compactMap { $0 }.joined(separator: " • "))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.forward")
+                .font(.caption2.bold())
+                .foregroundStyle(.secondary)
+        }
+        .contentShape(Rectangle())
     }
 
     private var header: some View {
@@ -355,12 +407,13 @@ struct CurrentJobWidgetView: View {
             Text(job.shortAddress)
                 .font(.headline)
                 .lineLimit(2)
-            Text(job.assignment ?? job.jobNumber ?? "Open Job Tracker for details")
+            Text(primaryDetailText(for: job))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
+            notesPreview(job)
             Spacer(minLength: 0)
-            footer(job)
+            actionButtons(for: job, compact: true)
         }
         .widgetURL(URL(string: "jobtracker://job?id=\(job.id)"))
     }
@@ -376,13 +429,15 @@ struct CurrentJobWidgetView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                footer(job)
+                notesPreview(job)
+                actionButtons(for: job, compact: false)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 7) {
                 metricTile(icon: "point.topleft.down.curvedto.point.bottomright.up", title: "Distance", value: job.distanceText ?? "Open map")
                 metricTile(icon: "clock", title: "Scheduled", value: job.scheduledDate.formatted(.dateTime.hour().minute()))
+                metricTile(icon: "number", title: "Job #", value: job.jobNumber ?? "Not set")
                 metricTile(icon: "bell.badge", title: "Alerts", value: alertSummary)
             }
             .frame(width: 125)
@@ -433,11 +488,37 @@ struct CurrentJobWidgetView: View {
         }
     }
 
-    private func footer(_ job: JobSystemSnapshot.Item) -> some View {
-        Label(alertSummary, systemImage: entry.snapshot.arrivalMonitoring.state == .inactive ? "arrow.up.forward.app" : "location.badge.checkmark")
-            .font(.caption2.bold())
-            .foregroundStyle(statusColor)
-            .lineLimit(1)
+    private func primaryDetailText(for job: JobSystemSnapshot.Item) -> String {
+        let detail = [job.assignment, job.jobNumber, job.distanceText].compactMap { value in
+            guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return value
+        }.joined(separator: " • ")
+        return detail.isEmpty ? "Open Job Tracker for details" : detail
+    }
+
+    @ViewBuilder
+    private func notesPreview(_ job: JobSystemSnapshot.Item) -> some View {
+        if let notes = job.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
+            Label(notes, systemImage: "note.text")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+        }
+    }
+
+    private func actionButtons(for job: JobSystemSnapshot.Item, compact: Bool) -> some View {
+        HStack(spacing: 6) {
+            Button(intent: OpenWidgetJobIntent(jobID: job.id)) {
+                Label(compact ? "Open" : "Open job", systemImage: "arrow.up.forward.app")
+                    .lineLimit(1)
+            }
+            Button(intent: OpenDashboardWidgetIntent()) {
+                Label("Today", systemImage: "rectangle.grid.2x2")
+                    .lineLimit(1)
+            }
+        }
+        .font(.caption2.bold())
+        .buttonStyle(.bordered)
     }
 
     private var alertSummary: String {
