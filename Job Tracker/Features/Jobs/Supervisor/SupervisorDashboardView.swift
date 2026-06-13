@@ -1,0 +1,997 @@
+//
+//  SupervisorRole.swift
+//  Job Tracker
+//
+//  Created by Quinton Thompson on 8/31/25.
+//
+
+//
+//  SupervisorDashboardView.swift
+//  Job Tracker
+//
+//  Created Aug 2025
+//
+
+import SwiftUI
+import Foundation
+import FirebaseFirestore
+import CoreLocation
+
+private extension Notification.Name {
+    static let toggleSideMenu = Notification.Name("toggleSideMenu")
+}
+
+// MARK: - Role & Status filters
+
+enum SupervisorRole: String, CaseIterable, Identifiable {
+    case ug = "UG"
+    case oh = "OH"
+    case can = "Can"
+    case nid = "Nid"
+
+    var id: String { rawValue }
+}
+
+enum StatusFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case pending = "Pending"
+    case completed = "Completed"
+
+    var id: String { rawValue }
+}
+
+// MARK: - ViewModel
+
+final class SupervisorJobsViewModel: ObservableObject {
+    @Published var jobs: [Job] = []
+    @Published var isLoading = false
+    @Published var error: String? = nil
+
+    private var listener: ListenerRegistration?
+    private let db = Firestore.firestore()
+
+    /// Stream all jobs within an optional date range. View handles role/status filtering.
+    func start(range: DateInterval?) {
+        stop()
+        isLoading = true
+        error = nil
+
+        var q: Query = db.collection("jobs")
+
+        if let r = range {
+            q = q.whereField("date", isGreaterThanOrEqualTo: Timestamp(date: r.start))
+                 .whereField("date", isLessThan: Timestamp(date: r.end))
+        }
+
+        // Sort newest first to make grouping snappy
+        q = q.order(by: "date", descending: true)
+
+        listener = q.addSnapshotListener { [weak self] snap, err in
+            guard let self else { return }
+            if let err = err {
+                DispatchQueue.main.async {
+                    self.error = err.localizedDescription
+                    self.isLoading = false
+                }
+                return
+            }
+            let docs = snap?.documents ?? []
+            let mapped: [Job] = docs.compactMap { try? $0.data(as: Job.self) }
+            DispatchQueue.main.async {
+                self.jobs = mapped
+                self.isLoading = false
+            }
+        }
+    }
+
+    func stop() {
+        listener?.remove()
+        listener = nil
+    }
+}
+
+// MARK: - UI helpers
+@MainActor
+private func roleColor(_ role: SupervisorRole) -> Color {
+    switch role {
+    case .ug:     return JTColors.success.opacity(0.35)
+    case .oh: return JTColors.info.opacity(0.35)
+    case .can:    return JTColors.warning.opacity(0.35)
+    case .nid:    return JTColors.accent.opacity(0.35)
+    }
+}
+
+// MARK: - View
+
+struct SupervisorDashboardView: View {
+    @EnvironmentObject var usersViewModel: UsersViewModel
+    @EnvironmentObject var authViewModel:  AuthViewModel
+    @EnvironmentObject var jobsViewModel: JobsViewModel
+    @StateObject private var vm = SupervisorJobsViewModel()
+    @State private var showingCreate = false
+    @State private var showingImport = false
+    @State private var selectedJob: Job?
+
+    @State private var role: SupervisorRole = .ug
+    @State private var status: StatusFilter = .all
+    @State private var searchText = ""
+
+    @State private var dateRange: DateInterval = {
+        let cal = Calendar.current
+        let start = cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: Date()))!
+        let end = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: Date()))!
+        return DateInterval(start: start, end: end)
+    }()
+
+    var body: some View {
+        ZStack {
+            JTGradients.background
+                .ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: JTSpacing.lg) {
+                    header
+                    searchField
+
+                    // Filters card
+                    filtersCard
+
+                    // Summary chips
+                    summaryRow
+                        .padding(.top, 4)
+
+                    if vm.isLoading {
+                        supervisorStateCard(title: "Loading jobs…", systemImage: "hourglass")
+                    }
+
+                    if let error = vm.error {
+                        supervisorStateCard(title: "Unable to load jobs", systemImage: "exclamationmark.triangle", message: error)
+                    }
+
+                    // Pending section
+                    if !pendingJobs.isEmpty {
+                        sectionHeader("Not Completed")
+                        let pendingGroups = groupedByDay(pendingJobs).sorted { lhs, rhs in lhs.key > rhs.key }
+                        VStack(spacing: 12) {
+                            ForEach(pendingGroups, id: \.key) { day, jobs in
+                                dayHeader(day)
+                                ForEach(jobs, id: \.id) { job in
+                                    Button {
+                                        selectedJob = job
+                                    } label: {
+                                        SupervisorJobRow(
+                                            job: job,
+                                            userRoleResolver: resolveRole(forUserId:),
+                                            userNameResolver: resolveUserName(forUserId:)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityHint("Opens the full job details")
+                                }
+                            }
+                        }
+                    }
+
+                    // Completed section
+                    if !completedJobs.isEmpty {
+                        sectionHeader("Completed")
+                        let completedGroups = groupedByDay(completedJobs).sorted { lhs, rhs in lhs.key > rhs.key }
+                        VStack(spacing: 12) {
+                            ForEach(completedGroups, id: \.key) { day, jobs in
+                                dayHeader(day)
+                                ForEach(jobs, id: \.id) { job in
+                                    Button {
+                                        selectedJob = job
+                                    } label: {
+                                        SupervisorJobRow(
+                                            job: job,
+                                            userRoleResolver: resolveRole(forUserId:),
+                                            userNameResolver: resolveUserName(forUserId:)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityHint("Opens the full job details")
+                                }
+                            }
+                        }
+                    }
+
+                    if pendingJobs.isEmpty && completedJobs.isEmpty && !vm.isLoading {
+                        GlassCard {
+                            Text("No jobs match these filters.")
+                                .font(JTTypography.body)
+                                .foregroundStyle(JTColors.textSecondary)
+                                .padding(.vertical, JTSpacing.xl)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                }
+                .padding(.horizontal, JTSpacing.lg)
+                .padding(.top, JTSpacing.xxl + JTSpacing.xl)
+                .padding(.bottom, JTSpacing.xl)
+            }
+        }
+        .onAppear { vm.start(range: dateRange) }
+        .onDisappear { vm.stop() }
+        .onChange(of: dateRange) { _, _ in vm.start(range: dateRange) }
+        .jtNavigationBarStyle()
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if authViewModel.isSupervisorFlag || authViewModel.isAdminFlag {
+                    Menu {
+                        Button("Create Single Job") { showingCreate = true }
+                        Button("Import Job Sheet") { showingImport = true }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Create or Import Job")
+                }
+            }
+        }
+        .sheet(item: $selectedJob) { job in
+            UniversalJobDetailView(job: job, showsDoneButton: true)
+        }
+        .sheet(isPresented: $showingCreate) {
+            SupervisorCreateJobView()
+                .environmentObject(jobsViewModel)
+                .environmentObject(authViewModel)
+                .environmentObject(usersViewModel)
+        }
+        .sheet(isPresented: $showingImport) {
+            if authViewModel.isSupervisorFlag || authViewModel.isAdminFlag {
+                SupervisorJobImportView()
+                    .environmentObject(jobsViewModel)
+                    .environmentObject(authViewModel)
+                    .environmentObject(usersViewModel)
+            } else {
+                Text("Unauthorized")
+            }
+        }
+    }
+
+    // MARK: – Styled sections matching Dashboard
+    private var header: some View {
+        VStack(alignment: .leading, spacing: JTSpacing.xs) {
+            Text("Supervisor")
+                .font(JTTypography.screenTitle)
+                .foregroundStyle(JTColors.textPrimary)
+            Text("Filter crew jobs by role, status, and date range.")
+                .font(JTTypography.caption)
+                .foregroundStyle(JTColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: JTSpacing.sm) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(JTColors.textMuted)
+            TextField("Search address, job #, notes…", text: $searchText)
+                .font(JTTypography.body)
+                .foregroundStyle(JTColors.textPrimary)
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
+        }
+        .padding(JTSpacing.md)
+        .jtGlassBackground(cornerRadius: JTShapes.fieldCornerRadius, strokeColor: JTColors.glassSoftStroke)
+    }
+
+    private func supervisorStateCard(title: String, systemImage: String, message: String? = nil) -> some View {
+        GlassCard(cornerRadius: JTShapes.largeCardCornerRadius, strokeColor: JTColors.glassSoftStroke) {
+            VStack(spacing: JTSpacing.sm) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 28))
+                    .foregroundStyle(message == nil ? JTColors.textMuted : JTColors.error)
+                Text(title)
+                    .font(JTTypography.headline)
+                    .foregroundStyle(JTColors.textPrimary)
+                if let message {
+                    Text(message)
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(JTSpacing.lg)
+        }
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(JTTypography.title3)
+                .foregroundStyle(JTColors.textPrimary)
+            Spacer()
+        }
+        .padding(.top, JTSpacing.sm)
+    }
+
+    private func dayHeader(_ date: Date) -> some View {
+        HStack {
+            Text(dayString(date))
+                .font(JTTypography.captionEmphasized)
+                .foregroundStyle(JTColors.textSecondary)
+            Spacer()
+        }
+    }
+
+    // Filters shown as a card instead of a DisclosureGroup
+    private var filtersCard: some View {
+        VStack(spacing: 12) {
+            // Role tabs
+            Picker("Role", selection: $role) {
+                ForEach(SupervisorRole.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+
+            // Status tabs
+            Picker("Status", selection: $status) {
+                ForEach(StatusFilter.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+
+            // Date range row + quick presets
+            HStack(spacing: 12) {
+                Menu {
+                    Button("Today") { setPresetToday() }
+                    Button("Last 7 days") { setPreset(days: 7) }
+                    Button("Last 14 days") { setPreset(days: 14) }
+                    Button("This month") { setPresetThisMonth() }
+                } label: {
+                    Label("Quick Range", systemImage: "calendar.badge.clock")
+                        .foregroundStyle(JTColors.textPrimary)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("From")
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+                    DatePicker(
+                        "From",
+                        selection: Binding(get: { dateRange.start }, set: { dateRange = DateInterval(start: $0, end: dateRange.end) }),
+                        displayedComponents: .date
+                    )
+                    .labelsHidden()
+                    .tint(JTColors.accent)
+                    .accessibilityLabel("From")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("To")
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+                    DatePicker(
+                        "To",
+                        selection: Binding(get: { dateRange.end }, set: { dateRange = DateInterval(start: dateRange.start, end: $0) }),
+                        displayedComponents: .date
+                    )
+                    .labelsHidden()
+                    .tint(JTColors.accent)
+                    .accessibilityLabel("To")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.top, 4)
+        }
+        .padding(JTSpacing.md)
+        .jtGlassBackground(cornerRadius: JTShapes.cardCornerRadius)
+    }
+
+    private func setPreset(days: Int) {
+        let cal = Calendar.current
+        let end = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: Date()))!
+        let start = cal.date(byAdding: .day, value: -max(1, days-1), to: cal.startOfDay(for: Date()))!
+        dateRange = DateInterval(start: start, end: end)
+        vm.start(range: dateRange)
+    }
+
+    private func setPresetThisMonth() {
+        let cal = Calendar.current
+        let now = Date()
+        let comps = cal.dateComponents([.year, .month], from: now)
+        let start = cal.date(from: comps) ?? cal.startOfDay(for: now)
+        let end = cal.date(byAdding: .month, value: 1, to: start) ?? now
+        dateRange = DateInterval(start: start, end: end)
+        vm.start(range: dateRange)
+    }
+
+    private func setPresetToday() {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: Date())
+        let end = cal.date(byAdding: .day, value: 1, to: start)!
+        dateRange = DateInterval(start: start, end: end)
+        vm.start(range: dateRange)
+    }
+
+    // MARK: Derived sets
+
+    private var filteredForRole: [Job] {
+        // Treat a job as part of a role if creator or assignee has that role.
+        vm.jobs.filter { job in
+            let createdRole  = resolveRole(forUserId: job.createdBy)
+            let assignedRole = resolveRole(forUserId: job.assignedTo)
+            return createdRole == role.rawValue || assignedRole == role.rawValue
+        }
+    }
+
+    private var filteredByStatus: [Job] {
+        switch status {
+        case .all: return filteredForRole
+        case .pending: return filteredForRole.filter { $0.status.lowercased() == "pending" }
+        case .completed: return filteredForRole.filter { $0.status.lowercased() != "pending" }
+        }
+    }
+
+    private var searched: [Job] {
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return filteredByStatus }
+        return filteredByStatus.filter { job in
+            job.address.lowercased().contains(q)
+            || (job.jobNumber ?? "").lowercased().contains(q)
+            || (job.notes ?? "").lowercased().contains(q)
+        }
+    }
+
+    private var pendingJobs: [Job] {
+        searched.filter { $0.status.lowercased() == "pending" }
+    }
+
+    private var completedJobs: [Job] {
+        searched.filter { $0.status.lowercased() != "pending" }
+    }
+
+    private func groupedByDay(_ jobs: [Job]) -> [Date: [Job]] {
+        Dictionary(grouping: jobs) { Calendar.current.startOfDay(for: $0.date) }
+    }
+
+    private func dayString(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "EEE MMM d"
+        return f.string(from: date)
+    }
+
+    private func resolveRole(forUserId uid: String?) -> String {
+        guard let uid = uid, let user = usersViewModel.user(id: uid) else {
+            return ""
+        }
+        return CrewPosition.normalizedKey(from: user.position)
+    }
+
+    private func resolveUserName(forUserId uid: String?) -> String {
+        guard let uid = uid, let user = usersViewModel.user(id: uid) else { return "" }
+        let first = user.firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let last  = user.lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return [first, last].filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
+    // Summary chips
+    private var summaryRow: some View {
+        HStack(spacing: 12) {
+            chip("\(filteredForRole.count) jobs", system: "tray.full")
+            chip("\(pendingJobs.count) pending", system: "clock")
+            chip("\(completedJobs.count) completed", system: "checkmark.circle")
+            Spacer()
+        }
+    }
+
+    private func chip(_ text: String, system: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: system)
+            Text(text)
+        }
+        .font(JTTypography.captionEmphasized)
+        .padding(.vertical, JTSpacing.sm)
+        .padding(.horizontal, JTSpacing.md)
+        .background(JTColors.glassHighlight, in: Capsule(style: .continuous))
+        .foregroundStyle(JTColors.textPrimary)
+    }
+}
+
+// MARK: - Row
+
+private struct SupervisorJobRow: View {
+    let job: Job
+    let userRoleResolver: (String?) -> String
+    let userNameResolver: (String?) -> String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            metadata
+        }
+        .padding(JTSpacing.lg)
+        .jtGlassBackground(cornerRadius: JTShapes.cardCornerRadius)
+        .jtShadow(JTElevations.card)
+    }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(job.address)
+                .font(JTTypography.headline)
+                .foregroundStyle(JTColors.textPrimary)
+                .lineLimit(2)
+                .truncationMode(.tail)
+
+            Spacer(minLength: 8)
+
+            Text(job.displayStatus)
+                .font(JTTypography.captionEmphasized)
+                .foregroundStyle(JTColors.textPrimary)
+                .padding(.horizontal, JTSpacing.md)
+                .padding(.vertical, JTSpacing.sm)
+                .background(statusBadgeColor, in: Capsule(style: .continuous))
+        }
+    }
+
+    private var metadata: some View {
+        HStack(alignment: .top, spacing: 12) {
+            LazyVGrid(columns: metadataColumns, alignment: .leading, spacing: 8) {
+                ForEach(Array(metadataItems.enumerated()), id: \.offset) { _, item in
+                    Label {
+                        Text(item.text)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    } icon: {
+                        Image(systemName: item.icon)
+                    }
+                    .font(JTTypography.caption)
+                    .foregroundStyle(JTColors.textSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            hoursBadge
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(JTColors.textMuted)
+        }
+    }
+
+    private var hoursBadge: some View {
+        Text(hoursText)
+            .font(JTTypography.captionEmphasized)
+            .foregroundStyle(JTColors.textPrimary)
+            .padding(.horizontal, JTSpacing.md)
+            .padding(.vertical, JTSpacing.sm)
+            .background(JTColors.glassHighlight, in: Capsule(style: .continuous))
+    }
+
+    private var hoursText: String {
+        String(format: "%.1f h", job.hours)
+    }
+
+    private var metadataColumns: [GridItem] {
+        [
+            GridItem(.flexible(minimum: 110, maximum: .infinity), spacing: 12, alignment: .leading),
+            GridItem(.flexible(minimum: 110, maximum: .infinity), spacing: 12, alignment: .leading)
+        ]
+    }
+
+    private var metadataItems: [(icon: String, text: String)] {
+        var items: [(String, String)] = []
+
+        if let jobNumber = job.jobNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !jobNumber.isEmpty {
+            items.append(("number.circle", jobNumber))
+        }
+
+        items.append(("calendar", dateString(job.date)))
+
+        let assignedID = job.assignedTo?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let workerSource: String? = (assignedID?.isEmpty == false) ? job.assignedTo : job.createdBy
+        let workerName = userNameResolver(workerSource).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !workerName.isEmpty {
+            items.append(("person", workerName))
+        }
+
+        let creatorRole = userRoleResolver(job.createdBy).trimmingCharacters(in: .whitespacesAndNewlines)
+        if !creatorRole.isEmpty {
+            items.append(("person.fill", creatorRole))
+        }
+
+        if let assignedID, !assignedID.isEmpty {
+            let role = userRoleResolver(job.assignedTo).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !role.isEmpty {
+                items.append(("arrowshape.turn.up.right.fill", "→ \(role)"))
+            }
+        }
+
+        return items
+    }
+
+    private var statusBadgeColor: Color {
+        universalStatusColor(job.status).opacity(0.22)
+    }
+
+    private func dateString(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "M/d"
+        return f.string(from: d)
+    }
+}
+
+
+// MARK: - Role filter (local to create view)
+private enum RoleFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case underground = "UG"
+    case oh = "OH"
+    case can = "Can"
+    case nid = "Nid"
+    var id: String { rawValue }
+}
+
+// MARK: - Supervisor Create Job
+struct SupervisorCreateJobView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var jobsViewModel: JobsViewModel
+    @EnvironmentObject var authViewModel: AuthViewModel
+    @EnvironmentObject var usersViewModel: UsersViewModel
+
+    // Allow prefill from Import/Review flow
+    init(
+        prefillAddress: String? = nil,
+        prefillDate: Date? = nil,
+        prefillJobNumber: String? = nil,
+        prefillUserID: String? = nil,
+        prefillNotes: String? = nil
+    ) {
+        _address = State(initialValue: prefillAddress ?? "")
+        _date = State(initialValue: prefillDate ?? Date())
+        _jobNumber = State(initialValue: prefillJobNumber ?? "")
+        _selectedUserID = State(initialValue: prefillUserID)
+        _notes = State(initialValue: prefillNotes ?? "")
+    }
+
+    // Role filter for users
+    @State private var roleFilter: RoleFilter = .all
+
+    // Form fields
+    @State private var address = ""
+    @State private var date = Date()
+    @State private var notes = ""
+    @State private var materialsUsed = ""
+    @State private var jobNumber = ""
+    @State private var portalID = ""
+    @State private var locationNumber = ""
+    @State private var assignmentsText: String = ""
+    @State private var selectedUserID: String? = nil
+    @State private var showUserPicker = false
+
+    @FocusState private var isAssignmentsFocused: Bool
+    @FocusState private var isAddressFocused: Bool
+
+    // Reuse autocomplete
+    @StateObject private var addressSearch = AddressSearchCompleter()
+    @StateObject private var locationProvider = LocationProvider()
+
+    @State private var showAlert = false
+
+    // No statusOptions needed; status always Pending
+
+    private var isPortalIDInvalid: Bool {
+        let trimmed = portalID.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && Job.normalizedPortalID(from: trimmed) == nil
+    }
+
+    private var isLocationNumberInvalid: Bool {
+        let trimmed = locationNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && Job.normalizedLocationNumber(from: trimmed) == nil
+    }
+
+    private var selectedUserName: String {
+        guard let id = selectedUserID, let u = usersViewModel.user(id: id) else { return "Unassigned" }
+        let first = u.firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let last  = u.lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = [first, last].filter { !$0.isEmpty }.joined(separator: " ")
+        return name.isEmpty ? "Unassigned" : name
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                JTGradients.background(stops: 4)
+                    .ignoresSafeArea()
+
+                Form {
+                    // Worker Role filter
+                    Section(header: Text("Worker Role")) {
+                        Picker("Role", selection: $roleFilter) {
+                            ForEach(RoleFilter.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    // Assign to user (filtered by role)
+                    Section(header: Text("Assign To")) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(selectedUserName)
+                                    .font(.body)
+                                Text(roleFilter == .all ? "Choose from all users" : "Filtered by \(roleFilter.rawValue)")
+                                    .font(.caption)
+                                    .foregroundStyle(JTColors.textMuted)
+                            }
+                            Spacer()
+                            Button {
+                                showUserPicker = true
+                            } label: {
+                                Label("Select", systemImage: "person.crop.circle.badge.plus")
+                            }
+                        }
+                    }
+
+                    // Address with suggestions
+                    Section(header: Text("Address")) {
+                        ZStack(alignment: .topLeading) {
+                            TextField("Enter address", text: $address)
+                                .disableAutocorrection(true)
+                                .textInputAutocapitalization(.never)
+                                .focused($isAddressFocused)
+                                .onChange(of: address) { _, newValue in
+                                    if newValue.trimmingCharacters(in: .whitespaces).count >= 3 {
+                                        addressSearch.update(query: newValue)
+                                    } else {
+                                        addressSearch.results = []
+                                    }
+                                }
+                                .onAppear { locationProvider.request() }
+                                .onChange(of: addressSearch.results) { _, _ in
+                                    addressSearch.updateDistances(from: locationProvider.location)
+                                }
+                                .onChange(of: locationProvider.location) { _, _ in
+                                    addressSearch.updateDistances(from: locationProvider.location)
+                                }
+
+                            if isAddressFocused && !addressSearch.results.isEmpty {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    ForEach(Array(addressSearch.results.prefix(6).enumerated()), id: \.offset) { _, item in
+                                        Button(action: {
+                                            address = item.subtitle.isEmpty ? item.title : "\(item.title) \(item.subtitle)"
+                                            addressSearch.results = []
+                                            isAddressFocused = false
+                                            UIApplication.shared.endEditing()
+                                        }) {
+                                            HStack(alignment: .center, spacing: 10) {
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(item.title).font(.body)
+                                                    if !item.subtitle.isEmpty {
+                                                        Text(item.subtitle).font(.caption).foregroundStyle(JTColors.textMuted)
+                                                    }
+                                                }
+                                                Spacer()
+                                                let key = item.subtitle.isEmpty ? item.title : "\(item.title) \(item.subtitle)"
+                                                if let miles = addressSearch.distances[key] {
+                                                    Text(String(format: "%.1f mi", miles))
+                                                        .font(.caption.bold())
+                                                        .padding(.vertical, 5)
+                                                        .padding(.horizontal, 8)
+                                                        .background(JTColors.glassHighlight, in: Capsule())
+                                                        .overlay(Capsule().stroke(JTColors.glassSoftStroke))
+                                                }
+                                            }
+                                            .padding(.vertical, 10)
+                                            .padding(.horizontal, 12)
+                                            .frame(maxWidth: .infinity)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        if item != addressSearch.results.prefix(6).last {
+                                            Divider().padding(.leading, 12)
+                                        }
+                                    }
+                                }
+                                .jtGlassBackground(cornerRadius: JTShapes.fieldCornerRadius, strokeColor: JTColors.glassSoftStroke)
+                                .jtShadow(JTElevations.card)
+                                .padding(.top, 44)
+                            }
+                        }
+                    }
+
+                    Section(header: Text("Date")) {
+                        DatePicker("Select Date", selection: $date, displayedComponents: [.date])
+                            .datePickerStyle(.compact)
+                    }
+
+                    Section(header: Text("Job Number *")) {
+                        TextField("Required", text: $jobNumber)
+                    }
+
+                    Section(header: Text("Portal ID")) {
+                        TextField("Optional, e.g. 97087", text: $portalID)
+                            .keyboardType(.numberPad)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
+                        Text("Enter the Gibson portal edit ID, or paste the full portal link and the app will store the ID.")
+                            .font(.caption)
+                            .foregroundStyle(JTColors.textMuted)
+                        if isPortalIDInvalid {
+                            Text("Enter a numeric Portal ID or paste a Gibson portal edit link.")
+                                .font(.caption)
+                                .foregroundStyle(JTColors.error)
+                        }
+                    }
+
+                    Section(header: Text("Location Number")) {
+                        TextField("Optional, e.g. 833167", text: $locationNumber)
+                            .keyboardType(.numberPad)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
+                        Text("Use this when there is no Portal ID. Enter the location number or paste a Gibson consumer search link.")
+                            .font(.caption)
+                            .foregroundStyle(JTColors.textMuted)
+                        if isLocationNumberInvalid {
+                            Text("Enter a numeric location number or paste a Gibson consumer search link.")
+                                .font(.caption)
+                                .foregroundStyle(JTColors.error)
+                        }
+                    }
+
+                    Section(header: Text("Materials Used")) {
+                        TextField("Enter materials info…", text: $materialsUsed)
+                    }
+
+                    Section(header: Text("Notes")) {
+                        TextEditor(text: $notes).frame(minHeight: 80)
+                    }
+                }
+                .scrollContentBackground(.hidden)
+                .tint(JTColors.accent)
+                .foregroundStyle(JTColors.textPrimary)
+            }
+            .navigationTitle("New Job")
+            .navigationBarTitleDisplayMode(.inline)
+            .jtNavigationBarStyle()
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") { dismiss() }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") { saveJob() }
+                        .disabled(jobNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isPortalIDInvalid || isLocationNumberInvalid)
+                }
+            }
+            .sheet(isPresented: $showUserPicker) {
+                UserSelectSheet(
+                    users: filteredUsers,
+                    selectedUserID: $selectedUserID
+                )
+                .presentationDetents([.medium, .large])
+                .environmentObject(usersViewModel)
+            }
+        }
+    }
+
+    // Filter users by selected roleFilter (normalize legacy spellings)
+    private var filteredUsers: [AppUser] {
+        let users = usersViewModel.allUsers
+        let base: [AppUser]
+        switch roleFilter {
+        case .all:
+            base = users
+        case .underground, .oh, .can, .nid:
+            base = users.filter { user in
+                CrewPosition.normalizedKey(from: user.position).caseInsensitiveCompare(roleFilter.rawValue) == .orderedSame
+            }
+        }
+        return base.sorted { ($0.firstName + $0.lastName)
+            .localizedCaseInsensitiveCompare($1.firstName + $1.lastName) == .orderedAscending }
+    }
+
+    private func saveJob() {
+        guard let supervisorID = authViewModel.currentUser?.id else {
+            dismiss()
+            return
+        }
+
+        // New jobs created by supervisors always start as Pending
+        let finalStatus = "Pending"
+
+        Task {
+            let coord = await MapKitGeocoding.coordinate(for: address)
+
+            let job = Job(
+                address: address,
+                date: date,
+                status: finalStatus,
+                assignedTo: selectedUserID,
+                createdBy: supervisorID,
+                notes: notes,
+                jobNumber: jobNumber.isEmpty ? nil : jobNumber,
+                portalID: Job.normalizedPortalID(from: portalID),
+                locationNumber: Job.normalizedLocationNumber(from: locationNumber),
+                assignments: assignmentsText.isEmpty ? nil : assignmentsText,
+                materialsUsed: materialsUsed,
+                latitude: coord?.latitude,
+                longitude: coord?.longitude
+            )
+            await MainActor.run {
+                jobsViewModel.createJob(job)
+                dismiss()
+            }
+        }
+    }
+}
+
+// MARK: - User selector sheet
+private struct UserSelectSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var usersViewModel: UsersViewModel
+
+    let users: [AppUser]
+    @Binding var selectedUserID: String?
+    @State private var search = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button {
+                        selectedUserID = nil
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Image(systemName: "person.crop.circle")
+                            Text("Unassigned")
+                            if selectedUserID == nil {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(JTColors.accent)
+                            }
+                        }
+                    }
+                }
+
+                Section(header: Text("Users")) {
+                    ForEach(filtered, id: \.id) { u in
+                        Button {
+                            selectedUserID = u.id
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.circle.fill")
+                                    .imageScale(.large)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(u.firstName) \(u.lastName)")
+                                    Text(normalizedRole(u.position))
+                                        .font(.caption)
+                                        .foregroundStyle(JTColors.textMuted)
+                                }
+                                Spacer()
+                                if selectedUserID == u.id {
+                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(JTColors.accent)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Choose User")
+            .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search users…")
+            .jtNavigationBarStyle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private var filtered: [AppUser] {
+        let q = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !q.isEmpty else { return users }
+        return users.filter { u in
+            let name = (u.firstName + " " + u.lastName).lowercased()
+            return name.contains(q)
+        }
+    }
+
+    private func normalizedRole(_ s: String) -> String {
+        CrewPosition.positionDisplayName(from: s)
+    }
+}

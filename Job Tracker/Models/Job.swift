@@ -1,0 +1,384 @@
+import Foundation
+
+struct Job: Identifiable, Codable {
+    var id: String                  // Firestore doc ID or UUID
+    var address: String             // Full physical job address
+    var date: Date                  // Date for scheduling/tracking
+    var status: String              // e.g. "Pending", "Needs OH", "Done", etc.
+    var assignedTo: String?         // userID of whoever currently owns the job (nil = unclaimed)
+    var createdBy: String?          // userID of whoever created the job
+    var notes: String?              // Additional text notes
+    var jobNumber: String?          // A job number for timesheet or reference
+    var portalID: String?           // Gibson portal edit ID used to deep-link into the external portal
+    var locationNumber: String?     // Gibson consumer location number used to search the external portal
+    var assignments: String?        // e.g. "12.3.2" or "123.2.4" – free-form dotted assignment code
+    var materialsUsed: String?      // e.g. "Preforms, Weatherhead, Rams Head, 1 Nid Box and 1 Jumper", etc.
+    var photos: [String]            // Array of image URLs
+    var housePhotoURL: String?
+    var nidPhotoURL: String?
+    var canPhotoURL: String?
+    var participants: [String]?     // userIDs who can see this job (visibility list)
+    // Geographic coordinates (optional; filled when geocoded or user-entered)
+    var latitude: Double?
+    var longitude: Double?
+    var hours: Double               // Hours spent on this job
+    
+    // New optional properties for footages:
+    var nidFootage: String?
+    var canFootage: String?
+    var jobPlacement: String?       // "OH" or "UG"
+    
+    // Default initializer updated to include new fields.
+    init(
+        id: String = UUID().uuidString,
+        address: String,
+        date: Date,
+        status: String,
+        assignedTo: String? = nil,
+        createdBy: String? = nil,
+        notes: String = "",
+        jobNumber: String? = nil,
+        portalID: String? = nil,
+        locationNumber: String? = nil,
+        assignments: String? = nil,
+        materialsUsed: String? = nil,
+        photos: [String] = [],
+        housePhotoURL: String? = nil,
+        nidPhotoURL: String? = nil,
+        canPhotoURL: String? = nil,
+        participants: [String]? = nil,
+        hours: Double = 0.0,
+        nidFootage: String? = nil,
+        canFootage: String? = nil,
+        jobPlacement: String? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil
+    ) {
+        self.id = id
+        self.address = address
+        self.date = date
+        self.status = status
+        self.assignedTo = assignedTo
+        self.createdBy = createdBy
+        self.notes = notes
+        self.jobNumber = jobNumber
+        self.portalID = Self.normalizedPortalID(from: portalID)
+        self.locationNumber = Self.normalizedLocationNumber(from: locationNumber)
+        self.assignments = assignments
+        self.materialsUsed = materialsUsed
+        self.photos = photos
+        self.housePhotoURL = housePhotoURL
+        self.nidPhotoURL = nidPhotoURL
+        self.canPhotoURL = canPhotoURL
+        self.participants = participants
+        self.hours = hours
+        self.nidFootage = nidFootage
+        self.canFootage = canFootage
+        self.jobPlacement = jobPlacement
+        self.latitude = latitude
+        self.longitude = longitude
+    }
+}
+
+extension Job: Hashable {
+    static func == (lhs: Job, rhs: Job) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+}
+
+extension Job {
+    /// A job is still active while its status is Pending; any other status means it is done.
+    var isPending: Bool {
+        status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "pending"
+    }
+
+    var isDone: Bool {
+        !isPending
+    }
+
+    /// Returns the first component of the address (before any commas) as a "short address."
+    var shortAddress: String {
+        let components = address.split(separator: ",")
+        guard let firstComponent = components.first else { return address }
+        return firstComponent.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+import CoreLocation
+extension Job {
+    /// Convenience CLLocation for distance calculations (returns nil if coords missing)
+    var clLocation: CLLocation? {
+        guard let lat = latitude, let lon = longitude else { return nil }
+        return CLLocation(latitude: lat, longitude: lon)
+    }
+}
+
+// MARK: - Gibson portal support
+
+extension Job {
+    static let portalBaseURLString = "https://portal.gibsonemc.com/edit"
+    static let locationSearchBaseURLString = "https://portal.gibsonemc.com/consumers/search/"
+
+    /// Accepts either a plain portal ID (for example, "97087") or a full Gibson portal URL
+    /// and returns the numeric edit ID that should be stored on the job.
+    static func normalizedPortalID(from rawValue: String?) -> String? {
+        guard let rawValue else { return nil }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let url = URL(string: trimmed),
+           let editIndex = url.pathComponents.firstIndex(of: "edit"),
+           url.pathComponents.indices.contains(editIndex + 1) {
+            let candidate = url.pathComponents[editIndex + 1]
+            return candidate.allSatisfy(\.isNumber) ? candidate : nil
+        }
+
+        return trimmed.allSatisfy(\.isNumber) ? trimmed : nil
+    }
+
+    var normalizedPortalID: String? {
+        Self.normalizedPortalID(from: portalID)
+    }
+
+    /// Accepts either a plain location number (for example, "833167") or a full Gibson
+    /// consumer search URL and returns the numeric location number that should be stored.
+    static func normalizedLocationNumber(from rawValue: String?) -> String? {
+        guard let rawValue else { return nil }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let url = URL(string: trimmed),
+           let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           url.path.contains("/consumers/search"),
+           let queryValue = components.queryItems?.first(where: { $0.name == "q" })?.value?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !queryValue.isEmpty,
+           queryValue.allSatisfy(\.isNumber) {
+            return queryValue
+        }
+
+        return trimmed.allSatisfy(\.isNumber) ? trimmed : nil
+    }
+
+    var normalizedLocationNumber: String? {
+        Self.normalizedLocationNumber(from: locationNumber)
+    }
+
+    var portalURL: URL? {
+        guard let normalizedPortalID else { return nil }
+        return URL(string: "\(Self.portalBaseURLString)/\(normalizedPortalID)")
+    }
+
+    var locationSearchURL: URL? {
+        guard let normalizedLocationNumber else { return nil }
+        var components = URLComponents(string: Self.locationSearchBaseURLString)
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: normalizedLocationNumber),
+            URLQueryItem(name: "models", value: "consumers.consumer")
+        ]
+        return components?.url
+    }
+
+    var gibsonPortalURL: URL? {
+        portalURL ?? locationSearchURL
+    }
+}
+
+// MARK: - Search index support
+
+protocol JobSearchMatchable {
+    var id: String { get }
+    var address: String { get }
+    var jobNumber: String? { get }
+    var portalID: String? { get }
+    var locationNumber: String? { get }
+    var status: String { get }
+    var createdBy: String? { get }
+    var date: Date { get }
+    var notes: String? { get }
+    var assignments: String? { get }
+    var materialsUsed: String? { get }
+    var nidFootage: String? { get }
+    var canFootage: String? { get }
+    var jobPlacement: String? { get }
+}
+
+extension Job: JobSearchMatchable {
+    var displayStatus: String { CrewPosition.statusDisplayName(from: status) }
+}
+
+
+struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearchMatchable {
+    var id: String
+    var address: String
+    var jobNumber: String?
+    var portalID: String?
+    var locationNumber: String?
+    var status: String
+    var createdBy: String?
+    var date: Date
+    var notes: String?
+    var assignments: String?
+    var materialsUsed: String?
+    var nidFootage: String?
+    var canFootage: String?
+    var jobPlacement: String?
+
+    init(
+        id: String,
+        address: String,
+        jobNumber: String? = nil,
+        portalID: String? = nil,
+        locationNumber: String? = nil,
+        status: String,
+        createdBy: String? = nil,
+        date: Date,
+        notes: String? = nil,
+        assignments: String? = nil,
+        materialsUsed: String? = nil,
+        nidFootage: String? = nil,
+        canFootage: String? = nil,
+        jobPlacement: String? = nil
+    ) {
+        self.id = id
+        self.address = address
+        self.jobNumber = jobNumber
+        self.portalID = Job.normalizedPortalID(from: portalID)
+        self.locationNumber = Job.normalizedLocationNumber(from: locationNumber)
+        self.status = status
+        self.createdBy = createdBy
+        self.date = date
+        self.notes = notes
+        self.assignments = assignments
+        self.materialsUsed = materialsUsed
+        self.nidFootage = nidFootage
+        self.canFootage = canFootage
+        self.jobPlacement = jobPlacement
+    }
+
+    init(job: Job) {
+        self.init(
+            id: job.id,
+            address: job.address,
+            jobNumber: job.jobNumber,
+            portalID: job.portalID,
+            locationNumber: job.locationNumber,
+            status: job.status,
+            createdBy: job.createdBy,
+            date: job.date,
+            notes: job.notes,
+            assignments: job.assignments,
+            materialsUsed: job.materialsUsed,
+            nidFootage: job.nidFootage,
+            canFootage: job.canFootage,
+            jobPlacement: job.jobPlacement
+        )
+    }
+
+    func makePartialJob() -> Job {
+        var job = Job(
+            id: id,
+            address: address,
+            date: date,
+            status: status,
+            createdBy: createdBy,
+            notes: notes ?? "",
+            jobNumber: jobNumber,
+            portalID: portalID,
+            locationNumber: locationNumber,
+            assignments: assignments,
+            materialsUsed: materialsUsed,
+            photos: [],
+            participants: nil,
+            hours: 0.0,
+            nidFootage: nidFootage,
+            canFootage: canFootage,
+            jobPlacement: jobPlacement
+        )
+        job.notes = notes
+        job.assignments = assignments
+        job.materialsUsed = materialsUsed
+        job.nidFootage = nidFootage
+        job.canFootage = canFootage
+        job.jobPlacement = jobPlacement
+        job.jobNumber = jobNumber
+        job.portalID = Job.normalizedPortalID(from: portalID)
+        job.locationNumber = Job.normalizedLocationNumber(from: locationNumber)
+        job.createdBy = createdBy
+        return job
+    }
+}
+
+// MARK: - Timesheet sorting support
+
+extension Job {
+    fileprivate var trimmedJobNumberForTimesheet: String? {
+        guard let raw = jobNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return nil
+        }
+        return raw
+    }
+
+    fileprivate var normalizedJobNumberForTimesheet: String? {
+        trimmedJobNumberForTimesheet?.uppercased()
+    }
+
+    static func timesheetSortComparator(_ lhs: Job, _ rhs: Job) -> Bool {
+        let lhsNumber = lhs.trimmedJobNumberForTimesheet
+        let rhsNumber = rhs.trimmedJobNumberForTimesheet
+
+        switch (lhsNumber, rhsNumber) {
+        case let (.some(lhsString), .some(rhsString)):
+            let lhsInt = Int(lhsString)
+            let rhsInt = Int(rhsString)
+            if let lhsInt, let rhsInt, lhsInt != rhsInt {
+                return lhsInt < rhsInt
+            }
+
+            let lhsNormalized = lhs.normalizedJobNumberForTimesheet ?? lhsString.uppercased()
+            let rhsNormalized = rhs.normalizedJobNumberForTimesheet ?? rhsString.uppercased()
+            if lhsNormalized != rhsNormalized {
+                return lhsNormalized < rhsNormalized
+            }
+
+            if lhs.date != rhs.date {
+                return lhs.date < rhs.date
+            }
+
+            let addressComparison = lhs.address.localizedCaseInsensitiveCompare(rhs.address)
+            if addressComparison != .orderedSame {
+                return addressComparison == .orderedAscending
+            }
+
+            return lhs.id < rhs.id
+
+        case (.none, .none):
+            if lhs.date != rhs.date {
+                return lhs.date < rhs.date
+            }
+
+            let addressComparison = lhs.address.localizedCaseInsensitiveCompare(rhs.address)
+            if addressComparison != .orderedSame {
+                return addressComparison == .orderedAscending
+            }
+
+            return lhs.id < rhs.id
+
+        case (.none, .some):
+            return false
+
+        case (.some, .none):
+            return true
+        }
+    }
+}
+
+extension Sequence where Element == Job {
+    /// Returns the jobs sorted in the same order used by the weekly timesheet UI/PDF.
+    func sortedForTimesheet() -> [Job] {
+        sorted(by: Job.timesheetSortComparator)
+    }
+}
