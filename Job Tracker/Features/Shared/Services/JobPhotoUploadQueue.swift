@@ -21,6 +21,17 @@ enum JobPhotoSlot: String, Codable, CaseIterable {
             return "canPhotoURL"
         }
     }
+
+    var displayTitle: String {
+        switch self {
+        case .house:
+            return "House Photo"
+        case .nid:
+            return "NID Photo"
+        case .can:
+            return "CAN Photo"
+        }
+    }
 }
 
 private struct PendingJobPhotoUpload: Identifiable, Codable, Equatable {
@@ -88,11 +99,7 @@ struct JobPhotoUploadStatus: Identifiable, Equatable {
     let state: State
 
     var title: String {
-        switch slot {
-        case .house: return "House photo"
-        case .nid: return "NID photo"
-        case .can: return "Can photo"
-        }
+        slot.displayTitle
     }
 
     var subtitle: String {
