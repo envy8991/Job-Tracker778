@@ -89,7 +89,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		AA000000000000000000000C /* Exceptions for "Job Tracker Widgets" folder in "Job Tracker Widgets" target */ = {
+		AA000000000000000000000E /* Exceptions for "Job Tracker Widgets" folder in "Job Tracker Widgets" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -122,7 +122,7 @@
 		AA0000000000000000000004 /* Job Tracker Widgets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				AA000000000000000000000C /* Exceptions for "Job Tracker Widgets" folder in "Job Tracker Widgets" target */,
+				AA000000000000000000000E /* Exceptions for "Job Tracker Widgets" folder in "Job Tracker Widgets" target */,
 			);
 			path = "Job Tracker Widgets";
 			sourceTree = "<group>";
