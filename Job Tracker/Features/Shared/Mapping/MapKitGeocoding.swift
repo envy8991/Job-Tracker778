@@ -23,9 +23,9 @@ enum MapKitGeocoding {
 
     static func coordinate(for mapItem: MKMapItem) -> CLLocationCoordinate2D? {
         if #available(iOS 26.0, *) {
-            return mapItem.location?.coordinate
+            return mapItem.location.coordinate
         } else {
-            return legacyCoordinate(for: mapItem)
+            return legacyPlacemarkCoordinate(for: mapItem)
         }
     }
 
@@ -36,8 +36,8 @@ enum MapKitGeocoding {
         application.open(url)
     }
 
-    @available(iOS, introduced: 2.0, obsoleted: 26.0, message: "Use MKMapItem.location instead.")
-    private static func legacyCoordinate(for mapItem: MKMapItem) -> CLLocationCoordinate2D? {
+    @available(iOS, introduced: 2.0, deprecated: 26.0, message: "Use MKMapItem.location instead.")
+    private static func legacyPlacemarkCoordinate(for mapItem: MKMapItem) -> CLLocationCoordinate2D? {
         mapItem.placemark.location?.coordinate
     }
 }
