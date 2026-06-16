@@ -174,24 +174,101 @@ private struct AddressDraft: Identifiable, Equatable {
     }
 }
 
-private struct DuplicateJobConfirmation: Identifiable {
-    let id = UUID()
-    let newJob: Job
-    let existingJob: JobSearchIndexEntry
+private struct DuplicateJobMatch: Identifiable {
+    let entry: JobSearchIndexEntry
     let reasons: [String]
-    let remainingJobs: [Job]
+    let score: Int
 
-    var message: String {
-        var lines = [
-            "This may already be in Job Tracker:",
-            existingJob.address
-        ]
-        if let jobNumber = existingJob.jobNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !jobNumber.isEmpty {
-            lines.append("Job #: \(jobNumber)")
+    var id: String { entry.id }
+
+    var reasonsText: String {
+        reasons.joined(separator: ", ")
+    }
+}
+
+private struct DuplicateJobPrompt: Identifiable {
+    let id = UUID()
+    let addressID: AddressDraft.ID?
+    let address: String
+    let newJob: Job?
+    let matches: [DuplicateJobMatch]
+    let remainingJobs: [Job]
+    let joinsAndContinuesSave: Bool
+
+    var title: String {
+        matches.count == 1 ? "Existing Job Found" : "Existing Jobs Found"
+    }
+}
+
+private struct DuplicateJobsSheet: View {
+    let prompt: DuplicateJobPrompt
+    let onJoin: (DuplicateJobMatch) -> Void
+    let onCreateSeparate: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("We found existing job\(prompt.matches.count == 1 ? "" : "s") that match this address or location.")
+                        .font(.headline)
+
+                    Text(prompt.address)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(prompt.matches) { match in
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(match.entry.address)
+                                        .font(.headline)
+                                    if let jobNumber = match.entry.jobNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !jobNumber.isEmpty {
+                                        Text("Job #: \(jobNumber)")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Text("Matched by: \(match.reasonsText)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(match.entry.date, style: .date)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Button {
+                                onJoin(match)
+                            } label: {
+                                Label("Add This Job to My Dashboard", systemImage: "plus.circle.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .padding()
+                        .background(.thinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+
+                    Button(role: .destructive) {
+                        onCreateSeparate()
+                    } label: {
+                        Label("Create My Own Separate Job", systemImage: "doc.badge.plus")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding()
+            }
+            .navigationTitle(prompt.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { onCancel() }
+                }
+            }
         }
-        lines.append("Matched by: \(reasons.joined(separator: ", "))")
-        lines.append("Add yourself to the existing job so everyone shares notes, or create a separate job if this is truly different.")
-        return lines.joined(separator: "\n")
     }
 }
 
@@ -217,7 +294,8 @@ struct CreateJobView: View {
     @StateObject private var locationProvider = LocationProvider()
 
     @State private var alertMessage: String?
-    @State private var duplicateConfirmation: DuplicateJobConfirmation?
+    @State private var duplicatePrompt: DuplicateJobPrompt?
+    @State private var duplicateCheckTasks: [AddressDraft.ID: Task<Void, Never>] = [:]
 
     let statusOptions = ["Pending","OH","UG","Nid","Can","Done","Talk to Rick","Custom"]
 
@@ -448,19 +526,20 @@ struct CreateJobView: View {
                     Text(alertMessage)
                 }
             })
-            .alert("Possible Duplicate Job", isPresented: duplicateConfirmationBinding, presenting: duplicateConfirmation, actions: { confirmation in
-                Button("Add Me to Existing Job") {
-                    joinExistingJob(confirmation)
-                }
-                Button("Create Separate Job", role: .destructive) {
-                    createJobAndContinue(confirmation.newJob, remainingJobs: confirmation.remainingJobs)
-                }
-                Button("Cancel", role: .cancel) {
-                    duplicateConfirmation = nil
-                }
-            }, message: { confirmation in
-                Text(confirmation.message)
-            })
+            .sheet(item: $duplicatePrompt) { prompt in
+                DuplicateJobsSheet(
+                    prompt: prompt,
+                    onJoin: { match in
+                        joinExistingJob(match, prompt: prompt)
+                    },
+                    onCreateSeparate: {
+                        createSeparateJob(from: prompt)
+                    },
+                    onCancel: {
+                        duplicatePrompt = nil
+                    }
+                )
+            }
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     if focusedAddressID != nil {
@@ -480,7 +559,11 @@ struct CreateJobView: View {
             .onChange(of: locationProvider.location) { _, _ in
                 addressSearch.updateDistances(from: locationProvider.location)
             }
-            .onChange(of: focusedAddressID) { _, newValue in
+            .onChange(of: focusedAddressID) { oldValue, newValue in
+                if let oldValue, newValue != oldValue,
+                   let address = addresses.first(where: { $0.id == oldValue })?.text {
+                    scheduleDuplicateReview(for: oldValue, address: address)
+                }
                 guard let newValue else {
                     addressSearch.results = []
                     return
@@ -574,12 +657,15 @@ struct CreateJobView: View {
         }
 
         let remaining = Array(jobs.dropFirst())
-        if let match = bestDuplicateMatch(for: next) {
-            duplicateConfirmation = DuplicateJobConfirmation(
+        let matches = duplicateMatches(for: next)
+        if !matches.isEmpty {
+            duplicatePrompt = DuplicateJobPrompt(
+                addressID: nil,
+                address: next.address,
                 newJob: next,
-                existingJob: match.entry,
-                reasons: match.reasons,
-                remainingJobs: remaining
+                matches: matches,
+                remainingJobs: remaining,
+                joinsAndContinuesSave: true
             )
             return
         }
@@ -588,27 +674,40 @@ struct CreateJobView: View {
     }
 
     private func createJobAndContinue(_ job: Job, remainingJobs: [Job]) {
-        duplicateConfirmation = nil
+        duplicatePrompt = nil
         jobsViewModel.createJob(job) { _ in
             processPreparedJobs(remainingJobs)
         }
     }
 
-    private func joinExistingJob(_ confirmation: DuplicateJobConfirmation) {
-        duplicateConfirmation = nil
-        jobsViewModel.addCurrentUserAsParticipant(to: confirmation.existingJob.id) { success in
+    private func joinExistingJob(_ match: DuplicateJobMatch, prompt: DuplicateJobPrompt) {
+        duplicatePrompt = nil
+        jobsViewModel.addCurrentUserAsParticipant(to: match.entry.id) { success in
             if success {
-                processPreparedJobs(confirmation.remainingJobs)
+                if prompt.joinsAndContinuesSave {
+                    processPreparedJobs(prompt.remainingJobs)
+                } else if let addressID = prompt.addressID {
+                    removeAddress(id: addressID)
+                }
             } else {
                 alertMessage = "Could not add you to the existing job. Please try again or create a separate job."
             }
         }
     }
 
-    private func bestDuplicateMatch(for job: Job) -> (entry: JobSearchIndexEntry, reasons: [String])? {
-        let candidates = jobsViewModel.allSearchEntries.compactMap { entry -> (JobSearchIndexEntry, [String], Int)? in
+    private func createSeparateJob(from prompt: DuplicateJobPrompt) {
+        duplicatePrompt = nil
+        if prompt.joinsAndContinuesSave, let newJob = prompt.newJob {
+            createJobAndContinue(newJob, remainingJobs: prompt.remainingJobs)
+        }
+    }
+
+    private func duplicateMatches(for job: Job) -> [DuplicateJobMatch] {
+        let candidates = jobsViewModel.allSearchEntries.compactMap { entry -> DuplicateJobMatch? in
             var reasons: [String] = []
             var score = 0
+
+            if entry.id == job.id { return nil }
 
             if let jobPortalID = job.normalizedPortalID,
                let entryPortalID = Job.normalizedPortalID(from: entry.portalID),
@@ -644,13 +743,13 @@ struct CreateJobView: View {
             }
 
             guard !reasons.isEmpty, score >= 35 else { return nil }
-            return (entry, reasons, score)
+            return DuplicateJobMatch(entry: entry, reasons: reasons, score: score)
         }
 
         return candidates.sorted { lhs, rhs in
-            if lhs.2 != rhs.2 { return lhs.2 > rhs.2 }
-            return lhs.0.date > rhs.0.date
-        }.first.map { ($0.0, $0.1) }
+            if lhs.score != rhs.score { return lhs.score > rhs.score }
+            return lhs.entry.date > rhs.entry.date
+        }
     }
 
     private func coordinateDistance(from job: Job, to entry: JobSearchIndexEntry) -> CLLocationDistance? {
@@ -753,15 +852,6 @@ struct CreateJobView: View {
         )
     }
 
-    private var duplicateConfirmationBinding: Binding<Bool> {
-        Binding(
-            get: { duplicateConfirmation != nil },
-            set: { newValue in
-                if !newValue { duplicateConfirmation = nil }
-            }
-        )
-    }
-
     @ViewBuilder
     private func addressField(for address: Binding<AddressDraft>) -> some View {
         let addressID = address.wrappedValue.id
@@ -779,6 +869,9 @@ struct CreateJobView: View {
             .disableAutocorrection(true)
             .textInputAutocapitalization(.never)
             .focused($focusedAddressID, equals: addressID)
+            .onSubmit {
+                scheduleDuplicateReview(for: addressID, address: address.wrappedValue.text)
+            }
             .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -798,6 +891,7 @@ struct CreateJobView: View {
                             addressSearch.results = []
                             focusedAddressID = nil
                             UIApplication.shared.endEditing()
+                            scheduleDuplicateReview(for: addressID, address: composed)
                         } label: {
                             HStack(alignment: .center, spacing: 10) {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -866,6 +960,8 @@ struct CreateJobView: View {
     }
 
     private func removeAddress(id: AddressDraft.ID) {
+        duplicateCheckTasks[id]?.cancel()
+        duplicateCheckTasks[id] = nil
         guard let index = addresses.firstIndex(where: { $0.id == id }) else { return }
 
         if focusedAddressID != nil {
@@ -877,6 +973,41 @@ struct CreateJobView: View {
         addresses.remove(at: index)
         if addresses.isEmpty {
             addresses = [AddressDraft()]
+        }
+    }
+
+    private func scheduleDuplicateReview(for addressID: AddressDraft.ID, address: String) {
+        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        duplicateCheckTasks[addressID]?.cancel()
+        duplicateCheckTasks[addressID] = Task {
+            let coordinate = await MapKitGeocoding.coordinate(for: trimmed)
+            guard !Task.isCancelled else { return }
+
+            let probe = Job(
+                address: trimmed,
+                date: date,
+                status: "Pending",
+                latitude: coordinate?.latitude,
+                longitude: coordinate?.longitude
+            )
+
+            await MainActor.run {
+                guard addresses.contains(where: { $0.id == addressID && $0.text.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed }) else {
+                    return
+                }
+                let matches = duplicateMatches(for: probe)
+                guard !matches.isEmpty else { return }
+                duplicatePrompt = DuplicateJobPrompt(
+                    addressID: addressID,
+                    address: trimmed,
+                    newJob: nil,
+                    matches: matches,
+                    remainingJobs: [],
+                    joinsAndContinuesSave: false
+                )
+            }
         }
     }
 }

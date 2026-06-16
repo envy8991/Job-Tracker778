@@ -309,7 +309,6 @@ private struct RecentCrewJobDetailSheet: View {
 
     @EnvironmentObject private var jobsViewModel: JobsViewModel
     @EnvironmentObject private var usersViewModel: UsersViewModel
-    @EnvironmentObject private var authViewModel: AuthViewModel
     @Environment(\.dismiss) private var dismiss
 
     @State private var isAdding = false
@@ -538,25 +537,12 @@ private struct RecentCrewJobDetailSheet: View {
         isAdding = true
         errorMessage = nil
 
-        let userID = authViewModel.currentUser?.id
-
-        let finishCreation: (CLLocationCoordinate2D?) -> Void = { coordinate in
-            let newJob = Self.makeDashboardJob(from: job, userID: userID, coordinate: coordinate)
-
-            jobsViewModel.createJob(newJob) { success in
-                isAdding = false
-                if success {
-                    dismiss()
-                } else {
-                    errorMessage = "We couldn’t add the job to your dashboard. Please try again."
-                }
-            }
-        }
-
-        Task {
-            let coordinate = await MapKitGeocoding.coordinate(for: job.address)
-            await MainActor.run {
-                finishCreation(coordinate)
+        jobsViewModel.addCurrentUserAsParticipant(to: job.id) { success in
+            isAdding = false
+            if success {
+                dismiss()
+            } else {
+                errorMessage = "We couldn’t add the existing job to your dashboard. Please try again."
             }
         }
     }
