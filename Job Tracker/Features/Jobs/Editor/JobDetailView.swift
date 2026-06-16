@@ -104,7 +104,6 @@ private let jobPlacementChoices = ["OH", "UG"]
     @State private var housePhotoImage: UIImage?
     @State private var nidPhotoImage: UIImage?
     @State private var canPhotoImage: UIImage?
-    @State private var selectedMetaGlassesSlot: JobPhotoSlot = .house
 
     // Full-screen viewer state
     @State private var fullScreenImageURL: URL? = nil
@@ -329,15 +328,6 @@ private let jobPlacementChoices = ["OH", "UG"]
 
                     Section(header: Text("Job Photos")) { jobPhotoSlotsSection }
 
-                    Section(header: Text("Meta Smart Glasses")) {
-                        MetaSmartGlassesCapturePanel(
-                            job: job,
-                            selectedSlot: $selectedMetaGlassesSlot,
-                            onPhotoCaptured: applyMetaSmartGlassesCapture
-                        )
-                        .glassCard()
-                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-                    }
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)   // keep gradient visible
@@ -998,17 +988,6 @@ extension JobDetailView {
                 enqueuePendingPhotosIfNeeded()
                 finalizeJobSave()
             }
-        }
-    }
-
-    private func applyMetaSmartGlassesCapture(slot: JobPhotoSlot, image: UIImage) {
-        switch slot {
-        case .house:
-            housePhotoImage = image
-        case .nid:
-            nidPhotoImage = image
-        case .can:
-            canPhotoImage = image
         }
     }
 

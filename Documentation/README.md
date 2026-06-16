@@ -12,7 +12,6 @@ This folder collects long-form guides for each feature area in Job Tracker. The 
 - [Dashboard](Features/Dashboard.md)
 - [Help](Features/Help.md)
 - [Jobs](Features/Jobs.md)
-- [Meta Smart Glasses Integration Concept](Features/MetaSmartGlasses.md)
 - [Search](Features/Search.md)
 - [Settings](Features/Settings.md)
 - [Shared](Features/Shared.md)

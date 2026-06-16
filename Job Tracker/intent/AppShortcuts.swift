@@ -108,16 +108,6 @@ struct JobTrackerShortcuts: AppShortcutsProvider {
                 ],
                 shortTitle: "Current Job",
                 systemImageName: "briefcase"
-            ),
-            AppShortcut(
-                intent: AddMetaSmartGlassesJobNoteIntent(),
-                phrases: [
-                    "Meta add evidence to my current job in \(.applicationName)",
-                    "Add Meta glasses note with \(.applicationName)",
-                    "Add this footage to my current job with \(.applicationName)"
-                ],
-                shortTitle: "Meta Evidence",
-                systemImageName: "eyeglasses"
             )
         ]
     }
