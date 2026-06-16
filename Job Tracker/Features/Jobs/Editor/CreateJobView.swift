@@ -174,6 +174,27 @@ private struct AddressDraft: Identifiable, Equatable {
     }
 }
 
+private struct DuplicateJobConfirmation: Identifiable {
+    let id = UUID()
+    let newJob: Job
+    let existingJob: JobSearchIndexEntry
+    let reasons: [String]
+    let remainingJobs: [Job]
+
+    var message: String {
+        var lines = [
+            "This may already be in Job Tracker:",
+            existingJob.address
+        ]
+        if let jobNumber = existingJob.jobNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !jobNumber.isEmpty {
+            lines.append("Job #: \(jobNumber)")
+        }
+        lines.append("Matched by: \(reasons.joined(separator: ", "))")
+        lines.append("Add yourself to the existing job so everyone shares notes, or create a separate job if this is truly different.")
+        return lines.joined(separator: "\n")
+    }
+}
+
 struct CreateJobView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var jobsViewModel: JobsViewModel
@@ -196,6 +217,7 @@ struct CreateJobView: View {
     @StateObject private var locationProvider = LocationProvider()
 
     @State private var alertMessage: String?
+    @State private var duplicateConfirmation: DuplicateJobConfirmation?
 
     let statusOptions = ["Pending","OH","UG","Nid","Can","Done","Talk to Rick","Custom"]
 
@@ -426,6 +448,19 @@ struct CreateJobView: View {
                     Text(alertMessage)
                 }
             })
+            .alert("Possible Duplicate Job", isPresented: duplicateConfirmationBinding, presenting: duplicateConfirmation, actions: { confirmation in
+                Button("Add Me to Existing Job") {
+                    joinExistingJob(confirmation)
+                }
+                Button("Create Separate Job", role: .destructive) {
+                    createJobAndContinue(confirmation.newJob, remainingJobs: confirmation.remainingJobs)
+                }
+                Button("Cancel", role: .cancel) {
+                    duplicateConfirmation = nil
+                }
+            }, message: { confirmation in
+                Text(confirmation.message)
+            })
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     if focusedAddressID != nil {
@@ -452,6 +487,9 @@ struct CreateJobView: View {
                 }
                 let current = addresses.first(where: { $0.id == newValue })?.text ?? ""
                 handleAddressQueryChange(current)
+            }
+            .onAppear {
+                jobsViewModel.startSearchIndexForAllJobs()
             }
         }
     }
@@ -501,17 +539,12 @@ struct CreateJobView: View {
         let portalIDValue = Job.normalizedPortalID(from: portalID)
         let locationNumberValue = Job.normalizedLocationNumber(from: locationNumber)
 
-        func processAddress(at index: Int) {
-            if index >= addressesToSave.count {
-                DispatchQueue.main.async { dismiss() }
-                return
-            }
-
-            let currentAddress = addressesToSave[index]
-            Task {
+        Task {
+            var preparedJobs: [Job] = []
+            for currentAddress in addressesToSave {
                 let coord = await MapKitGeocoding.coordinate(for: currentAddress)
 
-                let job = Job(
+                preparedJobs.append(Job(
                     address: currentAddress,
                     date: date,
                     status: finalStatus,
@@ -525,20 +558,151 @@ struct CreateJobView: View {
                     materialsUsed: materialsUsed,
                     latitude: coord?.latitude,
                     longitude: coord?.longitude
-                )
+                ))
+            }
 
-                DispatchQueue.main.async {
-                    jobsViewModel.createJob(job)
-                    if index == addressesToSave.count - 1 {
-                        dismiss()
-                    } else {
-                        processAddress(at: index + 1)
-                    }
-                }
+            await MainActor.run {
+                processPreparedJobs(preparedJobs)
             }
         }
+    }
 
-        processAddress(at: 0)
+    private func processPreparedJobs(_ jobs: [Job]) {
+        guard let next = jobs.first else {
+            dismiss()
+            return
+        }
+
+        let remaining = Array(jobs.dropFirst())
+        if let match = bestDuplicateMatch(for: next) {
+            duplicateConfirmation = DuplicateJobConfirmation(
+                newJob: next,
+                existingJob: match.entry,
+                reasons: match.reasons,
+                remainingJobs: remaining
+            )
+            return
+        }
+
+        createJobAndContinue(next, remainingJobs: remaining)
+    }
+
+    private func createJobAndContinue(_ job: Job, remainingJobs: [Job]) {
+        duplicateConfirmation = nil
+        jobsViewModel.createJob(job) { _ in
+            processPreparedJobs(remainingJobs)
+        }
+    }
+
+    private func joinExistingJob(_ confirmation: DuplicateJobConfirmation) {
+        duplicateConfirmation = nil
+        jobsViewModel.addCurrentUserAsParticipant(to: confirmation.existingJob.id) { success in
+            if success {
+                processPreparedJobs(confirmation.remainingJobs)
+            } else {
+                alertMessage = "Could not add you to the existing job. Please try again or create a separate job."
+            }
+        }
+    }
+
+    private func bestDuplicateMatch(for job: Job) -> (entry: JobSearchIndexEntry, reasons: [String])? {
+        let candidates = jobsViewModel.allSearchEntries.compactMap { entry -> (JobSearchIndexEntry, [String], Int)? in
+            var reasons: [String] = []
+            var score = 0
+
+            if let jobPortalID = job.normalizedPortalID,
+               let entryPortalID = Job.normalizedPortalID(from: entry.portalID),
+               jobPortalID == entryPortalID {
+                reasons.append("Portal ID")
+                score += 100
+            }
+
+            if let jobLocationNumber = job.normalizedLocationNumber,
+               let entryLocationNumber = Job.normalizedLocationNumber(from: entry.locationNumber),
+               jobLocationNumber == entryLocationNumber {
+                reasons.append("Location Number")
+                score += 100
+            }
+
+            if let distance = coordinateDistance(from: job, to: entry) {
+                if distance <= 50 {
+                    reasons.append("same coordinates")
+                    score += 90
+                } else if distance <= 200 {
+                    reasons.append("nearby coordinates")
+                    score += 45
+                }
+            }
+
+            let addressComparison = compareAddresses(job.address, entry.address)
+            if addressComparison.isExact {
+                reasons.append("address")
+                score += 80
+            } else if addressComparison.isClose {
+                reasons.append("similar address")
+                score += 35
+            }
+
+            guard !reasons.isEmpty, score >= 35 else { return nil }
+            return (entry, reasons, score)
+        }
+
+        return candidates.sorted { lhs, rhs in
+            if lhs.2 != rhs.2 { return lhs.2 > rhs.2 }
+            return lhs.0.date > rhs.0.date
+        }.first.map { ($0.0, $0.1) }
+    }
+
+    private func coordinateDistance(from job: Job, to entry: JobSearchIndexEntry) -> CLLocationDistance? {
+        guard let jobLatitude = job.latitude,
+              let jobLongitude = job.longitude,
+              let entryLatitude = entry.latitude,
+              let entryLongitude = entry.longitude else {
+            return nil
+        }
+
+        let newLocation = CLLocation(latitude: jobLatitude, longitude: jobLongitude)
+        let existingLocation = CLLocation(latitude: entryLatitude, longitude: entryLongitude)
+        return newLocation.distance(from: existingLocation)
+    }
+
+    private func compareAddresses(_ lhs: String, _ rhs: String) -> (isExact: Bool, isClose: Bool) {
+        let lhsKey = normalizedAddressKey(lhs)
+        let rhsKey = normalizedAddressKey(rhs)
+        guard !lhsKey.isEmpty, !rhsKey.isEmpty else { return (false, false) }
+        if lhsKey == rhsKey { return (true, false) }
+
+        let lhsTokens = Set(lhsKey.split(separator: " ").map(String.init))
+        let rhsTokens = Set(rhsKey.split(separator: " ").map(String.init))
+        let shared = lhsTokens.intersection(rhsTokens).count
+        let smallest = min(lhsTokens.count, rhsTokens.count)
+        return (false, smallest >= 3 && shared >= max(3, smallest - 1))
+    }
+
+    private func normalizedAddressKey(_ rawValue: String) -> String {
+        let replacements: [String: String] = [
+            "street": "st",
+            "st.": "st",
+            "avenue": "ave",
+            "ave.": "ave",
+            "road": "rd",
+            "rd.": "rd",
+            "drive": "dr",
+            "dr.": "dr",
+            "lane": "ln",
+            "ln.": "ln",
+            "court": "ct",
+            "ct.": "ct",
+            "highway": "hwy",
+            "hwy.": "hwy"
+        ]
+
+        return rawValue
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .map { replacements[$0] ?? $0 }
+            .joined(separator: " ")
     }
 
     // MARK: - Assignments helpers
@@ -585,6 +749,15 @@ struct CreateJobView: View {
             get: { alertMessage != nil },
             set: { newValue in
                 if !newValue { alertMessage = nil }
+            }
+        )
+    }
+
+    private var duplicateConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { duplicateConfirmation != nil },
+            set: { newValue in
+                if !newValue { duplicateConfirmation = nil }
             }
         )
     }

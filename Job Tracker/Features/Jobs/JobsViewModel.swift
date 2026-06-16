@@ -376,6 +376,34 @@ class JobsViewModel: ObservableObject {
         }
     }
 
+    func addCurrentUserAsParticipant(to jobID: String, completion: @escaping (Bool) -> Void = { _ in }) {
+        guard let userID = currentUserID(), !userID.isEmpty else {
+            completion(false)
+            return
+        }
+
+        db.collection("jobs").document(jobID).updateData([
+            "participants": FieldValue.arrayUnion([userID])
+        ]) { [weak self] error in
+            if let error = error {
+                print("Error joining existing job: \(error)")
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+
+            DispatchQueue.main.async {
+                if let index = self?.jobs.firstIndex(where: { $0.id == jobID }) {
+                    var participants = Set(self?.jobs[index].participants ?? [])
+                    participants.insert(userID)
+                    self?.jobs[index].participants = Array(participants).sorted()
+                    self?.rebuildSearchIndexEntries()
+                    self?.notifyJobsChanged()
+                }
+                completion(true)
+            }
+        }
+    }
+
     // MARK: - Update
 
     func updateJob(_ job: Job, documentID: String) {
