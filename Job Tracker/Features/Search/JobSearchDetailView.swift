@@ -18,6 +18,7 @@ struct JobSearchDetailView: View {
     @State private var isAdding = false
     @State private var errorMessage: String? = nil
     @State private var alertState: AlertState?
+    @State private var portalPage: GibsonPortalPage?
 
     private struct AlertState: Identifiable {
         enum Kind {
@@ -148,6 +149,9 @@ struct JobSearchDetailView: View {
                 ActivityView(activityItems: shareItems, subject: "Job link for \(subject)")
             }
         }
+        .sheet(item: $portalPage) { page in
+            GibsonPortalView(url: page.url)
+        }
         .alert(item: $alertState) { state in
             Alert(
                 title: Text(state.title),
@@ -244,7 +248,7 @@ struct JobSearchDetailView: View {
 
     private func openPortal(job: Job) {
         guard let url = job.gibsonPortalURL else { return }
-        UIApplication.shared.open(url)
+        portalPage = GibsonPortalPage(url: url)
     }
 
     private func openInMaps(job: Job) {
@@ -648,6 +652,7 @@ struct UniversalJobDetailView: View {
     @EnvironmentObject private var usersViewModel: UsersViewModel
     @Environment(\.dismiss) private var dismiss
     @AppStorage("addressSuggestionProvider") private var suggestionProviderRaw = "apple"
+    @State private var portalPage: GibsonPortalPage?
 
     private var summaryTitle: String {
         displayValue(job.shortAddress).flatMap { $0.isEmpty ? nil : $0 } ?? displayValue(job.address) ?? "Job"
@@ -754,6 +759,9 @@ struct UniversalJobDetailView: View {
             }
         }
         .jtNavigationBarStyle()
+        .sheet(item: $portalPage) { page in
+            GibsonPortalView(url: page.url)
+        }
     }
 
     private var summaryCard: some View {
@@ -824,7 +832,7 @@ struct UniversalJobDetailView: View {
 
     private func openPortal(job: Job) {
         guard let url = job.gibsonPortalURL else { return }
-        UIApplication.shared.open(url)
+        portalPage = GibsonPortalPage(url: url)
     }
 
     private func openInMaps(job: Job) {

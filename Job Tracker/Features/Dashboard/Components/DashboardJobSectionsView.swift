@@ -84,7 +84,6 @@ private struct DashboardJobSectionHeader: View {
 }
 
 struct JobCard: View {
-    @Environment(\.openURL) private var openURL
 
     let job: Job
     let isHere: Bool
@@ -99,6 +98,7 @@ struct JobCard: View {
     @State private var showStatusDialog = false
     @State private var showCustomStatusEntry = false
     @State private var customStatusText = ""
+    @State private var portalPage: GibsonPortalPage?
 
     init(
         job: Job,
@@ -150,6 +150,9 @@ struct JobCard: View {
         .alert("Delete this job?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive, action: onDelete)
             Button("Cancel", role: .cancel) { }
+        }
+        .sheet(item: $portalPage) { page in
+            GibsonPortalView(url: page.url)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(houseNumber(job.address)), \(DateFormatter.localizedString(from: job.date, dateStyle: .medium, timeStyle: .none))")
@@ -322,7 +325,7 @@ struct JobCard: View {
 
     private func openPortal() {
         guard let url = job.gibsonPortalURL else { return }
-        openURL(url)
+        portalPage = GibsonPortalPage(url: url)
     }
 
     private func statusBackground(for status: String) -> Color {
