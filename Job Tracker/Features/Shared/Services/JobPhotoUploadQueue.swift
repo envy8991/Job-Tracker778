@@ -10,6 +10,7 @@ enum JobPhotoSlot: String, Codable, CaseIterable {
     case house
     case nid
     case can
+    case mapDesign
 
     var firestoreField: String {
         switch self {
@@ -19,6 +20,8 @@ enum JobPhotoSlot: String, Codable, CaseIterable {
             return "nidPhotoURL"
         case .can:
             return "canPhotoURL"
+        case .mapDesign:
+            return "mapDesignPhotoURL"
         }
     }
 
@@ -30,6 +33,8 @@ enum JobPhotoSlot: String, Codable, CaseIterable {
             return "NID Photo"
         case .can:
             return "CAN Photo"
+        case .mapDesign:
+            return "Map Design"
         }
     }
 }

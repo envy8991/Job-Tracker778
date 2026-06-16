@@ -17,6 +17,7 @@ struct Job: Identifiable, Codable {
     var housePhotoURL: String?
     var nidPhotoURL: String?
     var canPhotoURL: String?
+    var mapDesignPhotoURL: String?
     var participants: [String]?     // userIDs who can see this job (visibility list)
     // Geographic coordinates (optional; filled when geocoded or user-entered)
     var latitude: Double?
@@ -46,6 +47,7 @@ struct Job: Identifiable, Codable {
         housePhotoURL: String? = nil,
         nidPhotoURL: String? = nil,
         canPhotoURL: String? = nil,
+        mapDesignPhotoURL: String? = nil,
         participants: [String]? = nil,
         hours: Double = 0.0,
         nidFootage: String? = nil,
@@ -70,6 +72,7 @@ struct Job: Identifiable, Codable {
         self.housePhotoURL = housePhotoURL
         self.nidPhotoURL = nidPhotoURL
         self.canPhotoURL = canPhotoURL
+        self.mapDesignPhotoURL = mapDesignPhotoURL
         self.participants = participants
         self.hours = hours
         self.nidFootage = nidFootage

@@ -8,6 +8,7 @@ final class AppNavigationViewModel: ObservableObject {
         case yellowSheet
         case maps
         case recentCrewJobs
+        case mapDesigns
         case search
         case more
         case profile
@@ -28,6 +29,7 @@ final class AppNavigationViewModel: ObservableObject {
             case .yellowSheet: return "Yellow Sheet"
             case .maps:        return "Route Mapper"
             case .recentCrewJobs: return "Recent Crew Jobs"
+            case .mapDesigns: return "Map Designs"
             case .search:      return "Job Search"
             case .more:        return "More"
             case .profile:     return "Profile"
@@ -48,6 +50,7 @@ final class AppNavigationViewModel: ObservableObject {
             case .yellowSheet: return "doc.text"
             case .maps:        return "map"
             case .recentCrewJobs: return "clock.arrow.circlepath"
+            case .mapDesigns: return "map.fill"
             case .search:      return "magnifyingglass"
             case .more:        return "ellipsis.circle"
             case .profile:     return "person.crop.circle"
@@ -68,6 +71,7 @@ final class AppNavigationViewModel: ObservableObject {
             case .yellowSheet: return .yellowSheet
             case .maps:        return .more
             case .recentCrewJobs: return .more
+            case .mapDesigns: return .more
             case .search:      return .search
             case .more,
                  .profile,
@@ -84,7 +88,7 @@ final class AppNavigationViewModel: ObservableObject {
 
         var isMoreStackDestination: Bool {
             switch self {
-            case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter, .maps, .recentCrewJobs, .spliceAssist, .gibsonPortal:
+            case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter, .maps, .recentCrewJobs, .mapDesigns, .spliceAssist, .gibsonPortal:
                 return true
             default:
                 return false
