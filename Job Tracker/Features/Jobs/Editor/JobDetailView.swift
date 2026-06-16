@@ -104,6 +104,7 @@ private let jobPlacementChoices = ["OH", "UG"]
     @State private var housePhotoImage: UIImage?
     @State private var nidPhotoImage: UIImage?
     @State private var canPhotoImage: UIImage?
+    @State private var mapDesignPhotoImage: UIImage?
 
     // Full-screen viewer state
     @State private var fullScreenImageURL: URL? = nil
@@ -410,6 +411,8 @@ private let jobPlacementChoices = ["OH", "UG"]
                                 nidPhotoImage = newImage
                             case .can:
                                 canPhotoImage = newImage
+                            case .mapDesign:
+                                mapDesignPhotoImage = newImage
                             case .none:
                                 break
                             }
@@ -590,6 +593,7 @@ extension JobDetailView {
             jobPhotoSlotCard(title: "House Picture", urlString: job.housePhotoURL, image: housePhotoImage, slot: .house)
             jobPhotoSlotCard(title: "NID Picture", urlString: job.nidPhotoURL, image: nidPhotoImage, slot: .nid)
             jobPhotoSlotCard(title: "CAN Picture", urlString: job.canPhotoURL, image: canPhotoImage, slot: .can)
+            jobPhotoSlotCard(title: "Map Design", urlString: job.mapDesignPhotoURL, image: mapDesignPhotoImage, slot: .mapDesign)
 
             if !job.photos.isEmpty {
                 legacyPhotosSection
@@ -995,7 +999,8 @@ extension JobDetailView {
         let pending: [(slot: JobPhotoSlot, image: UIImage)] = [
             housePhotoImage.map { (.house, $0) },
             nidPhotoImage.map { (.nid, $0) },
-            canPhotoImage.map { (.can, $0) }
+            canPhotoImage.map { (.can, $0) },
+            mapDesignPhotoImage.map { (.mapDesign, $0) }
         ].compactMap { $0 }
 
         guard !pending.isEmpty else { return }

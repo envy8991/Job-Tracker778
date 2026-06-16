@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct MainTabView: View {
     var body: some View {
@@ -120,6 +121,10 @@ private struct MoreMenuList: View {
                     Label(AppNavigationViewModel.Destination.recentCrewJobs.title,
                           systemImage: AppNavigationViewModel.Destination.recentCrewJobs.systemImage)
                 }
+                NavigationLink(value: AppNavigationViewModel.Destination.mapDesigns) {
+                    Label(AppNavigationViewModel.Destination.mapDesigns.title,
+                          systemImage: AppNavigationViewModel.Destination.mapDesigns.systemImage)
+                }
             }
 
             Section("Resources") {
@@ -190,6 +195,8 @@ private struct MoreDestinationView: View {
             HelpCenterView()
         case .recentCrewJobs:
             RecentCrewJobsView()
+        case .mapDesigns:
+            WeeklyMapDesignsView()
         case .spliceAssist:
             SpliceAssistView()
         case .gibsonPortal:
@@ -714,5 +721,173 @@ struct AdminUpdateLogsView: View {
             }
         }
         .navigationTitle("Update Logs")
+    }
+}
+
+// MARK: - Weekly Map Designs
+
+struct WeeklyMapDesignsView: View {
+    @StateObject private var timesheetJobsVM = TimesheetJobsViewModel()
+    @State private var selectedDate = Date()
+    @State private var shareItems: [Any] = []
+    @State private var isPreparingShare = false
+    @State private var isShowingShareSheet = false
+    @State private var shareErrorMessage: String?
+
+    private var completedJobs: [Job] {
+        timesheetJobsVM.jobs
+            .filter { $0.isDone }
+            .sorted { $0.date < $1.date }
+    }
+
+    private var jobsWithMapDesigns: [Job] {
+        completedJobs.filter { $0.mapDesignPhotoURL?.isEmpty == false }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                DatePicker("Week", selection: $selectedDate, displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .onChange(of: selectedDate) { _, newValue in
+                        timesheetJobsVM.fetchJobsForWeek(selectedDate: newValue)
+                    }
+            } footer: {
+                Text("Shows done jobs for the selected week, using the same weekly job window as timesheets.")
+            }
+
+            Section {
+                Button {
+                    Task { await prepareShare() }
+                } label: {
+                    if isPreparingShare {
+                        Label("Preparing Map Designs…", systemImage: "hourglass")
+                    } else {
+                        Label("Share Weekly Map Designs", systemImage: "square.and.arrow.up")
+                    }
+                }
+                .disabled(isPreparingShare || jobsWithMapDesigns.isEmpty)
+
+                if jobsWithMapDesigns.isEmpty {
+                    Text("No done jobs with map designs for this week yet.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Done Jobs") {
+                if completedJobs.isEmpty {
+                    Text("No done jobs found for this week.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(completedJobs) { job in
+                        WeeklyMapDesignJobRow(job: job)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(JTGradients.background(stops: 4).ignoresSafeArea())
+        .navigationTitle("Map Designs")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear { timesheetJobsVM.fetchJobsForWeek(selectedDate: selectedDate) }
+        .sheet(isPresented: $isShowingShareSheet) {
+            ActivityView(activityItems: shareItems, subject: "Weekly Map Designs")
+        }
+        .alert("Map Designs", isPresented: Binding(
+            get: { shareErrorMessage != nil },
+            set: { if !$0 { shareErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { shareErrorMessage = nil }
+        } message: {
+            Text(shareErrorMessage ?? "")
+        }
+    }
+
+    @MainActor
+    private func prepareShare() async {
+        isPreparingShare = true
+        defer { isPreparingShare = false }
+
+        var items: [Any] = ["Map Designs for \(formattedWeekRange(containing: selectedDate))"]
+        for job in jobsWithMapDesigns {
+            guard let urlString = job.mapDesignPhotoURL, let url = URL(string: urlString) else { continue }
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let image = UIImage(data: data) {
+                    items.append("\(job.shortAddress) — \(job.date.formatted(date: .abbreviated, time: .omitted))")
+                    items.append(image)
+                }
+            } catch {
+                #if DEBUG
+                print("[WeeklyMapDesignsView] Failed to load map design: \(error.localizedDescription)")
+                #endif
+            }
+        }
+
+        guard items.count > 1 else {
+            shareErrorMessage = "No map design images could be loaded for sharing."
+            return
+        }
+
+        shareItems = items
+        isShowingShareSheet = true
+    }
+
+    private func formattedWeekRange(containing date: Date) -> String {
+        var calendar = Calendar.current
+        calendar.firstWeekday = 1
+        guard let interval = calendar.dateInterval(of: .weekOfYear, for: date),
+              let end = calendar.date(byAdding: .day, value: -1, to: interval.end) else {
+            return date.formatted(date: .abbreviated, time: .omitted)
+        }
+        return "\(interval.start.formatted(date: .abbreviated, time: .omitted)) – \(end.formatted(date: .abbreviated, time: .omitted))"
+    }
+}
+
+private struct WeeklyMapDesignJobRow: View {
+    let job: Job
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(job.shortAddress)
+                        .font(.headline)
+                    Text(job.date, style: .date)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(job.displayStatus)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            if let urlString = job.mapDesignPhotoURL, let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(maxWidth: .infinity, minHeight: 160)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    case .failure:
+                        Label("Map design failed to load", systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.secondary)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+            } else {
+                Label("No map design uploaded", systemImage: "photo.badge.plus")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 6)
     }
 }
