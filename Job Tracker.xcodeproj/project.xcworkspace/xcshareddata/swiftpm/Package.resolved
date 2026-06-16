@@ -91,15 +91,6 @@
       }
     },
     {
-      "identity" : "meta-wearables-dat-ios",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/facebook/meta-wearables-dat-ios",
-      "state" : {
-        "revision" : "c40db39",
-        "version" : "0.7.0"
-      }
-    },
-    {
       "identity" : "nanopb",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/firebase/nanopb.git",

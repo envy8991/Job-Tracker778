@@ -16,8 +16,6 @@
 		CDDA11702D579F85007BADFF /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA116F2D579F85007BADFF /* FirebaseFirestore */; };
 		CD7E5700000000000000010C /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA116F2D579F85007BADFF /* FirebaseFirestore */; };
 		CDDA11722D579F85007BADFF /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = CDDA11712D579F85007BADFF /* FirebaseStorage */; };
-		CDFACE000000000000000001 /* MWDATCore in Frameworks */ = {isa = PBXBuildFile; productRef = CDFACE000000000000000004 /* MWDATCore */; };
-		CDFACE000000000000000002 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = CDFACE000000000000000005 /* MWDATCamera */; };
 		CDFE39FE2FA3624A00AEEAAB /* WebMaps in Resources */ = {isa = PBXBuildFile; fileRef = CDFE39FD2FA3624A00AEEAAB /* WebMaps */; };
 		AA0000000000000000000003 /* Job Tracker Widgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000002 /* Job Tracker Widgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -144,8 +142,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CDFACE000000000000000001 /* MWDATCore in Frameworks */,
-				CDFACE000000000000000002 /* MWDATCamera in Frameworks */,
 				CDDA116E2D579F85007BADFF /* FirebaseDatabase in Frameworks */,
 				CDDA11702D579F85007BADFF /* FirebaseFirestore in Frameworks */,
 				CDDA116C2D579F85007BADFF /* FirebaseCore in Frameworks */,
@@ -275,8 +271,6 @@
 				CDDA116D2D579F85007BADFF /* FirebaseDatabase */,
 				CDDA116F2D579F85007BADFF /* FirebaseFirestore */,
 				CDDA11712D579F85007BADFF /* FirebaseStorage */,
-				CDFACE000000000000000004 /* MWDATCore */,
-				CDFACE000000000000000005 /* MWDATCamera */,
 			);
 			productName = "Job Tracker";
 			productReference = CDDA111D2D579EC0007BADFF /* Job Tracker.app */;
@@ -391,7 +385,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				CDDA11682D579F85007BADFF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
-				CDFACE000000000000000003 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CDDA111E2D579EC0007BADFF /* Products */;
@@ -995,14 +988,6 @@
 				minimumVersion = 11.8.1;
 			};
 		};
-		CDFACE000000000000000003 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/facebook/meta-wearables-dat-ios";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.7.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1030,16 +1015,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = CDDA11682D579F85007BADFF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
-		};
-		CDFACE000000000000000004 /* MWDATCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = CDFACE000000000000000003 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
-			productName = MWDATCore;
-		};
-		CDFACE000000000000000005 /* MWDATCamera */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = CDFACE000000000000000003 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
-			productName = MWDATCamera;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

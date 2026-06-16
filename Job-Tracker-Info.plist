@@ -48,18 +48,8 @@
 	<key>GEMINI_API_KEY</key>
 	<string></string>
 	<key>NSCameraUsageDescription</key>
-	<string>Job Tracker uses the camera to capture job-site evidence photos, including Meta smart glasses fallback captures.</string>
+	<string>Job Tracker uses the camera to capture job-site evidence photos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Job Tracker lets you choose existing job-site evidence photos to attach to a job.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Job Tracker may use the microphone for future Meta smart glasses voice notes and hands-free field evidence workflows.</string>
-	<key>MWDAT</key>
-	<dict>
-		<key>Analytics</key>
-		<dict>
-			<key>OptOut</key>
-			<true/>
-		</dict>
-	</dict>
 </dict>
 </plist>
