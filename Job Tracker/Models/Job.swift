@@ -209,6 +209,8 @@ protocol JobSearchMatchable {
     var nidFootage: String? { get }
     var canFootage: String? { get }
     var jobPlacement: String? { get }
+    var latitude: Double? { get }
+    var longitude: Double? { get }
 }
 
 extension Job: JobSearchMatchable {
@@ -231,6 +233,8 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
     var nidFootage: String?
     var canFootage: String?
     var jobPlacement: String?
+    var latitude: Double?
+    var longitude: Double?
 
     init(
         id: String,
@@ -246,7 +250,9 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
         materialsUsed: String? = nil,
         nidFootage: String? = nil,
         canFootage: String? = nil,
-        jobPlacement: String? = nil
+        jobPlacement: String? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil
     ) {
         self.id = id
         self.address = address
@@ -262,6 +268,8 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
         self.nidFootage = nidFootage
         self.canFootage = canFootage
         self.jobPlacement = jobPlacement
+        self.latitude = latitude
+        self.longitude = longitude
     }
 
     init(job: Job) {
@@ -279,7 +287,9 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
             materialsUsed: job.materialsUsed,
             nidFootage: job.nidFootage,
             canFootage: job.canFootage,
-            jobPlacement: job.jobPlacement
+            jobPlacement: job.jobPlacement,
+            latitude: job.latitude,
+            longitude: job.longitude
         )
     }
 
@@ -301,7 +311,9 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
             hours: 0.0,
             nidFootage: nidFootage,
             canFootage: canFootage,
-            jobPlacement: jobPlacement
+            jobPlacement: jobPlacement,
+            latitude: latitude,
+            longitude: longitude
         )
         job.notes = notes
         job.assignments = assignments
@@ -312,6 +324,8 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
         job.jobNumber = jobNumber
         job.portalID = Job.normalizedPortalID(from: portalID)
         job.locationNumber = Job.normalizedLocationNumber(from: locationNumber)
+        job.latitude = latitude
+        job.longitude = longitude
         job.createdBy = createdBy
         return job
     }
