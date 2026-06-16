@@ -377,6 +377,19 @@ class JobsViewModel: ObservableObject {
     }
 
     func addCurrentUserAsParticipant(to jobID: String, completion: @escaping (Bool) -> Void = { _ in }) {
+        if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
+            let userID = "ui-test-user"
+            if let index = jobs.firstIndex(where: { $0.id == jobID }) {
+                var participants = Set(jobs[index].participants ?? [])
+                participants.insert(userID)
+                jobs[index].participants = Array(participants).sorted()
+                rebuildSearchIndexEntries()
+                notifyJobsChanged()
+            }
+            completion(true)
+            return
+        }
+
         guard let userID = currentUserID(), !userID.isEmpty else {
             completion(false)
             return
