@@ -122,6 +122,11 @@ extension Job {
 extension Job {
     static let portalBaseURLString = "https://portal.gibsonemc.com/edit"
     static let locationSearchBaseURLString = "https://portal.gibsonemc.com/consumers/search/"
+    static let portalLoginURL = "https://portal.gibsonemc.com/accounts/login/?next=/"
+
+    static var gibsonPortalLoginURL: URL {
+        URL(string: portalLoginURL)!
+    }
 
     /// Accepts either a plain portal ID (for example, "97087") or a full Gibson portal URL
     /// and returns the numeric edit ID that should be stored on the job.

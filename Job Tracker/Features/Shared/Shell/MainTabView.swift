@@ -127,6 +127,10 @@ private struct MoreMenuList: View {
                     Label(AppNavigationViewModel.Destination.maps.title,
                           systemImage: AppNavigationViewModel.Destination.maps.systemImage)
                 }
+                NavigationLink(value: AppNavigationViewModel.Destination.gibsonPortal) {
+                    Label(AppNavigationViewModel.Destination.gibsonPortal.title,
+                          systemImage: AppNavigationViewModel.Destination.gibsonPortal.systemImage)
+                }
             }
 
             Section("Splice Assist") {
@@ -188,6 +192,10 @@ private struct MoreDestinationView: View {
             RecentCrewJobsView()
         case .spliceAssist:
             SpliceAssistView()
+        case .gibsonPortal:
+            GibsonPortalView(url: Job.gibsonPortalLoginURL)
+                .navigationTitle(AppNavigationViewModel.Destination.gibsonPortal.title)
+                .navigationBarTitleDisplayMode(.inline)
         case .more:
             MoreMenuList()
         default:
