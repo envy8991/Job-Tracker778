@@ -685,22 +685,48 @@ struct CreateJobView: View {
     private func joinExistingJob(_ match: DuplicateJobMatch, prompt: DuplicateJobPrompt) {
         duplicatePrompt = nil
         let dashboardDate = prompt.newJob?.date ?? date
-        jobsViewModel.addCurrentUserAsParticipant(to: match.entry.id, scheduledDate: dashboardDate) { success in
-            if success {
-                var dashboardJob = match.entry.makePartialJob()
-                dashboardJob.date = dashboardDate
-                onAddedToDashboard?(dashboardJob)
+        let calendar = Calendar.current
 
-                if prompt.joinsAndContinuesSave {
-                    processPreparedJobs(prompt.remainingJobs)
-                } else if let addressID = prompt.addressID {
-                    removeAddress(id: addressID)
-                }
-
-                dismiss()
-            } else {
-                alertMessage = "Could not add you to the existing job. Please try again or create a separate job."
+        if calendar.isDate(match.entry.date, inSameDayAs: dashboardDate) {
+            jobsViewModel.addCurrentUserAsParticipant(to: match.entry.id) { success in
+                handleDuplicateJoinResult(
+                    success: success,
+                    dashboardJob: match.entry.makePartialJob(),
+                    prompt: prompt
+                )
             }
+            return
+        }
+
+        var dashboardCopy = match.entry.makePartialJob()
+        dashboardCopy.id = UUID().uuidString
+        dashboardCopy.date = dashboardDate
+        dashboardCopy.createdBy = authViewModel.currentUser?.id ?? dashboardCopy.createdBy
+        dashboardCopy.assignedTo = nil
+        dashboardCopy.participants = authViewModel.currentUser?.id.map { [$0] }
+
+        jobsViewModel.createJob(dashboardCopy) { success in
+            handleDuplicateJoinResult(
+                success: success,
+                dashboardJob: dashboardCopy,
+                prompt: prompt
+            )
+        }
+    }
+
+    private func handleDuplicateJoinResult(success: Bool, dashboardJob: Job, prompt: DuplicateJobPrompt) {
+        if success {
+            onAddedToDashboard?(dashboardJob)
+
+            if prompt.joinsAndContinuesSave {
+                processPreparedJobs(prompt.remainingJobs)
+            } else if let addressID = prompt.addressID {
+                removeAddress(id: addressID)
+            }
+
+            dismiss()
+        } else {
+            alertMessage = "Could not add this duplicate job to your dashboard. Please try again or create a separate job."
         }
     }
 
