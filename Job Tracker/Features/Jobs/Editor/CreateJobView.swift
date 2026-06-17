@@ -576,6 +576,9 @@ struct CreateJobView: View {
             .onAppear {
                 jobsViewModel.startSearchIndexForAllJobs()
             }
+            .onDisappear {
+                cancelDuplicateReviewTasks()
+            }
         }
     }
 
@@ -677,8 +680,18 @@ struct CreateJobView: View {
 
     private func createJobAndContinue(_ job: Job, remainingJobs: [Job]) {
         duplicatePrompt = nil
-        jobsViewModel.createJob(job) { _ in
-            processPreparedJobs(remainingJobs)
+        jobsViewModel.createJob(job) { success in
+            guard success else {
+                alertMessage = "Could not create this job. Please try again."
+                return
+            }
+
+            if remainingJobs.isEmpty {
+                onAddedToDashboard?(job)
+                dismiss()
+            } else {
+                processPreparedJobs(remainingJobs)
+            }
         }
     }
 
@@ -716,15 +729,20 @@ struct CreateJobView: View {
 
     private func handleDuplicateJoinResult(success: Bool, dashboardJob: Job, prompt: DuplicateJobPrompt) {
         if success {
-            onAddedToDashboard?(dashboardJob)
-
             if prompt.joinsAndContinuesSave {
-                processPreparedJobs(prompt.remainingJobs)
-            } else if let addressID = prompt.addressID {
-                removeAddress(id: addressID)
+                if prompt.remainingJobs.isEmpty {
+                    onAddedToDashboard?(dashboardJob)
+                    dismiss()
+                } else {
+                    processPreparedJobs(prompt.remainingJobs)
+                }
+            } else {
+                onAddedToDashboard?(dashboardJob)
+                if let addressID = prompt.addressID {
+                    removeAddress(id: addressID)
+                }
+                dismiss()
             }
-
-            dismiss()
         } else {
             alertMessage = "Could not add this duplicate job to your dashboard. Please try again or create a separate job."
         }
@@ -758,7 +776,19 @@ struct CreateJobView: View {
                 score += 100
             }
 
-            if let distance = coordinateDistance(from: job, to: entry) {
+            let addressComparison = compareAddresses(job.address, entry.address)
+            let hasStrongIdentifierMatch = !reasons.isEmpty
+
+            if addressComparison.isExact {
+                reasons.append("address")
+                score += 80
+            } else if addressComparison.isClose {
+                reasons.append("similar address")
+                score += 35
+            }
+
+            if addressComparison.isExact || addressComparison.isClose || hasStrongIdentifierMatch,
+               let distance = coordinateDistance(from: job, to: entry) {
                 if distance <= 50 {
                     reasons.append("same coordinates")
                     score += 90
@@ -766,15 +796,6 @@ struct CreateJobView: View {
                     reasons.append("nearby coordinates")
                     score += 45
                 }
-            }
-
-            let addressComparison = compareAddresses(job.address, entry.address)
-            if addressComparison.isExact {
-                reasons.append("address")
-                score += 80
-            } else if addressComparison.isClose {
-                reasons.append("similar address")
-                score += 35
             }
 
             guard !reasons.isEmpty, score >= 35 else { return nil }
@@ -975,6 +996,11 @@ struct CreateJobView: View {
         if addresses.isEmpty {
             addresses = [AddressDraft()]
         }
+    }
+
+    private func cancelDuplicateReviewTasks() {
+        duplicateCheckTasks.values.forEach { $0.cancel() }
+        duplicateCheckTasks.removeAll()
     }
 
     private func scheduleDuplicateReview(for addressID: AddressDraft.ID, address: String) {
