@@ -766,42 +766,8 @@ struct CreateJobView: View {
     }
 
     private func compareAddresses(_ lhs: String, _ rhs: String) -> (isExact: Bool, isClose: Bool) {
-        let lhsKey = normalizedAddressKey(lhs)
-        let rhsKey = normalizedAddressKey(rhs)
-        guard !lhsKey.isEmpty, !rhsKey.isEmpty else { return (false, false) }
-        if lhsKey == rhsKey { return (true, false) }
-
-        let lhsTokens = Set(lhsKey.split(separator: " ").map(String.init))
-        let rhsTokens = Set(rhsKey.split(separator: " ").map(String.init))
-        let shared = lhsTokens.intersection(rhsTokens).count
-        let smallest = min(lhsTokens.count, rhsTokens.count)
-        return (false, smallest >= 3 && shared >= max(3, smallest - 1))
-    }
-
-    private func normalizedAddressKey(_ rawValue: String) -> String {
-        let replacements: [String: String] = [
-            "street": "st",
-            "st.": "st",
-            "avenue": "ave",
-            "ave.": "ave",
-            "road": "rd",
-            "rd.": "rd",
-            "drive": "dr",
-            "dr.": "dr",
-            "lane": "ln",
-            "ln.": "ln",
-            "court": "ct",
-            "ct.": "ct",
-            "highway": "hwy",
-            "hwy.": "hwy"
-        ]
-
-        return rawValue
-            .lowercased()
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { !$0.isEmpty }
-            .map { replacements[$0] ?? $0 }
-            .joined(separator: " ")
+        let comparison = AddressDuplicateMatcher.compare(lhs, rhs)
+        return (comparison.isExact, comparison.isClose)
     }
 
     // MARK: - Assignments helpers
