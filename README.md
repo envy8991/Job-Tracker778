@@ -1,6 +1,6 @@
 # Job Tracker
 
-Job Tracker is a SwiftUI field-operations app for fiber technicians, supervisors, and administrators. It centralizes job dispatch, daily routing, crew collaboration, paperwork, maps, AI-assisted splice troubleshooting, widgets, Live Activities, Siri/App Intents, a watchOS companion, an iMessage extension, CarPlay job dispatch, and a browser prototype in one Firebase-backed workspace.
+Job Tracker is a SwiftUI field-operations app for fiber technicians, supervisors, and administrators. It centralizes job dispatch, daily routing, crew collaboration, paperwork, maps, AI-assisted splice troubleshooting, Siri/App Intents, a watchOS companion, an iMessage extension, CarPlay job dispatch, and a browser prototype in one Firebase-backed workspace.
 
 The repository is intentionally organized so future contributors can understand how each feature works before making changes. Start here, then use the linked feature documentation and tests as the safety net for implementation details.
 
@@ -25,9 +25,8 @@ The repository is intentionally organized so future contributors can understand 
 ## Platform Targets
 
 - **iOS/iPadOS app:** SwiftUI app target in `Job Tracker/`, deployed through the shared `Job Tracker` Xcode scheme.
-- **Minimum iOS target:** iOS 26.0 for the main app, widgets, unit tests, and UI tests.
+- **Minimum iOS target:** iOS 26.0 for the main app, unit tests, and UI tests.
 - **watchOS companion:** `Job Tracker Companion Watch App/`, minimum watchOS 26.0.
-- **Widgets and Live Activities:** `Job Tracker Widgets/`, including Today Jobs, Current Job, and Job Live Activity widgets.
 - **iMessage extension:** `imessage cs/`, used to share job cards in Messages.
 - **CarPlay scene:** Dispatch-focused CarPlay scene configured in `Job-Tracker-Info.plist` and implemented under `Job Tracker/Features/CarPlay/`.
 - **Browser prototype:** Static and parity-enhanced web prototype under `website/`.
@@ -45,7 +44,6 @@ Job-Tracker778/
 │   ├── DesignSystem/                    # Theme tokens, components, typography, elevations
 │   ├── Resources/WebMaps/               # Web mapping resources embedded in the app
 │   └── intent/                          # App Intents and App Shortcuts
-├── Job Tracker Widgets/                 # WidgetKit widgets and Live Activity UI
 ├── Job Tracker Companion Watch App/     # watchOS companion app
 ├── imessage cs/                         # Messages extension target
 ├── Job TrackerTests/                    # Unit and integration-style XCTest coverage
@@ -86,7 +84,6 @@ Use the following placement rule when adding code:
 - App-wide models that represent Firestore documents go in `Models/`.
 - Visual constants and reusable design primitives go in `DesignSystem/`.
 - Siri/App Intent entry points go in `intent/`.
-- System surfaces such as widgets and Live Activities go in their target folders and synchronize through `Features/SystemExperiences/`.
 
 ### Design System
 
@@ -113,7 +110,6 @@ npm run test:firebase-rules
 6. `UsersViewModel` listens for roster data used by partner pairing, chat, admin tools, and supervisor flows.
 7. `LocationService` and `ArrivalAlertManager` power smart routing, distance labels, maps, and arrival notifications.
 8. `ForceUpdateViewModel` observes `app_config/ios_version`; if the installed version/build is below the configured minimum, `ForceUpdateView` blocks the app until the user updates.
-9. System experiences receive snapshots from `JobSystemExperienceService`, update widgets, and maintain the Live Activity for the current/next job.
 
 ## Feature Guide
 
@@ -215,7 +211,7 @@ Mapping support includes MapKit geocoding, Leaflet-based web map rendering resou
 Future update checklist:
 
 - Always handle missing coordinates by falling back to address geocoding or user-facing unavailable states.
-- Keep Apple Maps and Google Maps provider behavior consistent across dashboard, job detail, widgets, and CarPlay.
+- Keep Apple Maps and Google Maps provider behavior consistent across dashboard, job detail, and CarPlay.
 - Do not block core job workflows on location permission.
 
 ### Splice Assist
@@ -273,16 +269,6 @@ Future update checklist:
 - Ensure intent code uses the same job-selection rules as dashboard and routing.
 - Test intents on-device or in a simulator that supports App Intents discovery.
 
-### System Experiences: Widgets and Live Activities
-
-`JobSystemExperienceService` writes lightweight job snapshots for widgets, reloads widget timelines, and updates the Live Activity for the active/next job. The widget extension renders Today Jobs, Current Job, and Job Live Activity surfaces. Deep links route back into the main app for dashboards, job details, and directions.
-
-Future update checklist:
-
-- Keep snapshot models small and safe for app group storage.
-- Keep widget deep-link paths synchronized with `DeepLinkRouter` and shell navigation.
-- Update both app and widget-side `JobLiveActivityAttributes` definitions together if attributes change.
-
 ### CarPlay
 
 CarPlay is limited to safe, read-only job dispatch. It shows today’s dashboard-scoped jobs for the signed-in technician, sorts by distance when available, limits list size, displays compact details, and starts directions using the selected map provider. Editing, photos, chat, timesheets, admin tools, search, and long-form workflows must stay off CarPlay.
@@ -305,14 +291,13 @@ Future update checklist:
 - `YellowSheet` and related nested types: Daily compliance/safety paperwork records.
 - `ChatMessage`: Partner/crew messaging payload.
 - `MapShape` and route/fiber map types: Mapping overlays and route persistence.
-- `JobSystemSnapshot`: Widget/Live Activity snapshot state.
 
 ### Firestore Collections Used by the App
 
 | Collection | Purpose | Important Consumers |
 | --- | --- | --- |
 | `users` | `AppUser` profiles, role flags, roster data | Auth, Settings, Admin, Team, Shared Jobs |
-| `jobs` | Job assignments and searchable job records | Dashboard, Jobs, Search, Timesheets, CarPlay, Widgets |
+| `jobs` | Job assignments and searchable job records | Dashboard, Jobs, Search, Timesheets, CarPlay |
 | `sharedJobs` | Tokenized job share/import payloads | Deep links, iMessage, cross-device sharing |
 | `timesheets` | Weekly timesheet documents | Timesheets, PDF export/history |
 | `yellowSheets` | Daily yellow sheet documents | Yellow Sheet workflows, PDF export/history |
@@ -343,7 +328,6 @@ Firebase Storage is used for job photos and generated PDFs. `JobPhotoUploadQueue
 - **Firebase Functions:** Admin/custom-claim and maintenance workflows where configured.
 - **MapKit/Core Location:** Address autocomplete, geocoding, distance calculations, and location authorization.
 - **Apple Maps/Google Maps:** Navigation handoff based on user preference and availability.
-- **WidgetKit/ActivityKit:** Widgets and Live Activities.
 - **App Intents/Siri/Shortcuts:** Voice and automation entry points.
 - **CarPlay:** Read-only dispatch list and directions flow.
 - **Messages framework:** iMessage job card extension.
@@ -366,13 +350,11 @@ Firebase Storage is used for job photos and generated PDFs. `JobPhotoUploadQueue
 
 ### Entitlements and Capabilities
 
-Review these files when changing bundle IDs, app groups, widgets, CarPlay, or sharing:
+Review these files when changing bundle IDs, app groups, CarPlay, or sharing:
 
 - `Job Tracker/Job Tracker.entitlements`
-- `Job Tracker Widgets/Job Tracker Widgets.entitlements`
 - `imessage cs/imessage cs.entitlements`
 - `Job-Tracker-Info.plist`
-- `Job Tracker Widgets/Info.plist`
 - `imessage cs/Info.plist`
 
 The iMessage extension currently uses app group `group.com.quinton.JobTracker`; keep app group IDs synchronized across targets if shared storage changes.
@@ -461,16 +443,6 @@ Future update checklist:
 - Avoid phone-only editing flows on watch unless explicitly designed and tested.
 - Verify watch target membership when adding shared files.
 
-### Widgets and Live Activity
-
-The widget bundle includes:
-
-- `TodayJobsWidget`
-- `CurrentJobWidget`
-- `JobLiveActivityWidget`
-
-Widget actions use App Intents/deep links to open dashboard, job detail, and directions in the main app.
-
 ### iMessage Extension
 
 The iMessage extension renders job cards for Messages. Shared payloads originate from the Jobs sharing helpers and are parsed by `MessagesViewController`. Keep URL schemes, app groups, and payload schemas synchronized with `SharedJobPayload` and `DeepLinkRouter`.
@@ -491,7 +463,7 @@ Use this as a product/design reference, not as the source of truth for productio
 1. Read this README section for the feature.
 2. Read the matching file in `Documentation/Features/`.
 3. Inspect existing tests for the behavior you are touching.
-4. Identify all companion surfaces affected by the change: widgets, Live Activities, watch, iMessage, CarPlay, Siri intents, PDFs, and website prototype.
+4. Identify all companion surfaces affected by the change: watch, iMessage, CarPlay, Siri intents, PDFs, and website prototype.
 5. Confirm Firestore/Storage schema and rules implications.
 
 ### When Adding or Renaming Firestore Fields
@@ -504,7 +476,6 @@ Update all applicable locations:
 - Search index and matching tests.
 - Share payloads and deep-link parsing.
 - PDF generators.
-- Widgets/Live Activity snapshots.
 - Watch app mappings.
 - Firestore rules and emulator tests.
 - Feature documentation.
@@ -573,12 +544,6 @@ Update all applicable locations:
 - Confirm Storage rules allow writes for the signed-in user.
 - Confirm linked jobs/timesheets/yellow sheets have required metadata.
 - Re-run tests around PDF generator behavior after layout changes.
-
-### Widgets or Live Activities are stale
-
-- Confirm app group and widget entitlements are aligned.
-- Confirm `JobSystemExperienceService` is receiving updated snapshots.
-- Rebuild both the app and widget extension after changing shared attributes.
 
 ### CarPlay does not appear
 

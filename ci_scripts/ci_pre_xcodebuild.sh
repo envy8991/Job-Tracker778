@@ -56,13 +56,6 @@ replacements = {
         "PRODUCT_BUNDLE_IDENTIFIER": f"{product_bundle_id}.watchkitapp",
         "INFOPLIST_KEY_WKCompanionAppBundleIdentifier": product_bundle_id,
     },
-    # Widget extension embedded in the iOS app's PlugIns folder.
-    "AA0000000000000000000009": {
-        "PRODUCT_BUNDLE_IDENTIFIER": f"{product_bundle_id}.widgets",
-    },
-    "AA000000000000000000000A": {
-        "PRODUCT_BUNDLE_IDENTIFIER": f"{product_bundle_id}.widgets",
-    },
 }
 
 updated = project
@@ -88,7 +81,7 @@ for config_id, settings in replacements.items():
 
 if updated != project:
     project_path.write_text(updated)
-    print("[xcode-cloud-safety-net] Updated parent app, watch app, and widget extension bundle identifiers for this checkout.")
+    print("[xcode-cloud-safety-net] Updated parent app and watch app bundle identifiers for this checkout.")
 PYNORMALIZE
 }
 

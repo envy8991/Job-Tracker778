@@ -133,7 +133,6 @@ class AuthViewModel: ObservableObject {
                 switch result {
                 case .success:
                     self?.stopCurrentUserListener()
-                    JobSystemExperienceService.shared.clearSensitiveSystemExperienceData()
                     self?.applyUser(nil)
                     completion(.success(()))
                 case .failure(let error):
@@ -145,9 +144,6 @@ class AuthViewModel: ObservableObject {
 
     func signOut() {
         if ProcessInfo.processInfo.isJobTrackerUITesting {
-            Task { @MainActor in
-                JobSystemExperienceService.shared.clearSensitiveSystemExperienceData()
-            }
             applyUser(nil)
             return
         }
@@ -155,9 +151,6 @@ class AuthViewModel: ObservableObject {
         do {
             stopCurrentUserListener()
             try FirebaseService.shared.signOutUser()
-            Task { @MainActor in
-                JobSystemExperienceService.shared.clearSensitiveSystemExperienceData()
-            }
             applyUser(nil)
         } catch {
             print("Sign-out error: \(error)")

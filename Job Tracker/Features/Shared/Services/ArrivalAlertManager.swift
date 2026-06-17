@@ -20,9 +20,7 @@ final class ArrivalAlertManager: ObservableObject {
         let message: String
     }
 
-    @Published private(set) var status: Status {
-        didSet { publishSystemExperienceStatus() }
-    }
+    @Published private(set) var status: Status
     @Published private(set) var authorizationStatus: UNAuthorizationStatus
 
     private let locationService: LocationService
@@ -304,10 +302,6 @@ final class ArrivalAlertManager: ObservableObject {
             monitoredJobIDs.remove(jobID)
             scheduleNotification(for: job)
             updateStatusForActiveMonitors()
-            JobSystemExperienceService.shared.publishArrivalMonitoring(
-                state: .active,
-                message: "Arrived at \(job.shortAddress). Update or open the job when ready."
-            )
         case .monitoringFailed(let identifier, let error):
             if let identifier, let jobID = jobID(fromRegionIdentifier: identifier) {
                 monitoredJobIDs.remove(jobID)
@@ -341,25 +335,6 @@ final class ArrivalAlertManager: ObservableObject {
     }
 
     // MARK: - Helpers
-
-    private func publishSystemExperienceStatus() {
-        let state: JobSystemSnapshot.ArrivalMonitoring.State
-        switch status.kind {
-        case .inactive:
-            state = .inactive
-        case .active:
-            state = .active
-        case .warning:
-            state = .warning
-        case .error:
-            state = .error
-        }
-
-        JobSystemExperienceService.shared.publishArrivalMonitoring(
-            state: state,
-            message: status.message
-        )
-    }
 
     private var isNotificationAuthorized: Bool {
         switch authorizationStatus {
