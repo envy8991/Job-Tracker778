@@ -186,13 +186,18 @@ private struct DuplicateJobMatch: Identifiable {
     }
 }
 
+private struct PreparedJob {
+    let addressID: AddressDraft.ID
+    let job: Job
+}
+
 private struct DuplicateJobPrompt: Identifiable {
     let id = UUID()
     let addressID: AddressDraft.ID?
     let address: String
-    let newJob: Job?
+    let newJob: PreparedJob?
     let matches: [DuplicateJobMatch]
-    let remainingJobs: [Job]
+    let remainingJobs: [PreparedJob]
     let joinsAndContinuesSave: Bool
 
     var title: String {
@@ -585,9 +590,12 @@ struct CreateJobView: View {
     // MARK: - Save
 
     private func attemptSave() {
-        let trimmedAddresses = addresses
-            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        let addressDraftsToSave = addresses.compactMap { draft -> AddressDraft? in
+            let trimmed = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : AddressDraft(id: draft.id, text: trimmed)
+        }
+
+        let trimmedAddresses = addressDraftsToSave.map(\.text)
 
         if jobNumber.isEmpty {
             alertMessage = "Please enter a Job Number before saving."
@@ -611,10 +619,10 @@ struct CreateJobView: View {
             return
         }
 
-        saveJobs(addressesToSave: trimmedAddresses)
+        saveJobs(addressDraftsToSave: addressDraftsToSave)
     }
 
-    private func saveJobs(addressesToSave: [String]) {
+    private func saveJobs(addressDraftsToSave: [AddressDraft]) {
         guard let userID = authViewModel.currentUser?.id else { dismiss(); return }
 
         let baseStatus = (status == "Custom")
@@ -626,27 +634,33 @@ struct CreateJobView: View {
         let assignmentsValue = sanitizedAssign.isEmpty || !isValidAssignment(sanitizedAssign) ? nil : sanitizedAssign
         let portalIDValue = Job.normalizedPortalID(from: portalID)
         let locationNumberValue = Job.normalizedLocationNumber(from: locationNumber)
+        let selectedDate = date
+        let notesValue = notes
+        let jobNumberValue = jobNumber.isEmpty ? nil : jobNumber
+        let materialsUsedValue = materialsUsed
 
         Task {
-            var preparedJobs: [Job] = []
-            for currentAddress in addressesToSave {
+            var preparedJobs: [PreparedJob] = []
+
+            for addressDraft in addressDraftsToSave {
+                let currentAddress = addressDraft.text
                 let coord = await MapKitGeocoding.coordinate(for: currentAddress)
 
-                preparedJobs.append(Job(
+                preparedJobs.append(PreparedJob(addressID: addressDraft.id, job: Job(
                     address: currentAddress,
-                    date: date,
+                    date: selectedDate,
                     status: finalStatus,
                     assignedTo: finalStatus == "Pending" ? nil : userID,
                     createdBy: userID,
-                    notes: notes,
-                    jobNumber: jobNumber.isEmpty ? nil : jobNumber,
+                    notes: notesValue,
+                    jobNumber: jobNumberValue,
                     portalID: portalIDValue,
                     locationNumber: locationNumberValue,
                     assignments: assignmentsValue,
-                    materialsUsed: materialsUsed,
+                    materialsUsed: materialsUsedValue,
                     latitude: coord?.latitude,
                     longitude: coord?.longitude
-                ))
+                )))
             }
 
             await MainActor.run {
@@ -655,18 +669,18 @@ struct CreateJobView: View {
         }
     }
 
-    private func processPreparedJobs(_ jobs: [Job]) {
+    private func processPreparedJobs(_ jobs: [PreparedJob]) {
         guard let next = jobs.first else {
             dismiss()
             return
         }
 
         let remaining = Array(jobs.dropFirst())
-        let matches = duplicateMatches(for: next)
+        let matches = duplicateMatches(for: next.job)
         if !matches.isEmpty {
             duplicatePrompt = DuplicateJobPrompt(
-                addressID: nil,
-                address: next.address,
+                addressID: next.addressID,
+                address: next.job.address,
                 newJob: next,
                 matches: matches,
                 remainingJobs: remaining,
@@ -678,16 +692,18 @@ struct CreateJobView: View {
         createJobAndContinue(next, remainingJobs: remaining)
     }
 
-    private func createJobAndContinue(_ job: Job, remainingJobs: [Job]) {
+    private func createJobAndContinue(_ preparedJob: PreparedJob, remainingJobs: [PreparedJob]) {
         duplicatePrompt = nil
-        jobsViewModel.createJob(job) { success in
+        jobsViewModel.createJob(preparedJob.job) { success in
             guard success else {
                 alertMessage = "Could not create this job. Please try again."
                 return
             }
 
+            removeCompletedAddress(id: preparedJob.addressID)
+
             if remainingJobs.isEmpty {
-                onAddedToDashboard?(job)
+                onAddedToDashboard?(preparedJob.job)
                 dismiss()
             } else {
                 processPreparedJobs(remainingJobs)
@@ -697,7 +713,7 @@ struct CreateJobView: View {
 
     private func joinExistingJob(_ match: DuplicateJobMatch, prompt: DuplicateJobPrompt) {
         duplicatePrompt = nil
-        let dashboardDate = prompt.newJob?.date ?? date
+        let dashboardDate = prompt.newJob?.job.date ?? date
         let calendar = Calendar.current
 
         if calendar.isDate(match.entry.date, inSameDayAs: dashboardDate) {
@@ -734,6 +750,7 @@ struct CreateJobView: View {
                     onAddedToDashboard?(dashboardJob)
                     dismiss()
                 } else {
+                    removeCompletedAddress(id: prompt.addressID)
                     processPreparedJobs(prompt.remainingJobs)
                 }
             } else {
@@ -979,6 +996,18 @@ struct CreateJobView: View {
         } else {
             addressSearch.results = []
         }
+    }
+
+    private func removeCompletedAddress(id: AddressDraft.ID?) {
+        guard let id, let index = addresses.firstIndex(where: { $0.id == id }) else { return }
+        duplicateCheckTasks[id]?.cancel()
+        duplicateCheckTasks[id] = nil
+        if focusedAddressID == id {
+            focusedAddressID = nil
+            addressSearch.results = []
+            UIApplication.shared.endEditing()
+        }
+        addresses.remove(at: index)
     }
 
     private func removeAddress(id: AddressDraft.ID) {
