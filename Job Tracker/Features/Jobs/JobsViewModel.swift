@@ -376,13 +376,20 @@ class JobsViewModel: ObservableObject {
         }
     }
 
-    func addCurrentUserAsParticipant(to jobID: String, completion: @escaping (Bool) -> Void = { _ in }) {
+    func addCurrentUserAsParticipant(
+        to jobID: String,
+        scheduledDate: Date? = nil,
+        completion: @escaping (Bool) -> Void = { _ in }
+    ) {
         if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
             let userID = "ui-test-user"
             if let index = jobs.firstIndex(where: { $0.id == jobID }) {
                 var participants = Set(jobs[index].participants ?? [])
                 participants.insert(userID)
                 jobs[index].participants = Array(participants).sorted()
+                if let scheduledDate {
+                    jobs[index].date = scheduledDate
+                }
                 rebuildSearchIndexEntries()
                 notifyJobsChanged()
             }
@@ -395,9 +402,14 @@ class JobsViewModel: ObservableObject {
             return
         }
 
-        db.collection("jobs").document(jobID).updateData([
+        var update: [String: Any] = [
             "participants": FieldValue.arrayUnion([userID])
-        ]) { [weak self] error in
+        ]
+        if let scheduledDate {
+            update["date"] = Timestamp(date: scheduledDate)
+        }
+
+        db.collection("jobs").document(jobID).updateData(update) { [weak self] error in
             if let error = error {
                 print("Error joining existing job: \(error)")
                 DispatchQueue.main.async { completion(false) }
@@ -409,6 +421,9 @@ class JobsViewModel: ObservableObject {
                     var participants = Set(self?.jobs[index].participants ?? [])
                     participants.insert(userID)
                     self?.jobs[index].participants = Array(participants).sorted()
+                    if let scheduledDate {
+                        self?.jobs[index].date = scheduledDate
+                    }
                     self?.rebuildSearchIndexEntries()
                     self?.notifyJobsChanged()
                 }

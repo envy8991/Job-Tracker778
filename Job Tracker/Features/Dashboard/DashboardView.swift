@@ -187,7 +187,10 @@ struct DashboardView: View {
                 case .share:
                     DashboardDailyShareSheet(items: viewModel.shareItems, subject: viewModel.shareSubject)
                 case .createJob:
-                    CreateJobView()
+                    CreateJobView { job in
+                        viewModel.selectedDate = job.date
+                        viewModel.dismissSheets()
+                    }
                 case .syncDetails:
                     DashboardSyncDetailsSheet(jobsViewModel: jobsViewModel)
                 }

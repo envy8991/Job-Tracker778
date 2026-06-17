@@ -273,6 +273,8 @@ private struct DuplicateJobsSheet: View {
 }
 
 struct CreateJobView: View {
+    var onAddedToDashboard: ((Job) -> Void)? = nil
+
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var jobsViewModel: JobsViewModel
     @EnvironmentObject var authViewModel: AuthViewModel
@@ -682,13 +684,20 @@ struct CreateJobView: View {
 
     private func joinExistingJob(_ match: DuplicateJobMatch, prompt: DuplicateJobPrompt) {
         duplicatePrompt = nil
-        jobsViewModel.addCurrentUserAsParticipant(to: match.entry.id) { success in
+        let dashboardDate = prompt.newJob?.date ?? date
+        jobsViewModel.addCurrentUserAsParticipant(to: match.entry.id, scheduledDate: dashboardDate) { success in
             if success {
+                var dashboardJob = match.entry.makePartialJob()
+                dashboardJob.date = dashboardDate
+                onAddedToDashboard?(dashboardJob)
+
                 if prompt.joinsAndContinuesSave {
                     processPreparedJobs(prompt.remainingJobs)
                 } else if let addressID = prompt.addressID {
                     removeAddress(id: addressID)
                 }
+
+                dismiss()
             } else {
                 alertMessage = "Could not add you to the existing job. Please try again or create a separate job."
             }
