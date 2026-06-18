@@ -732,7 +732,7 @@ struct CreateJobView: View {
         dashboardCopy.date = dashboardDate
         dashboardCopy.createdBy = authViewModel.currentUser?.id ?? dashboardCopy.createdBy
         dashboardCopy.assignedTo = nil
-        dashboardCopy.participants = authViewModel.currentUser?.id.map { [$0] }
+        dashboardCopy.participants = authViewModel.currentUser.map { [$0.id] }
 
         jobsViewModel.createJob(dashboardCopy) { success in
             handleDuplicateJoinResult(
