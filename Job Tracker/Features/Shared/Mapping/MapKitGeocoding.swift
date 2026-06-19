@@ -1,4 +1,5 @@
 import CoreLocation
+import Contacts
 import MapKit
 import UIKit
 
@@ -29,11 +30,32 @@ enum MapKitGeocoding {
         }
     }
 
-    static func openDrivingDirections(to coordinate: CLLocationCoordinate2D, with application: UIApplication = .shared) {
-        let destination = "\(coordinate.latitude),\(coordinate.longitude)"
-        guard let encodedDestination = destination.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "maps://?saddr=Current%20Location&daddr=\(encodedDestination)&dirflg=d") else { return }
-        application.open(url)
+    @discardableResult
+    static func openDrivingDirections(
+        to coordinate: CLLocationCoordinate2D,
+        name: String? = nil,
+        with application: UIApplication = .shared
+    ) -> Bool {
+        let placemark = MKPlacemark(coordinate: coordinate)
+        let mapItem = MKMapItem(placemark: placemark)
+        mapItem.name = name
+        return mapItem.openInMaps(launchOptions: drivingLaunchOptions)
+    }
+
+    @discardableResult
+    static func openDrivingDirections(to address: String, name: String? = nil) -> Bool {
+        let trimmedAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedAddress.isEmpty else { return false }
+
+        let geocoderDictionary = [CNPostalAddressStreetKey: trimmedAddress]
+        let placemark = MKPlacemark(coordinate: kCLLocationCoordinate2DInvalid, addressDictionary: geocoderDictionary)
+        let mapItem = MKMapItem(placemark: placemark)
+        mapItem.name = name ?? trimmedAddress
+        return mapItem.openInMaps(launchOptions: drivingLaunchOptions)
+    }
+
+    private static var drivingLaunchOptions: [String: Any] {
+        [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving]
     }
 
     @available(iOS, introduced: 2.0, deprecated: 26.0, message: "Use MKMapItem.location instead.")
