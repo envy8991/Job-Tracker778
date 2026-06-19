@@ -7,6 +7,7 @@
 
 
 import UIKit
+import CarPlay
 import UserNotifications
 import FirebaseCore
 import Firebase
@@ -30,6 +31,24 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             configureNotifications()
         }
         return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        if connectingSceneSession.role.rawValue == "CPTemplateApplicationSceneSessionRoleApplication" {
+            let configuration = UISceneConfiguration(
+                name: "JobDispatchCarPlay",
+                sessionRole: connectingSceneSession.role
+            )
+            configuration.sceneClass = CPTemplateApplicationScene.self
+            configuration.delegateClass = JobDispatchCarPlaySceneDelegate.self
+            return configuration
+        }
+
+        return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
     }
 
     func applicationWillResignActive(_ application: UIApplication) { }

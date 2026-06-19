@@ -38,10 +38,9 @@ rg -q "JobDispatchCarPlaySceneDelegate" "$INFO_PLIST" \
   || fail "Info.plist does not point to JobDispatchCarPlaySceneDelegate"
 pass "CarPlay scene is registered in Info.plist"
 
-if rg -q "com\.apple\.developer\.carplay" "$ENTITLEMENTS"; then
-  fail "CarPlay entitlement is present before managed-capability approval"
-fi
-pass "No CarPlay entitlement is embedded before Apple approval"
+rg -q "com\.apple\.developer\.carplay-driving-task" "$ENTITLEMENTS" \
+  || fail "Approved CarPlay Driving Task entitlement is missing from app entitlements"
+pass "Approved CarPlay Driving Task entitlement is embedded"
 
 if /usr/bin/python3 - <<PY
 import plistlib
