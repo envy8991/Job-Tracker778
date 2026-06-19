@@ -6,7 +6,7 @@ Use this packet when submitting Job Tracker for Apple CarPlay entitlement review
 
 Request the **Driving Task** CarPlay category. Job Tracker is not a turn-by-turn navigation provider, media app, messaging app, parking app, EV charging app, or quick-ordering app. The CarPlay surface is limited to a short, read-only dispatch workflow that helps a technician choose the next assigned job and hand directions to Maps.
 
-Do **not** add a CarPlay entitlement key to `Job Tracker/Job Tracker.entitlements` before Apple approves the managed capability and the provisioning profile has been regenerated. Apple requires the entitlement in the App ID, provisioning profile, and app entitlements file to match after approval.
+Apple has approved the managed Driving Task capability for Job Tracker. Keep the App ID, regenerated provisioning profile, and `Job Tracker/Job Tracker.entitlements` aligned with the approved `com.apple.developer.carplay-driving-task` entitlement.
 
 ## Copy/Paste Use-Case Summary
 
@@ -33,14 +33,14 @@ Do **not** add a CarPlay entitlement key to `Job Tracker/Job Tracker.entitlement
 
 - [ ] Apple Developer Program account is active and the bundle ID matches `com.quinton.Job-Tracker-CS25`.
 - [ ] Request text uses the Driving Task positioning above and does not claim Job Tracker is a navigation app.
-- [ ] `Job Tracker/Job Tracker.entitlements` does not contain any CarPlay entitlement until Apple approves the managed capability.
-- [ ] Once Apple approves access, enable the approved CarPlay capability for the App ID, regenerate provisioning profiles, and then add only the approved entitlement key to the app entitlements file.
+- [x] `Job Tracker/Job Tracker.entitlements` contains only the approved Driving Task CarPlay entitlement.
+- [ ] Confirm the App ID has the approved CarPlay Driving Task managed capability enabled and regenerate/download provisioning profiles before archiving.
 - [ ] Run the CarPlay Simulator demo script and capture screenshots/video for the request if Apple asks for supporting material.
 - [ ] Verify the production build does not ship hard-coded service credentials in the app Info.plist.
 
 ## Post-Approval Implementation Step
 
-After Apple grants the managed capability, add the exact approved entitlement key to `Job Tracker/Job Tracker.entitlements` as a Boolean `true`, update signing to use the regenerated provisioning profile, and build on a Mac with Xcode. If Apple grants a specific Driving Task entitlement that is not visible in Xcode's standard CarPlay capability list, use the exact key provided by Apple in the approval response/provisioning profile.
+After Apple grants the managed capability, the app entitlements file must include `com.apple.developer.carplay-driving-task` as a Boolean `true`. Update signing to use the regenerated provisioning profile and build on a Mac with Xcode before submitting a CarPlay-enabled archive.
 
 ## References
 
