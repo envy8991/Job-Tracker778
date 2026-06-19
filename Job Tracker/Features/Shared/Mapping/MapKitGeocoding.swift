@@ -1,5 +1,4 @@
 import CoreLocation
-import Contacts
 import MapKit
 import UIKit
 
@@ -36,10 +35,17 @@ enum MapKitGeocoding {
         name: String? = nil,
         with application: UIApplication = .shared
     ) -> Bool {
-        let placemark = MKPlacemark(coordinate: coordinate)
-        let mapItem = MKMapItem(placemark: placemark)
-        mapItem.name = name
-        return mapItem.openInMaps(launchOptions: drivingLaunchOptions)
+        guard CLLocationCoordinate2DIsValid(coordinate) else { return false }
+
+        var components = URLComponents(string: "http://maps.apple.com/")
+        components?.queryItems = [
+            URLQueryItem(name: "daddr", value: "\(coordinate.latitude),\(coordinate.longitude)"),
+            URLQueryItem(name: "dirflg", value: "d")
+        ]
+
+        guard let url = components?.url else { return false }
+        application.open(url)
+        return true
     }
 
     @discardableResult
@@ -47,15 +53,15 @@ enum MapKitGeocoding {
         let trimmedAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedAddress.isEmpty else { return false }
 
-        let geocoderDictionary = [CNPostalAddressStreetKey: trimmedAddress]
-        let placemark = MKPlacemark(coordinate: kCLLocationCoordinate2DInvalid, addressDictionary: geocoderDictionary)
-        let mapItem = MKMapItem(placemark: placemark)
-        mapItem.name = name ?? trimmedAddress
-        return mapItem.openInMaps(launchOptions: drivingLaunchOptions)
-    }
+        var components = URLComponents(string: "http://maps.apple.com/")
+        components?.queryItems = [
+            URLQueryItem(name: "daddr", value: trimmedAddress),
+            URLQueryItem(name: "dirflg", value: "d")
+        ]
 
-    private static var drivingLaunchOptions: [String: Any] {
-        [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving]
+        guard let url = components?.url else { return false }
+        UIApplication.shared.open(url)
+        return true
     }
 
     @available(iOS, introduced: 2.0, deprecated: 26.0, message: "Use MKMapItem.location instead.")
