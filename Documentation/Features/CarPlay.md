@@ -22,9 +22,7 @@ The CarPlay experience is intentionally limited to safe, driving-focused job dis
 
 ## Entitlement Strategy
 
-Apple grants CarPlay through managed capabilities after reviewing the app category and use case. The project includes the CarPlay scene and implementation code, but the app entitlements file must not add a CarPlay entitlement until Apple approves the managed capability and the provisioning profile is regenerated.
-
-Request the **Driving Task** category because Job Tracker provides a limited dispatch workflow for choosing a job destination and starting directions; it is not a turn-by-turn navigation app. Use the complete request packet in [CarPlayEntitlementRequest.md](../CarPlayEntitlementRequest.md) when submitting the request.
+Apple grants CarPlay through managed capabilities after reviewing the app category and use case. Job Tracker has been approved for the **Driving Task** category, so `Job Tracker/Job Tracker.entitlements` now includes the approved `com.apple.developer.carplay-driving-task` entitlement. The App ID and regenerated provisioning profiles must include the same managed capability before archiving.
 
 Recommended request positioning:
 
@@ -33,5 +31,5 @@ Recommended request positioning:
 ## Testing Notes
 
 - Apple documents CarPlay simulator testing from Xcode by opening Simulator's CarPlay external display after configuring the project.
-- Real-device, TestFlight, and App Store distribution require Apple to approve the appropriate CarPlay managed capability and require a provisioning profile that contains the matching entitlement.
+- Real-device, TestFlight, and App Store distribution require the regenerated provisioning profile to contain the approved `com.apple.developer.carplay-driving-task` entitlement.
 - Because this is a driving-task/job-dispatch experience rather than a navigation app, do not add navigation-only dashboard, instrument-cluster, or map-window scenes.
