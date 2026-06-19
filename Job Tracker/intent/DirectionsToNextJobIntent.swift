@@ -41,7 +41,7 @@ struct DirectionsToNextJobIntent: AppIntent {
             return .result(dialog: IntentDialog("Couldn't determine a location for that address."))
         }
 
-        await MainActor.run {
+        _ = await MainActor.run {
             MapKitGeocoding.openDrivingDirections(to: coord)
         }
         return .result(dialog: IntentDialog("Opening directions to \(short)."))
