@@ -215,12 +215,10 @@ final class JobDispatchCarPlaySceneDelegate: NSObject, CPTemplateApplicationScen
     }
 
     private func openAppleMaps(coordinate: CLLocationCoordinate2D, name: String) {
-        MapKitGeocoding.openDrivingDirections(to: coordinate)
+        MapKitGeocoding.openDrivingDirections(to: coordinate, name: name)
     }
 
     private func openAppleMapsAddress(_ address: String) {
-        guard let encoded = address.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "maps://?saddr=Current%20Location&daddr=\(encoded)&dirflg=d") else { return }
-        UIApplication.shared.open(url)
+        MapKitGeocoding.openDrivingDirections(to: address)
     }
 }
