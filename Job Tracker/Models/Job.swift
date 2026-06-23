@@ -233,6 +233,13 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
     var notes: String?
     var assignments: String?
     var materialsUsed: String?
+    var assignedTo: String?
+    var photos: [String]?
+    var housePhotoURL: String?
+    var nidPhotoURL: String?
+    var canPhotoURL: String?
+    var mapDesignPhotoURL: String?
+    var hours: Double?
     var nidFootage: String?
     var canFootage: String?
     var jobPlacement: String?
@@ -251,6 +258,13 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
         notes: String? = nil,
         assignments: String? = nil,
         materialsUsed: String? = nil,
+        assignedTo: String? = nil,
+        photos: [String]? = nil,
+        housePhotoURL: String? = nil,
+        nidPhotoURL: String? = nil,
+        canPhotoURL: String? = nil,
+        mapDesignPhotoURL: String? = nil,
+        hours: Double? = nil,
         nidFootage: String? = nil,
         canFootage: String? = nil,
         jobPlacement: String? = nil,
@@ -268,6 +282,13 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
         self.notes = notes
         self.assignments = assignments
         self.materialsUsed = materialsUsed
+        self.assignedTo = assignedTo
+        self.photos = photos
+        self.housePhotoURL = housePhotoURL
+        self.nidPhotoURL = nidPhotoURL
+        self.canPhotoURL = canPhotoURL
+        self.mapDesignPhotoURL = mapDesignPhotoURL
+        self.hours = hours
         self.nidFootage = nidFootage
         self.canFootage = canFootage
         self.jobPlacement = jobPlacement
@@ -288,6 +309,13 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
             notes: job.notes,
             assignments: job.assignments,
             materialsUsed: job.materialsUsed,
+            assignedTo: job.assignedTo,
+            photos: job.photos,
+            housePhotoURL: job.housePhotoURL,
+            nidPhotoURL: job.nidPhotoURL,
+            canPhotoURL: job.canPhotoURL,
+            mapDesignPhotoURL: job.mapDesignPhotoURL,
+            hours: job.hours,
             nidFootage: job.nidFootage,
             canFootage: job.canFootage,
             jobPlacement: job.jobPlacement,
@@ -309,15 +337,20 @@ struct JobSearchIndexEntry: Identifiable, Codable, Hashable, Sendable, JobSearch
             locationNumber: locationNumber,
             assignments: assignments,
             materialsUsed: materialsUsed,
-            photos: [],
+            photos: photos ?? [],
+            housePhotoURL: housePhotoURL,
+            nidPhotoURL: nidPhotoURL,
+            canPhotoURL: canPhotoURL,
+            mapDesignPhotoURL: mapDesignPhotoURL,
             participants: nil,
-            hours: 0.0,
+            hours: hours ?? 0.0,
             nidFootage: nidFootage,
             canFootage: canFootage,
             jobPlacement: jobPlacement,
             latitude: latitude,
             longitude: longitude
         )
+        job.assignedTo = assignedTo
         job.notes = notes
         job.assignments = assignments
         job.materialsUsed = materialsUsed

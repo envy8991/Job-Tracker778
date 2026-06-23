@@ -705,25 +705,7 @@ struct CreateJobView: View {
     private func joinExistingJob(_ match: DuplicateJobMatch, prompt: DuplicateJobPrompt) {
         duplicatePrompt = nil
         let dashboardDate = prompt.newJob?.job.date ?? date
-        let calendar = Calendar.current
-
-        if calendar.isDate(match.entry.date, inSameDayAs: dashboardDate) {
-            jobsViewModel.addCurrentUserAsParticipant(to: match.entry.id) { success in
-                handleDuplicateJoinResult(
-                    success: success,
-                    dashboardJob: match.entry.makePartialJob(),
-                    prompt: prompt
-                )
-            }
-            return
-        }
-
-        var dashboardCopy = match.entry.makePartialJob()
-        dashboardCopy.id = UUID().uuidString
-        dashboardCopy.date = dashboardDate
-        dashboardCopy.createdBy = authViewModel.currentUser?.id ?? dashboardCopy.createdBy
-        dashboardCopy.assignedTo = nil
-        dashboardCopy.participants = authViewModel.currentUser.map { [$0.id] }
+        let dashboardCopy = dashboardCopyForCurrentUser(from: match.entry, scheduledDate: dashboardDate)
 
         jobsViewModel.createJob(dashboardCopy) { success in
             handleDuplicateJoinResult(
@@ -732,6 +714,17 @@ struct CreateJobView: View {
                 prompt: prompt
             )
         }
+    }
+
+    private func dashboardCopyForCurrentUser(from entry: JobSearchIndexEntry, scheduledDate: Date) -> Job {
+        var dashboardCopy = entry.makePartialJob()
+        dashboardCopy.id = UUID().uuidString
+        dashboardCopy.date = scheduledDate
+        dashboardCopy.status = "Pending"
+        dashboardCopy.createdBy = authViewModel.currentUser?.id ?? dashboardCopy.createdBy
+        dashboardCopy.assignedTo = nil
+        dashboardCopy.participants = authViewModel.currentUser.map { [$0.id] }
+        return dashboardCopy
     }
 
     private func handleDuplicateJoinResult(success: Bool, dashboardJob: Job, prompt: DuplicateJobPrompt) {
