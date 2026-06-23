@@ -676,19 +676,10 @@ struct CreateJobView: View {
         }
 
         let remaining = Array(jobs.dropFirst())
-        let matches = duplicateMatches(for: next.job)
-        if !matches.isEmpty {
-            duplicatePrompt = DuplicateJobPrompt(
-                addressID: next.addressID,
-                address: next.job.address,
-                newJob: next,
-                matches: matches,
-                remainingJobs: remaining,
-                joinsAndContinuesSave: true
-            )
-            return
-        }
 
+        // Duplicate detection is intentionally handled as part of address entry
+        // review instead of the save path, so users do not have to confirm the
+        // same duplicate twice after they already responded to the address prompt.
         createJobAndContinue(next, remainingJobs: remaining)
     }
 
