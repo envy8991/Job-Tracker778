@@ -10,6 +10,7 @@ struct AddressDuplicateMatcher {
         let normalizedKey: String
         let streetNumber: String?
         let streetTokens: [String]
+        let unit: String?
     }
 
     private static let replacements: [String: String] = [
@@ -26,7 +27,13 @@ struct AddressDuplicateMatcher {
         "court": "ct",
         "ct.": "ct",
         "highway": "hwy",
-        "hwy.": "hwy"
+        "hwy.": "hwy",
+        "apartment": "apt",
+        "apt.": "apt",
+        "unit": "apt",
+        "suite": "ste",
+        "ste.": "ste",
+        "#": "apt"
     ]
 
     static func compare(_ lhs: String, _ rhs: String) -> Comparison {
@@ -41,6 +48,10 @@ struct AddressDuplicateMatcher {
         }
 
         if let lhsNumber = lhsComponents.streetNumber, let rhsNumber = rhsComponents.streetNumber, lhsNumber != rhsNumber {
+            return Comparison(isExact: false, isClose: false)
+        }
+
+        if let lhsUnit = lhsComponents.unit, let rhsUnit = rhsComponents.unit, lhsUnit != rhsUnit {
             return Comparison(isExact: false, isClose: false)
         }
 
@@ -59,26 +70,40 @@ struct AddressDuplicateMatcher {
 
     private static func components(from rawValue: String) -> Components {
         let tokens = normalizedTokens(from: rawValue)
+        let unit = unitIdentifier(from: tokens)
         let streetNumber = tokens.first(where: { $0.allSatisfy(\.isNumber) })
-        let streetTokens: [String]
-        if let streetNumber {
-            streetTokens = tokens.filter { $0 != streetNumber }
-        } else {
-            streetTokens = tokens
+        let streetTokens = tokens.filter { token in
+            if token == streetNumber { return false }
+            if let unit, token == unit { return false }
+            return !unitMarkers.contains(token)
         }
 
         return Components(
             normalizedKey: tokens.joined(separator: " "),
             streetNumber: streetNumber,
-            streetTokens: streetTokens
+            streetTokens: streetTokens,
+            unit: unit
         )
     }
 
     private static func normalizedTokens(from rawValue: String) -> [String] {
         rawValue
             .lowercased()
+            .replacingOccurrences(of: "#", with: " apt ")
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }
             .map { replacements[$0] ?? $0 }
+    }
+
+    private static let unitMarkers = Set(["apt", "ste", "lot", "space", "bldg", "building", "trailer"])
+
+    private static func unitIdentifier(from tokens: [String]) -> String? {
+        for (index, token) in tokens.enumerated() where unitMarkers.contains(token) {
+            let nextIndex = index + 1
+            if tokens.indices.contains(nextIndex) {
+                return tokens[nextIndex]
+            }
+        }
+        return nil
     }
 }
