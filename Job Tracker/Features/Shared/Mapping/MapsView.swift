@@ -352,6 +352,7 @@ class FiberMapViewModel: ObservableObject {
     @Published var poles: [Pole] = []
     @Published var splices: [SpliceEnclosure] = []
     @Published var lines: [FiberLine] = []
+    @Published var jobs: [JobSearchIndexEntry] = []
 
     private let dataService: FiberAssetSyncService
     private let searchProvider: MapSearchProviding
@@ -366,7 +367,7 @@ class FiberMapViewModel: ObservableObject {
     @Published var selectedAsset: AnyHashable?
     @Published var lineStartPole: Pole?
     @Published var editInstruction: String?
-    @Published var visibleLayers: Set<MapLayer> = [.poles, .splices, .lines]
+    @Published var visibleLayers: Set<MapLayer> = [.jobs, .poles, .splices, .lines]
     @Published var mapCamera: MapCameraState
     @Published private(set) var pendingCenterCommand: MapCenterCommand?
     @Published var searchResults: [MapSearchResult] = []
@@ -375,6 +376,7 @@ class FiberMapViewModel: ObservableObject {
     @Published private(set) var isLoadingSnapshot = false
     @Published private(set) var isSavingSnapshot = false
     @Published var syncError: String?
+    @Published private(set) var mappedJobCount = 0
 
     // Sheet presentation
     @Published var itemToEdit: AnyIdentifiable?
@@ -383,6 +385,7 @@ class FiberMapViewModel: ObservableObject {
     private var locationServiceIdentifier: ObjectIdentifier?
     private var pendingSaveTask: Task<Void, Never>?
     private var didReceiveInitialSnapshot = false
+    private var jobUpdatesCancellable: AnyCancellable?
 
     init(dataService: FiberAssetSyncService = FirestoreFiberAssetSyncService(), searchProvider: MapSearchProviding = AppleMapSearchProvider()) {
         self.dataService = dataService
@@ -399,6 +402,25 @@ class FiberMapViewModel: ObservableObject {
     // Asset lookup for drawing lines
     func pole(for id: Pole.ID) -> Pole? {
         poles.first { $0.id == id }
+    }
+
+    func bindJobs(_ jobsPublisher: AnyPublisher<[JobSearchIndexEntry], Never>) {
+        jobUpdatesCancellable = jobsPublisher
+            .map { entries in
+                entries.filter { entry in
+                    guard let latitude = entry.latitude, let longitude = entry.longitude else { return false }
+                    return CLLocationCoordinate2DIsValid(CLLocationCoordinate2D(latitude: latitude, longitude: longitude))
+                }
+                .sorted { lhs, rhs in
+                    lhs.date > rhs.date
+                }
+            }
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] mappedJobs in
+                self?.jobs = mappedJobs
+                self?.mappedJobCount = mappedJobs.count
+            }
     }
     
     // UI Interaction
@@ -780,11 +802,12 @@ enum EditTool: String, CaseIterable, Identifiable {
 }
 
 enum MapLayer: String, CaseIterable, Identifiable {
-    case poles, splices, lines
+    case jobs, poles, splices, lines
     var id: String { rawValue }
     
     var label: String {
         switch self {
+        case .jobs: "Jobs"
         case .poles: "Poles"
         case .splices: "Splices"
         case .lines: "Lines"
@@ -800,6 +823,7 @@ struct MapsView: View {
     @State private var controlPanelWidth: CGFloat = 280
     @State private var collapsedDrawerWidth: CGFloat = 72
     @EnvironmentObject private var locationService: LocationService
+    @EnvironmentObject private var jobsViewModel: JobsViewModel
 
     var body: some View {
         ZStack {
@@ -893,7 +917,11 @@ struct MapsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showControls)
-        .onAppear { viewModel.bindLocationService(locationService) }
+        .onAppear {
+            viewModel.bindLocationService(locationService)
+            viewModel.bindJobs(jobsViewModel.$allSearchEntries.eraseToAnyPublisher())
+            jobsViewModel.startSearchIndexForAllJobs()
+        }
         .sheet(item: $viewModel.itemToEdit) { itemWrapper in
             let item = itemWrapper.value
             if let pole = item as? Pole {
@@ -1105,7 +1133,15 @@ struct ControlPanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 10) {
-                DrawerSectionHeader(title: "Layers")
+                HStack {
+                    DrawerSectionHeader(title: "Layers")
+                    Spacer()
+                    if viewModel.mappedJobCount > 0 {
+                        Label("\(viewModel.mappedJobCount)", systemImage: "mappin.and.ellipse")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(MapLayer.allCases) { layer in

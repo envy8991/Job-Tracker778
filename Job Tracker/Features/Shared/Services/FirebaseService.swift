@@ -820,6 +820,70 @@ class FirebaseService {
         }
     }
 
+    /// Adds latitude/longitude to legacy jobs that have an address but no stored coordinates.
+    /// Existing mapped jobs are skipped so current pins are not changed.
+    func adminBackfillCoordinatesForAllJobs(
+        progress: ((AdminMaintenanceProgress) -> Void)? = nil,
+        completion: @escaping (Result<Int, Error>) -> Void
+    ) {
+        db.collection("jobs").getDocuments { snapshot, error in
+            if let error {
+                DispatchQueue.main.async { completion(.failure(error)) }
+                return
+            }
+
+            let candidates = (snapshot?.documents ?? []).filter { doc in
+                let data = doc.data()
+                let address = (data["address"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let hasLatitude = data["latitude"] is Double || data["latitude"] is NSNumber
+                let hasLongitude = data["longitude"] is Double || data["longitude"] is NSNumber
+                return !address.isEmpty && (!hasLatitude || !hasLongitude)
+            }
+
+            guard !candidates.isEmpty else {
+                DispatchQueue.main.async {
+                    progress?(AdminMaintenanceProgress(processed: 0, total: 0, message: "No map updates required."))
+                    completion(.success(0))
+                }
+                return
+            }
+
+            DispatchQueue.main.async {
+                progress?(AdminMaintenanceProgress(processed: 0, total: candidates.count, message: "Geocoding old jobs…"))
+            }
+
+            Task {
+                var updatedCount = 0
+                for (index, doc) in candidates.enumerated() {
+                    let data = doc.data()
+                    let address = (data["address"] as? String) ?? ""
+                    if let coordinate = await MapKitGeocoding.coordinate(for: address) {
+                        do {
+                            try await doc.reference.updateData([
+                                "latitude": coordinate.latitude,
+                                "longitude": coordinate.longitude
+                            ])
+                            updatedCount += 1
+                        } catch {
+                            await MainActor.run { completion(.failure(error)) }
+                            return
+                        }
+                    }
+
+                    await MainActor.run {
+                        progress?(AdminMaintenanceProgress(
+                            processed: index + 1,
+                            total: candidates.count,
+                            message: "Mapped \(updatedCount) of \(candidates.count) legacy jobs"
+                        ))
+                    }
+                }
+
+                await MainActor.run { completion(.success(updatedCount)) }
+            }
+        }
+    }
+
     // MARK: - Photo Upload
     
     func uploadImage(_ image: UIImage, for jobID: String, completion: @escaping (Result<String, Error>) -> Void) {

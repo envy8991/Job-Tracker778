@@ -223,6 +223,7 @@ struct AdminPanelView: View {
     @State private var pendingToggle: PendingToggle?
     @State private var pendingDeleteUser: AppUser?
     @State private var showingBackfillConfirmation = false
+    @State private var showingMapBackfillConfirmation = false
     @State private var pendingUpdateAction: PendingUpdateAction?
     @State private var showingLogs = false
 
@@ -318,6 +319,22 @@ struct AdminPanelView: View {
             }
         } message: {
             Text("Merges legacy job creators and assignees into each job's participants array. Only run when you understand the impact.")
+        }
+
+        .confirmationDialog(
+            "Add old jobs to the map?",
+            isPresented: $showingMapBackfillConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Add Old Jobs to Map") {
+                showingMapBackfillConfirmation = false
+                viewModel.runMapCoordinateBackfill()
+            }
+            Button("Cancel", role: .cancel) {
+                showingMapBackfillConfirmation = false
+            }
+        } message: {
+            Text("Geocodes legacy jobs that do not already have saved coordinates so their pins appear on the route mapper. Existing mapped jobs are left unchanged.")
         }
         #if DEBUG
         .confirmationDialog(
@@ -625,6 +642,48 @@ struct AdminPanelView: View {
                     Label("Run Backfill", systemImage: "arrow.triangle.2.circlepath")
                 }
                 .disabled(viewModel.maintenanceStatus.isRunning)
+            }
+            .padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Add old jobs to route mapper")
+                    .font(.headline)
+                Text("Geocode legacy jobs with missing coordinates so each saved address can appear as a tappable map pin.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                if viewModel.mapBackfillStatus.isRunning, let progress = viewModel.mapBackfillStatus.progress {
+                    if let fraction = progress.fractionComplete {
+                        ProgressView(value: fraction) {
+                            Text(progress.message)
+                                .font(.subheadline)
+                        } currentValueLabel: {
+                            Text("\(progress.processed)/\(progress.total)")
+                                .font(.caption.monospacedDigit())
+                        }
+                    } else {
+                        ProgressView(progress.message)
+                    }
+                }
+
+                if let lastCount = viewModel.mapBackfillStatus.lastRunCount, !viewModel.mapBackfillStatus.isRunning {
+                    Text("Last run mapped \(lastCount) job\(lastCount == 1 ? "" : "s").")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let error = viewModel.mapBackfillStatus.lastErrorMessage {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+
+                Button {
+                    showingMapBackfillConfirmation = true
+                } label: {
+                    Label("Add Old Jobs to Map", systemImage: "mappin.and.ellipse")
+                }
+                .disabled(viewModel.mapBackfillStatus.isRunning)
             }
             .padding(.vertical, 4)
         }

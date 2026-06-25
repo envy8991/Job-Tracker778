@@ -40,12 +40,14 @@
                 layers: {
                     poles: null,
                     splices: null,
-                    lines: null
+                    lines: null,
+                    jobs: null
                 },
                 cache: {
                     poles: new Map(),
                     splices: new Map(),
-                    lines: new Map()
+                    lines: new Map(),
+                    jobs: new Map()
                 },
                 polePositions: new Map(),
                 isReady: false,
@@ -78,6 +80,7 @@
                 state.layers.poles = L.layerGroup().addTo(map);
                 state.layers.splices = L.layerGroup().addTo(map);
                 state.layers.lines = L.layerGroup().addTo(map);
+                state.layers.jobs = L.layerGroup().addTo(map);
 
                 setSelection(false);
 
@@ -170,6 +173,29 @@
                 return marker;
             }
 
+
+            function createJobMarker(job) {
+                const status = (job.status || '').toLowerCase();
+                const color = status === 'pending' ? '#2563eb' : status.includes('done') || status.includes('complete') ? '#16a34a' : '#f97316';
+                const icon = L.divIcon({
+                    className: 'job-pin-icon',
+                    html: `<div style="position:relative;width:28px;height:28px;transform:translateY(-7px);"><i class="fa-solid fa-location-dot" style="font-size:28px;color:${color};filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));-webkit-text-stroke:2px white;"></i></div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 28],
+                    popupAnchor: [0, -26]
+                });
+                const marker = L.marker([job.lat, job.lng], { icon, bubblingMouseEvents: false });
+                marker.bindPopup(renderPopup(job, 'Job'));
+                marker.on('touchstart', stopDomEvent);
+                marker.on('pointerdown', stopDomEvent);
+                marker.on('click', function(event) {
+                    stopDomEvent(event);
+                    setSelection(true, event.latlng);
+                    marker.openPopup();
+                });
+                return marker;
+            }
+
             function createLine(line) {
                 const start = state.polePositions.get(line.startPoleId);
                 const end = state.polePositions.get(line.endPoleId);
@@ -207,7 +233,7 @@
                 Object.entries(item).forEach(([key, value]) => {
                     if (ignoredKeys.has(key) || key === 'id' || value === null || value === undefined || key === 'name') { return; }
                     const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-                    if (key === 'imageUrl' && value) {
+                    if ((key === 'imageUrl' || key.endsWith('PhotoURL')) && value) {
                         html += `<img src="${value}" alt="${item.name || type}" class="rounded-md mt-2 max-h-40 w-full object-cover" onerror="this.style.display='none'">`;
                     } else if (value instanceof Array) {
                         html += `<strong>${formattedKey}:</strong> ${value.join(', ')}<br>`;
@@ -228,11 +254,13 @@
                 state.cache.poles.clear();
                 state.cache.splices.clear();
                 state.cache.lines.clear();
+                state.cache.jobs.clear();
                 state.polePositions.clear();
 
                 clearLayer(state.layers.poles);
                 clearLayer(state.layers.splices);
                 clearLayer(state.layers.lines);
+                clearLayer(state.layers.jobs);
 
                 snapshot.poles.forEach(pole => {
                     state.polePositions.set(pole.id, { lat: pole.lat, lng: pole.lng });
@@ -245,6 +273,12 @@
                     const marker = createSpliceMarker(splice);
                     state.cache.splices.set(splice.id, marker);
                     marker.addTo(state.layers.splices);
+                });
+
+                (snapshot.jobs || []).forEach(job => {
+                    const marker = createJobMarker(job);
+                    state.cache.jobs.set(job.id, marker);
+                    marker.addTo(state.layers.jobs);
                 });
 
                 snapshot.lines.forEach(line => {

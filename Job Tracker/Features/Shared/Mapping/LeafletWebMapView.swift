@@ -74,6 +74,11 @@ struct LeafletWebMapView: UIViewRepresentable {
                 .sink { [weak self] _ in self?.sendSnapshotIfReady() }
                 .store(in: &cancellables)
 
+            viewModel.$jobs
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in self?.sendSnapshotIfReady() }
+                .store(in: &cancellables)
+
             viewModel.$visibleLayers
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in self?.sendVisibleLayers() }
@@ -191,7 +196,30 @@ struct WebMapSnapshot: Codable {
     let poles: [WebPole]
     let splices: [WebSplice]
     let lines: [WebLine]
+    let jobs: [WebJob]
     let visibleLayers: [String]
+}
+
+struct WebJob: Codable {
+    let id: String
+    let name: String
+    let lat: Double
+    let lng: Double
+    let address: String
+    let jobNumber: String?
+    let status: String
+    let date: Date
+    let notes: String?
+    let assignments: String?
+    let materialsUsed: String?
+    let hours: Double?
+    let nidFootage: String?
+    let canFootage: String?
+    let jobPlacement: String?
+    let housePhotoURL: String?
+    let nidPhotoURL: String?
+    let canPhotoURL: String?
+    let mapDesignPhotoURL: String?
 }
 
 struct WebPole: Codable {
@@ -281,6 +309,30 @@ extension FiberMapViewModel {
                     notes: line.notes
                 )
             },
+            jobs: jobs.compactMap { job in
+                guard let latitude = job.latitude, let longitude = job.longitude else { return nil }
+                return WebJob(
+                    id: job.id,
+                    name: job.shortDisplayTitle,
+                    lat: latitude,
+                    lng: longitude,
+                    address: job.address,
+                    jobNumber: job.jobNumber,
+                    status: job.status,
+                    date: job.date,
+                    notes: job.notes,
+                    assignments: job.assignments,
+                    materialsUsed: job.materialsUsed,
+                    hours: job.hours,
+                    nidFootage: job.nidFootage,
+                    canFootage: job.canFootage,
+                    jobPlacement: job.jobPlacement,
+                    housePhotoURL: job.housePhotoURL,
+                    nidPhotoURL: job.nidPhotoURL,
+                    canPhotoURL: job.canPhotoURL,
+                    mapDesignPhotoURL: job.mapDesignPhotoURL
+                )
+            },
             visibleLayers: visibleLayers.map { $0.rawValue }
         )
     }
@@ -296,5 +348,15 @@ extension FiberMapViewModel {
                 zoom: mapCamera.zoom
             )
         )
+    }
+}
+
+private extension JobSearchIndexEntry {
+    var shortDisplayTitle: String {
+        if let jobNumber, !jobNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Job #\(jobNumber)"
+        }
+        let first = address.split(separator: ",").first.map(String.init) ?? address
+        return first.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Mapped Job" : first.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

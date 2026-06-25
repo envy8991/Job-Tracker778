@@ -16,6 +16,11 @@ protocol AdminPanelService: AnyObject {
         completion: @escaping (Result<Int, Error>) -> Void
     )
 
+    func adminBackfillCoordinatesForAllJobs(
+        progress: ((FirebaseService.AdminMaintenanceProgress) -> Void)?,
+        completion: @escaping (Result<Int, Error>) -> Void
+    )
+
     func refreshCustomClaims(for uid: String?, completion: ((Error?) -> Void)?)
 }
 
@@ -59,6 +64,7 @@ final class AdminPanelViewModel: ObservableObject {
     @Published private(set) var deletingUserIDs: Set<String> = []
     @Published var alert: AlertItem?
     @Published private(set) var maintenanceStatus: MaintenanceStatus = .idle
+    @Published private(set) var mapBackfillStatus: MaintenanceStatus = .idle
 
     var onUserFlagsUpdated: ((String) -> Void)?
 
@@ -201,6 +207,46 @@ final class AdminPanelViewModel: ObservableObject {
                     )
                 }
                 self.maintenanceStatus = status
+            }
+        })
+    }
+
+
+    func runMapCoordinateBackfill() {
+        guard !mapBackfillStatus.isRunning else { return }
+
+        mapBackfillStatus = MaintenanceStatus(
+            isRunning: true,
+            progress: MaintenanceStatus.Progress(processed: 0, total: 0, message: "Preparing map backfill…"),
+            lastRunCount: mapBackfillStatus.lastRunCount,
+            lastErrorMessage: nil
+        )
+
+        service.adminBackfillCoordinatesForAllJobs(progress: { [weak self] update in
+            guard let self else { return }
+            Task { @MainActor in
+                var status = self.mapBackfillStatus
+                status.isRunning = true
+                status.progress = MaintenanceStatus.Progress(processed: update.processed, total: update.total, message: update.message)
+                status.lastErrorMessage = nil
+                self.mapBackfillStatus = status
+            }
+        }, completion: { [weak self] result in
+            guard let self else { return }
+            Task { @MainActor in
+                var status = self.mapBackfillStatus
+                status.isRunning = false
+                status.progress = nil
+                switch result {
+                case .success(let count):
+                    status.lastRunCount = count
+                    status.lastErrorMessage = nil
+                    self.alert = AlertItem(title: "Map Backfill Complete", message: "Added coordinates to \(count) old job\(count == 1 ? "" : "s").", kind: .success)
+                case .failure(let error):
+                    status.lastErrorMessage = error.localizedDescription
+                    self.alert = AlertItem(title: "Map Backfill Failed", message: error.localizedDescription, kind: .error)
+                }
+                self.mapBackfillStatus = status
             }
         })
     }
