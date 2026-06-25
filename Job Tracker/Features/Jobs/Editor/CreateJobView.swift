@@ -167,10 +167,25 @@ final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDeleg
 private struct AddressDraft: Identifiable, Equatable {
     let id: UUID
     var text: String
+    var apartment: String
 
-    init(id: UUID = UUID(), text: String = "") {
+    init(id: UUID = UUID(), text: String = "", apartment: String = "") {
         self.id = id
         self.text = text
+        self.apartment = apartment
+    }
+
+    var trimmedAddress: String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var trimmedApartment: String {
+        apartment.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var fullAddress: String {
+        guard !trimmedApartment.isEmpty else { return trimmedAddress }
+        return "\(trimmedAddress) Apt \(trimmedApartment)"
     }
 }
 
@@ -568,8 +583,8 @@ struct CreateJobView: View {
             }
             .onChange(of: focusedAddressID) { oldValue, newValue in
                 if let oldValue, newValue != oldValue,
-                   let address = addresses.first(where: { $0.id == oldValue })?.text {
-                    scheduleDuplicateReview(for: oldValue, address: address)
+                   let draft = addresses.first(where: { $0.id == oldValue }) {
+                    scheduleDuplicateReview(for: oldValue, draft: draft)
                 }
                 guard let newValue else {
                     addressSearch.results = []
@@ -592,13 +607,20 @@ struct CreateJobView: View {
     private func attemptSave() {
         let addressDraftsToSave = addresses.compactMap { draft -> AddressDraft? in
             let trimmed = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? nil : AddressDraft(id: draft.id, text: trimmed)
+            return trimmed.isEmpty ? nil : AddressDraft(id: draft.id, text: trimmed, apartment: draft.trimmedApartment)
         }
 
-        let trimmedAddresses = addressDraftsToSave.map(\.text)
+        let trimmedAddresses = addressDraftsToSave.map(\.fullAddress)
+        let trimmedJobNumber = jobNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCustomStatus = customStatusText.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if jobNumber.isEmpty {
+        if trimmedJobNumber.isEmpty {
             alertMessage = "Please enter a Job Number before saving."
+            return
+        }
+
+        if status == "Custom", trimmedCustomStatus.isEmpty {
+            alertMessage = "Please enter a custom status or choose a saved status before saving."
             return
         }
 
@@ -636,15 +658,16 @@ struct CreateJobView: View {
         let locationNumberValue = Job.normalizedLocationNumber(from: locationNumber)
         let selectedDate = date
         let notesValue = notes
-        let jobNumberValue = jobNumber.isEmpty ? nil : jobNumber
+        let trimmedJobNumber = jobNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let jobNumberValue = trimmedJobNumber.isEmpty ? nil : trimmedJobNumber
         let materialsUsedValue = materialsUsed
 
         Task {
             var preparedJobs: [PreparedJob] = []
 
             for addressDraft in addressDraftsToSave {
-                let currentAddress = addressDraft.text
-                let coord = await MapKitGeocoding.coordinate(for: currentAddress)
+                let currentAddress = addressDraft.fullAddress
+                let coord = await MapKitGeocoding.coordinate(for: addressDraft.trimmedAddress)
 
                 preparedJobs.append(PreparedJob(addressID: addressDraft.id, job: Job(
                     address: currentAddress,
@@ -677,10 +700,19 @@ struct CreateJobView: View {
 
         let remaining = Array(jobs.dropFirst())
 
-        // Duplicate detection is intentionally handled as part of address entry
-        // review instead of the save path, so users do not have to confirm the
-        // same duplicate twice after they already responded to the address prompt.
-        createJobAndContinue(next, remainingJobs: remaining)
+        let matches = duplicateMatches(for: next.job)
+        if matches.isEmpty {
+            createJobAndContinue(next, remainingJobs: remaining)
+        } else {
+            duplicatePrompt = DuplicateJobPrompt(
+                addressID: next.addressID,
+                address: next.job.address,
+                newJob: next,
+                matches: matches,
+                remainingJobs: remaining,
+                joinsAndContinuesSave: true
+            )
+        }
     }
 
     private func createJobAndContinue(_ preparedJob: PreparedJob, remainingJobs: [PreparedJob]) {
@@ -740,9 +772,11 @@ struct CreateJobView: View {
             } else {
                 onAddedToDashboard?(dashboardJob)
                 if let addressID = prompt.addressID {
-                    removeAddress(id: addressID)
+                    removeCompletedAddress(id: addressID)
                 }
-                dismiss()
+                if validAddressCount == 0 {
+                    dismiss()
+                }
             }
         } else {
             alertMessage = "Could not add this duplicate job to your dashboard. Please try again or create a separate job."
@@ -880,6 +914,7 @@ struct CreateJobView: View {
         let addressID = address.wrappedValue.id
 
         ZStack(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: 8) {
             TextField("Enter address", text: Binding(
                 get: { address.wrappedValue.text },
                 set: { newValue in
@@ -893,7 +928,7 @@ struct CreateJobView: View {
             .textInputAutocapitalization(.never)
             .focused($focusedAddressID, equals: addressID)
             .onSubmit {
-                scheduleDuplicateReview(for: addressID, address: address.wrappedValue.text)
+                scheduleDuplicateReview(for: addressID, draft: address.wrappedValue)
             }
             .padding(12)
             .background(
@@ -905,6 +940,23 @@ struct CreateJobView: View {
                     .stroke(Color.gray.opacity(0.15), lineWidth: 1)
             )
 
+            TextField("Apartment / unit (optional)", text: Binding(
+                get: { address.wrappedValue.apartment },
+                set: { address.wrappedValue.apartment = $0 }
+            ))
+            .textInputAutocapitalization(.characters)
+            .disableAutocorrection(true)
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(.systemBackground).opacity(0.9))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+            )
+            }
+
             if focusedAddressID == addressID && !addressSearch.results.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(addressSearch.results.prefix(6).enumerated()), id: \.offset) { _, item in
@@ -914,7 +966,7 @@ struct CreateJobView: View {
                             addressSearch.results = []
                             focusedAddressID = nil
                             UIApplication.shared.endEditing()
-                            scheduleDuplicateReview(for: addressID, address: composed)
+                            scheduleDuplicateReview(for: addressID, draft: address.wrappedValue)
                         } label: {
                             HStack(alignment: .center, spacing: 10) {
                                 VStack(alignment: .leading, spacing: 2) {
@@ -1016,8 +1068,9 @@ struct CreateJobView: View {
         duplicateCheckTasks.removeAll()
     }
 
-    private func scheduleDuplicateReview(for addressID: AddressDraft.ID, address: String) {
-        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func scheduleDuplicateReview(for addressID: AddressDraft.ID, draft: AddressDraft) {
+        let trimmed = draft.trimmedAddress
+        let fullAddress = draft.fullAddress
         guard !trimmed.isEmpty else { return }
 
         duplicateCheckTasks[addressID]?.cancel()
@@ -1026,7 +1079,7 @@ struct CreateJobView: View {
             guard !Task.isCancelled else { return }
 
             let probe = Job(
-                address: trimmed,
+                address: fullAddress,
                 date: date,
                 status: "Pending",
                 latitude: coordinate?.latitude,
@@ -1034,14 +1087,14 @@ struct CreateJobView: View {
             )
 
             await MainActor.run {
-                guard addresses.contains(where: { $0.id == addressID && $0.text.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed }) else {
+                guard addresses.contains(where: { $0.id == addressID && $0.fullAddress == fullAddress }) else {
                     return
                 }
                 let matches = duplicateMatches(for: probe)
                 guard !matches.isEmpty else { return }
                 duplicatePrompt = DuplicateJobPrompt(
                     addressID: addressID,
-                    address: trimmed,
+                    address: fullAddress,
                     newJob: nil,
                     matches: matches,
                     remainingJobs: [],
