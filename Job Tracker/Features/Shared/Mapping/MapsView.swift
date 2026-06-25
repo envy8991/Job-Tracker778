@@ -1093,14 +1093,19 @@ private struct DrawerSectionHeader: View {
 
 private struct ControlPanelBadgeIcon: View {
     var body: some View {
-        Image(systemName: "map")
+        Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
             .font(.title3.weight(.semibold))
-            .foregroundStyle(Color.accentColor)
-            .frame(width: 38, height: 38)
+            .foregroundStyle(.white)
+            .frame(width: 40, height: 40)
             .background(
-                Circle()
-                    .fill(Color.accentColor.opacity(0.15))
+                LinearGradient(
+                    colors: [Color.green, Color.teal],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: Circle()
             )
+            .shadow(color: Color.green.opacity(0.28), radius: 10, x: 0, y: 6)
     }
 }
 
@@ -1156,6 +1161,10 @@ struct ControlPanelView: View {
                     }
                 }
             }
+
+            Divider()
+
+            RouteStyleLegend()
 
             Divider()
 
@@ -1217,6 +1226,38 @@ struct ControlPanelView: View {
     }
 }
 
+
+private struct RouteStyleLegend: View {
+    private let items: [(String, Color)] = [
+        ("Underground", .cyan),
+        ("Overhead", .orange),
+        ("Done", .green),
+        ("Pending", .gray)
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DrawerSectionHeader(title: "Route Style")
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 8) {
+                ForEach(items, id: \.0) { item in
+                    HStack(spacing: 7) {
+                        Capsule()
+                            .fill(item.1)
+                            .frame(width: 24, height: 6)
+
+                        Text(item.0)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                }
+            }
+        }
+    }
+}
+
 private struct MapControlsExpandedDrawer: View {
     @ObservedObject var viewModel: FiberMapViewModel
     var onCollapse: () -> Void
@@ -1243,16 +1284,16 @@ private struct MapControlsExpandedDrawer: View {
             ControlPanelView(viewModel: viewModel)
         }
         .padding(18)
-        .frame(maxWidth: 300, alignment: .leading)
+        .frame(maxWidth: 310, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .fill(.regularMaterial)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.primary.opacity(0.08))
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(Color.white.opacity(0.24))
         )
-        .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 12)
+        .shadow(color: Color.black.opacity(0.18), radius: 24, x: 0, y: 14)
         .background(
             GeometryReader { geometry in
                 Color.clear
@@ -1384,8 +1425,11 @@ private extension MapsView {
                 Button(action: performSearch) {
                     Text("Search")
                         .font(.callout.weight(.semibold))
+                        .padding(.horizontal, 6)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(.teal)
+                .clipShape(Capsule())
             }
 
             if let error = viewModel.searchError {
@@ -1429,10 +1473,13 @@ private extension MapsView {
                 .frame(maxHeight: 220)
             }
         }
-        .padding(16)
-        .background(.regularMaterial)
-        .cornerRadius(16)
-        .shadow(radius: 5)
+        .padding(14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color.white.opacity(0.22))
+        )
+        .shadow(color: Color.black.opacity(0.18), radius: 18, x: 0, y: 10)
     }
 }
 

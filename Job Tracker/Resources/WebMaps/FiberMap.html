@@ -22,11 +22,87 @@
             position: relative;
         }
         .leaflet-popup-content-wrapper {
-            border-radius: 8px;
+            border-radius: 18px;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.24);
+            border: 1px solid rgba(15, 23, 42, 0.08);
         }
         .leaflet-popup-content {
-            margin: 13px 19px;
+            margin: 16px 18px;
             font-size: 14px;
+            line-height: 1.35;
+            min-width: 210px;
+        }
+        .leaflet-popup-tip {
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+        }
+        .leaflet-control-zoom {
+            border: 0 !important;
+            border-radius: 16px !important;
+            overflow: hidden;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18) !important;
+        }
+        .leaflet-control-zoom a {
+            border: 0 !important;
+            color: #111827 !important;
+            background: rgba(255, 255, 255, 0.92) !important;
+            backdrop-filter: blur(14px);
+        }
+        .map-legend {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 18px;
+            box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
+            color: #111827;
+            font: 12px/1.35 Inter, system-ui, -apple-system, sans-serif;
+            padding: 10px 12px;
+            backdrop-filter: blur(16px);
+        }
+        .map-legend-title {
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .map-legend-row {
+            align-items: center;
+            display: flex;
+            gap: 8px;
+            margin-top: 5px;
+            white-space: nowrap;
+        }
+        .map-legend-swatch {
+            border-radius: 999px;
+            display: inline-block;
+            flex: 0 0 auto;
+            height: 10px;
+            width: 24px;
+        }
+        .job-circle-pin {
+            align-items: center;
+            background: #22c55e;
+            border: 3px solid var(--job-ring, #16a34a);
+            border-radius: 999px;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.28), 0 0 0 3px rgba(255,255,255,0.95);
+            display: flex;
+            height: 22px;
+            justify-content: center;
+            width: 22px;
+        }
+        .job-circle-pin::after {
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 999px;
+            content: '';
+            height: 7px;
+            width: 7px;
+        }
+        .map-popup-title {
+            color: #111827;
+            font-size: 16px;
+            font-weight: 800;
+            margin: 0 0 8px;
+        }
+        .map-popup-row strong {
+            color: #374151;
         }
         @import url('https://rsms.me/inter/inter.css');
     </style>
@@ -76,6 +152,22 @@
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; OpenStreetMap contributors'
                 }).addTo(map);
+
+                const legend = L.control({ position: 'bottomright' });
+                legend.onAdd = function() {
+                    const div = L.DomUtil.create('div', 'map-legend');
+                    div.innerHTML = `
+                        <div class="map-legend-title">Route colors</div>
+                        <div class="map-legend-row"><span class="map-legend-swatch" style="background:#0ea5e9"></span>Underground</div>
+                        <div class="map-legend-row"><span class="map-legend-swatch" style="background:#f97316"></span>Overhead / aerial</div>
+                        <div class="map-legend-row"><span class="map-legend-swatch" style="background:#22c55e"></span>Done / active</div>
+                        <div class="map-legend-row"><span class="map-legend-swatch" style="background:#94a3b8"></span>Pending / planned</div>
+                    `;
+                    L.DomEvent.disableClickPropagation(div);
+                    L.DomEvent.disableScrollPropagation(div);
+                    return div;
+                };
+                legend.addTo(map);
 
                 state.layers.poles = L.layerGroup().addTo(map);
                 state.layers.splices = L.layerGroup().addTo(map);
@@ -174,15 +266,24 @@
             }
 
 
-            function createJobMarker(job) {
+            function routeColorForJob(job) {
+                const placement = `${job.jobPlacement || ''} ${job.assignments || ''} ${job.materialsUsed || ''}`.toLowerCase();
                 const status = (job.status || '').toLowerCase();
-                const color = status === 'pending' ? '#2563eb' : status.includes('done') || status.includes('complete') ? '#16a34a' : '#f97316';
+                if (status.includes('done') || status.includes('complete')) { return '#22c55e'; }
+                if (placement.includes('underground') || placement.includes('ug') || placement.includes('u/g')) { return '#0ea5e9'; }
+                if (placement.includes('overhead') || placement.includes('aerial') || placement.includes('oh')) { return '#f97316'; }
+                if (status.includes('progress') || status.includes('started')) { return '#a855f7'; }
+                return '#94a3b8';
+            }
+
+            function createJobMarker(job) {
+                const ringColor = routeColorForJob(job);
                 const icon = L.divIcon({
                     className: 'job-pin-icon',
-                    html: `<div style="position:relative;width:28px;height:28px;transform:translateY(-7px);"><i class="fa-solid fa-location-dot" style="font-size:28px;color:${color};filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));-webkit-text-stroke:2px white;"></i></div>`,
+                    html: `<div class="job-circle-pin" style="--job-ring:${ringColor}" aria-hidden="true"></div>`,
                     iconSize: [28, 28],
-                    iconAnchor: [14, 28],
-                    popupAnchor: [0, -26]
+                    iconAnchor: [14, 14],
+                    popupAnchor: [0, -14]
                 });
                 const marker = L.marker([job.lat, job.lng], { icon, bubblingMouseEvents: false });
                 marker.bindPopup(renderPopup(job, 'Job'));
@@ -201,14 +302,17 @@
                 const end = state.polePositions.get(line.endPoleId);
                 if (!start || !end) { return null; }
                 const statusColor = {
-                    'Active': '#16a34a',
-                    'Inactive': '#dc2626',
-                    'Planned': '#3b82f6'
+                    'Active': '#22c55e',
+                    'Inactive': '#ef4444',
+                    'Planned': '#94a3b8'
                 };
                 const options = {
-                    color: statusColor[line.status] || 'gray',
-                    weight: 4,
-                    dashArray: line.status === 'Planned' ? '10, 10' : '',
+                    color: statusColor[line.status] || '#0ea5e9',
+                    weight: 5,
+                    opacity: 0.9,
+                    lineCap: 'round',
+                    lineJoin: 'round',
+                    dashArray: line.status === 'Planned' ? '8, 10' : '',
                     bubblingMouseEvents: false
                 };
                 const polyline = L.polyline([
@@ -228,7 +332,7 @@
 
             function renderPopup(item, type) {
                 const ignoredKeys = new Set(['lat', 'lng', 'startPoleId', 'endPoleId']);
-                let html = `<div class="space-y-1"><h3 class="font-semibold text-gray-800">${item.name || type}</h3>`;
+                let html = `<div class="space-y-1"><h3 class="map-popup-title">${item.name || type}</h3>`;
                 const isoDateRegex = /\d{4}-\d{2}-\d{2}T/;
                 Object.entries(item).forEach(([key, value]) => {
                     if (ignoredKeys.has(key) || key === 'id' || value === null || value === undefined || key === 'name') { return; }
@@ -236,12 +340,12 @@
                     if ((key === 'imageUrl' || key.endsWith('PhotoURL')) && value) {
                         html += `<img src="${value}" alt="${item.name || type}" class="rounded-md mt-2 max-h-40 w-full object-cover" onerror="this.style.display='none'">`;
                     } else if (value instanceof Array) {
-                        html += `<strong>${formattedKey}:</strong> ${value.join(', ')}<br>`;
+                        html += `<div class="map-popup-row"><strong>${formattedKey}:</strong> ${value.join(', ')}</div>`;
                     } else if (typeof value === 'string' && isoDateRegex.test(value)) {
                         const date = new Date(value);
-                        html += `<strong>${formattedKey}:</strong> ${isNaN(date.getTime()) ? value : date.toLocaleString()}<br>`;
+                        html += `<div class="map-popup-row"><strong>${formattedKey}:</strong> ${isNaN(date.getTime()) ? value : date.toLocaleString()}</div>`;
                     } else {
-                        html += `<strong>${formattedKey}:</strong> ${value}<br>`;
+                        html += `<div class="map-popup-row"><strong>${formattedKey}:</strong> ${value}</div>`;
                     }
                 });
                 html += '</div>';
