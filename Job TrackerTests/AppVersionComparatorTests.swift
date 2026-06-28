@@ -40,4 +40,36 @@ final class AppVersionComparatorTests: XCTestCase {
 
         XCTAssertEqual(decision, .updateRequired(requirement))
     }
+
+    func testVersion305PolicyRequiresOlderInstalledVersionToUpdate() {
+        let requirement = AppUpdateRequirement(
+            latestVersion: "3.0.5",
+            minimumRequiredVersion: "3.0.5",
+            latestBuild: "76",
+            minimumRequiredBuild: "76"
+        )
+        let decision = AppVersionComparator.decision(
+            currentVersion: "3.0.4",
+            currentBuild: "75",
+            requirement: requirement
+        )
+
+        XCTAssertEqual(decision, .updateRequired(requirement))
+    }
+
+    func testMinimumRequiredBuildOnlyAppliesToMatchingMinimumVersion() {
+        let requirement = AppUpdateRequirement(
+            latestVersion: "3.0.5",
+            minimumRequiredVersion: "3.0.5",
+            latestBuild: "76",
+            minimumRequiredBuild: "76"
+        )
+        let decision = AppVersionComparator.decision(
+            currentVersion: "3.0.6",
+            currentBuild: "1",
+            requirement: requirement
+        )
+
+        XCTAssertEqual(decision, .upToDate)
+    }
 }

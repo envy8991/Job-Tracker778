@@ -39,13 +39,16 @@ struct AppUpdateRemoteConfigDocument: Equatable {
     }
 
     init(data: [String: Any]) {
+        let latestVersion = Self.trimmedString(data["latestVersion"])
+        let minimumRequiredVersion = Self.trimmedString(data["minimumRequiredVersion"])
+
         self.init(
-            latestVersion: data["latestVersion"] as? String ?? data["minimumRequiredVersion"] as? String ?? "0",
-            minimumRequiredVersion: data["minimumRequiredVersion"] as? String,
-            latestBuild: data["latestBuild"] as? String,
-            minimumRequiredBuild: data["minimumRequiredBuild"] as? String,
-            updateURLString: data["updateURL"] as? String,
-            releaseNotes: data["releaseNotes"] as? String,
+            latestVersion: latestVersion ?? minimumRequiredVersion ?? "0",
+            minimumRequiredVersion: minimumRequiredVersion,
+            latestBuild: Self.trimmedString(data["latestBuild"]),
+            minimumRequiredBuild: Self.trimmedString(data["minimumRequiredBuild"]),
+            updateURLString: Self.trimmedString(data["updateURL"]),
+            releaseNotes: Self.trimmedString(data["releaseNotes"]),
             forceUpdateEnabled: data["forceUpdateEnabled"] as? Bool ?? true
         )
     }
@@ -64,11 +67,16 @@ struct AppUpdateRemoteConfigDocument: Equatable {
 
     private var trustedUpdateURL: URL? {
         guard let updateURLString else { return nil }
-        let trimmed = updateURLString.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmed), ["https", "itms-apps"].contains(url.scheme?.lowercased()) else {
+        guard let url = URL(string: updateURLString), ["https", "itms-apps"].contains(url.scheme?.lowercased()) else {
             return nil
         }
         return url
+    }
+
+    private static func trimmedString(_ value: Any?) -> String? {
+        guard let string = value as? String else { return nil }
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 
