@@ -106,12 +106,12 @@ final class ForceUpdateViewModelTests: XCTestCase {
 
     func testRemoteConfigDocumentParsesTrustedFirestorePayloadAndRejectsUntrustedURLScheme() {
         let document = AppUpdateRemoteConfigDocument(data: [
-            "latestVersion": "2.4.0",
-            "minimumRequiredVersion": "2.3.0",
-            "latestBuild": "30",
-            "minimumRequiredBuild": "25",
-            "updateURL": "javascript:alert(1)",
-            "releaseNotes": "Required security update",
+            "latestVersion": " 2.4.0 ",
+            "minimumRequiredVersion": " 2.3.0 ",
+            "latestBuild": " 30 ",
+            "minimumRequiredBuild": " 25 ",
+            "updateURL": " javascript:alert(1) ",
+            "releaseNotes": " Required security update ",
             "forceUpdateEnabled": true
         ])
 
@@ -123,6 +123,22 @@ final class ForceUpdateViewModelTests: XCTestCase {
         XCTAssertNil(requirement.updateURL)
         XCTAssertEqual(requirement.releaseNotes, "Required security update")
         XCTAssertTrue(requirement.isEnabled)
+    }
+
+    func testRemoteConfigDocumentFallsBackToMinimumRequiredVersionWhenLatestVersionIsBlank() {
+        let document = AppUpdateRemoteConfigDocument(data: [
+            "latestVersion": " ",
+            "minimumRequiredVersion": "3.0.5",
+            "latestBuild": "76",
+            "minimumRequiredBuild": "76",
+            "forceUpdateEnabled": true
+        ])
+
+        let requirement = document.requirement
+        XCTAssertEqual(requirement.latestVersion, "3.0.5")
+        XCTAssertEqual(requirement.minimumRequiredVersion, "3.0.5")
+        XCTAssertEqual(requirement.latestBuild, "76")
+        XCTAssertEqual(requirement.minimumRequiredBuild, "76")
     }
 
     @MainActor

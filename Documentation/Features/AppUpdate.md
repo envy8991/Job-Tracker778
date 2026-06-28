@@ -8,7 +8,7 @@ Create or update the document at `app_config/ios_version` with these fields:
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `latestVersion` | String | Yes | Latest available marketing version, such as `2.2.0`. Any installed version lower than this is blocked. |
+| `latestVersion` | String | Yes | Latest available marketing version, such as `3.0.5`. Any installed version lower than this is blocked. |
 | `latestBuild` | String | No | Latest available build number. When the marketing version matches, lower installed builds are blocked. |
 | `minimumRequiredVersion` | String | No | Optional hard floor. Installed versions below this value are blocked even if `latestVersion` is omitted. |
 | `minimumRequiredBuild` | String | No | Optional hard floor for build numbers. |
@@ -22,6 +22,8 @@ Create or update the document at `app_config/ios_version` with these fields:
 2. `FirestoreAppUpdateRequirementProvider` listens to `app_config/ios_version` in real time.
 3. `AppVersionComparator` compares semantic version components numerically, so `1.10.0` correctly sorts after `1.2.9`.
 4. If the policy describes a newer version or build, `ForceUpdateView` is rendered over the app and cannot be dismissed. The only action is to open `updateURL`.
+
+For the 3.0.5 rollout, set both `latestVersion` and `minimumRequiredVersion` to `3.0.5` and set both `latestBuild` and `minimumRequiredBuild` to `76` so any 3.0.4 (75) client is blocked until it updates.
 
 ## Testing Notes
 

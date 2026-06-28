@@ -48,6 +48,7 @@ enum AppVersionComparator {
 
         if let minimumRequiredBuild = requirement.minimumRequiredBuild,
            let currentBuild,
+           compare(currentVersion, requirement.minimumRequiredVersion ?? requirement.latestVersion) == .orderedSame,
            compareBuild(currentBuild, minimumRequiredBuild) == .orderedAscending {
             return .updateRequired(requirement)
         }
@@ -59,7 +60,7 @@ enum AppVersionComparator {
         if let latestBuild = requirement.latestBuild,
            let currentBuild,
            compareBuild(currentBuild, latestBuild) == .orderedAscending,
-           compare(currentVersion, requirement.latestVersion) != .orderedDescending {
+           compare(currentVersion, requirement.latestVersion) == .orderedSame {
             return .updateRequired(requirement)
         }
 
