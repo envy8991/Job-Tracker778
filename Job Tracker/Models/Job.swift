@@ -116,6 +116,9 @@ extension Job {
     /// Convenience CLLocation for distance calculations (returns nil if coords missing)
     var clLocation: CLLocation? {
         guard let lat = latitude, let lon = longitude else { return nil }
+        guard lat.isFinite, lon.isFinite,
+              (-90.0...90.0).contains(lat),
+              (-180.0...180.0).contains(lon) else { return nil }
         return CLLocation(latitude: lat, longitude: lon)
     }
 }
