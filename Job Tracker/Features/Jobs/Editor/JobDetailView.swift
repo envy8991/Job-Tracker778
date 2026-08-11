@@ -329,6 +329,15 @@ private let jobPlacementChoices = ["OH", "UG"]
 
                     Section(header: Text("Job Photos")) { jobPhotoSlotsSection }
 
+                    Section(header: Text("Timeline")) {
+                        JobAuditTimeline(jobID: job.id) { actorID in
+                            guard actorID == authViewModel.currentUser?.id else { return actorID }
+                            let first = authViewModel.currentUser?.firstName ?? ""
+                            let last = authViewModel.currentUser?.lastName ?? ""
+                            return "\(first) \(last)".trimmingCharacters(in: .whitespaces)
+                        }
+                    }
+
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)   // keep gradient visible
