@@ -65,3 +65,25 @@ Keep this setup as the default safety net when the project grows:
 - Move slow, flaky, device-only, or external-integration checks into an additional workflow/test plan instead of weakening this one.
 
 The guardrail script intentionally detects new XCTest targets in the project and fails the workflow if they are not listed in the safety-net test plan. That makes future test bundles opt-out by exception instead of accidentally invisible to Xcode Cloud.
+
+## Release version and build numbers
+
+The iOS app and its embedded watch app are the distributable targets in the current project. Keep their Debug and Release `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` settings identical. The unit-test and UI-test bundles do not ship and therefore do not carry release numbers. The `imessage cs` sources and plist are retained in the repository, but there is currently no iMessage extension target or extension product in the Xcode project; if one is restored, treat that embedded extension as a distributable target and give it the containing app's effective version and build.
+
+For every App Store release:
+
+1. Choose an App Store version train that is still open. **A closed App Store version train cannot receive another build**; increment `MARKETING_VERSION` and create/use the new version in App Store Connect instead.
+2. Set the iOS app and watch app `MARKETING_VERSION` to that public version (for example, `3.0.6`) in both build configurations.
+3. Find the greatest build already uploaded to App Store Connect, including expired or rejected builds, and set `CURRENT_PROJECT_VERSION` on both distributable targets to a strictly greater integer. Release `3.0.6` starts at build `130` because build `129` has already been uploaded.
+4. Do not add these settings to XCTest or UI-test targets. Keep `Job-Tracker-Info.plist` parameterized with `$(MARKETING_VERSION)` and `$(CURRENT_PROJECT_VERSION)` so the packaged bundle uses Xcode's effective settings.
+5. Run the preflight and then archive. For an extra local check on a Mac, supply App Store Connect's latest values as environment variables:
+
+   ```sh
+   CI_XCODE_CLOUD=TRUE \
+   CI_XCODEBUILD_ACTION=archive \
+   CI_LAST_UPLOADED_VERSION=3.0.6 \
+   CI_LAST_UPLOADED_BUILD=129 \
+   ci_scripts/ci_pre_xcodebuild.sh
+   ```
+
+For Xcode Cloud, define `CI_LAST_UPLOADED_VERSION` and `CI_LAST_UPLOADED_BUILD` as optional workflow environment variables and update them when the latest upload changes. Before an Archive action, the script asks Xcode for the app target's effective Release build settings, rejects empty/unexpanded or malformed bundle versions, rejects an older public version, and—when the archive stays on the last uploaded version train—requires a strictly increasing build. Omitting both inputs still performs resolution and format validation.
