@@ -287,6 +287,7 @@ struct SettingsView: View {
                 .padding(.bottom, 8)
             }
         }
+        .accessibilityIdentifier("Settings.Root")
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showThemeEditor) {

@@ -598,6 +598,7 @@ struct CreateJobView: View {
                 }
             }
             .navigationTitle("Create Job")
+            .accessibilityIdentifier("CreateJob.Root")
             .navigationBarTitleDisplayMode(.inline)
             .jtNavigationBarStyle()
             .toolbar {
@@ -608,6 +609,7 @@ struct CreateJobView: View {
                     Button("Save") {
                         attemptSave()
                     }
+                    .accessibilityIdentifier("CreateJob.Save")
                     .disabled(isSaving)
                 }
             }

@@ -40,6 +40,7 @@ struct SupervisorHomeDashboardView: View {
             .onChange(of: selectedDate) { _, newDate in viewModel.start(for: newDate) }
             .onDisappear { viewModel.stop() }
         }
+        .accessibilityIdentifier("SupervisorDashboard.Root")
     }
 
     private var header: some View {
@@ -113,6 +114,7 @@ struct SupervisorHomeDashboardView: View {
                 .buttonStyle(.plain)
             }
         }
+        .accessibilityIdentifier("SupervisorDashboard.Positions")
     }
 
     private func users(for position: CrewPosition) -> [AppUser] {

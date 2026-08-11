@@ -23,6 +23,29 @@ xcodebuild test \
   -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
 
+Run the adaptive-layout suite on a current iPad simulator as a second QA destination (and configure the Xcode Cloud Test action with the same destination):
+
+```sh
+xcodebuild test \
+  -project "Job Tracker.xcodeproj" \
+  -scheme "Job Tracker" \
+  -testPlan "Job Tracker Safety Net" \
+  -destination 'platform=iOS Simulator,name=iPad Pro 11-inch (M4)' \
+  -only-testing:'Job TrackerUITests/IPadAdaptiveLayoutUITests'
+```
+
+The test plan includes the complete `Job TrackerUITests` target, so the file-system-synchronized `IPadAdaptiveLayoutUITests` suite is discovered without a per-file project entry. The suite skips on an iPhone runner, keeping the complete safety-net plan usable there, but it only supplies adaptive-layout coverage when the workflow also has the documented iPad destination.
+
+### Manual iPad multitasking QA
+
+XCTest can rotate the simulator but cannot reliably choose Stage Manager or Split View window geometry. Before a release, repeat these checks manually with seeded or non-production data in both light and dark appearance:
+
+1. In **Split View**, test approximately one-third, one-half, and two-thirds widths. Visit Dashboard, Search and a selected result, Timesheet, Yellow Sheet, Create/Edit Job, Route Mapper, Settings, and Supervisor Dashboard. Confirm the selected sidebar/tab and pushed detail remain selected while changing widths.
+2. With **Stage Manager**, resize from the smallest supported window to a wide window in portrait and landscape. Confirm empty-state copy wraps without clipping and primary Create, Save, Done, and map-control actions remain visible or reachable by scrolling.
+3. While a text field is focused, resize the window, dismiss the keyboard using its semantic Done/Search action, and verify the edited value and scroll position remain intact.
+4. Present the week calendar, a job detail, and Create Job. Resize or rotate, then dismiss each sheet or popover using its labeled Close/Done control; verify focus returns to the previously selected sidebar/detail item.
+5. On Route Mapper, verify the controls drawer, search overlay, and locate button do not overlap at each size. Do not use visual map coordinates as pass/fail criteria.
+
 You can also run the configuration guardrail locally:
 
 ```sh

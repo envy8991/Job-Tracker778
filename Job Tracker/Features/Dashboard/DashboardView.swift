@@ -105,6 +105,7 @@ struct DashboardView: View {
                     JTPrimaryButton("Create Job", systemImage: "plus") {
                         viewModel.presentCreateJob()
                     }
+                    .accessibilityIdentifier("Dashboard.CreateJob")
                     .padding(.horizontal)
                     .padding(.top, JTSpacing.sm)
 
@@ -167,6 +168,7 @@ struct DashboardView: View {
                 .padding(.top, JTSpacing.md)
             }
             .toolbar(navigationBarVisibility, for: .navigationBar)
+            .accessibilityIdentifier("Dashboard.Root")
             .jtNavigationBarStyle()
             .safeAreaInset(edge: .top) {
                 Color.clear.frame(height: shellChromeHeight)

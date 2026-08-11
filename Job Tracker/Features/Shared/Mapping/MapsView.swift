@@ -916,6 +916,7 @@ struct MapsView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
+        .accessibilityIdentifier("Maps.Root")
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: showControls)
         .onAppear {
             viewModel.bindLocationService(locationService)

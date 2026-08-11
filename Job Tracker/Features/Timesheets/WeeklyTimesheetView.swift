@@ -359,6 +359,7 @@ struct WeeklyTimesheetView: View {
             }
             .jtNavigationBarStyle()
         }
+        .accessibilityIdentifier("Timesheet.Root")
     }
 }
 
@@ -372,6 +373,7 @@ extension WeeklyTimesheetView {
                     .font(JTTypography.captionEmphasized)
                     .foregroundStyle(JTColors.textSecondary)
                 TextField("Supervisor", text: $supervisor)
+                    .accessibilityIdentifier("Timesheet.Supervisor")
                     .padding(.vertical, JTSpacing.sm)
                     .padding(.horizontal, JTSpacing.md)
                     .jtGlassBackground(cornerRadius: JTShapes.fieldCornerRadius, strokeColor: JTColors.glassSoftStroke)

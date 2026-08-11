@@ -13,6 +13,7 @@ The `Job TrackerTests` bundle should keep fast, deterministic XCTest coverage ar
 - **Dashboard and recent crew jobs**: View-model tests cover summaries and detail sheets that crew members use to understand current work.
 - **Help and tutorial flows**: Tutorial stage tests protect onboarding guidance from accidental regressions.
 - **Seeded UI flows**: `Job TrackerUITests` launches with `JT_UI_TESTING=1` and deterministic seed data to cover authentication validation, dashboard job flow, create/detail/delete controls, search, timesheets, yellow sheets, settings, and admin-only navigation without writing to production Firebase.
+- **iPad adaptive UI flows**: `IPadAdaptiveLayoutUITests` runs from the same UI-test target on the documented iPad simulator and covers portrait/landscape continuity, readable empty states, reachable actions, form and keyboard behavior, dismissible presentations, maps, settings, and supervisor navigation. Stage Manager and Split View geometry remain part of the manual checklist in `XcodeCloudTesting.md`.
 - **Integration smoke tests**: `ServiceIntegrationSmokeTests` covers PDF generation, job-photo slot mapping, arrival-alert inactive state, and watch sync payload filtering; `AppIntentEntryPointTests` protects App Intent discoverability and fallback messaging.
 - **Firebase rules emulator tests**: `firebase-emulator-tests/firestore-storage.rules.test.js` is wired through `npm run test:firebase-rules` and intentionally skips until both `firestore.rules` and `storage.rules` are present.
 

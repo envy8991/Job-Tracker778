@@ -60,6 +60,7 @@ private struct PrimaryTabContainer: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .accessibilityIdentifier("IPadShell.Root")
         .jtNavigationBarStyle()
     }
 }

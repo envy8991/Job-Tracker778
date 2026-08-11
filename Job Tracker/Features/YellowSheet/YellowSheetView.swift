@@ -81,12 +81,14 @@ struct YellowSheetView: View {
                     JTPrimaryButton("Save Yellow Sheet", systemImage: "tray.and.arrow.down") {
                         saveCurrentYellowSheet()
                     }
+                    .accessibilityIdentifier("YellowSheet.Save")
                     .padding(.horizontal, JTSpacing.lg)
                     .padding(.bottom, JTSpacing.md)
                 }
                 .padding(.top, topContentPadding)
             }
             .navigationTitle("     ")
+            .accessibilityIdentifier("YellowSheet.Root")
             .jtNavigationBarStyle()
             .onAppear {
                 if ProcessInfo.processInfo.isJobTrackerUITesting {

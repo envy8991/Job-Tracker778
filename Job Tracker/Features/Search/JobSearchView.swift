@@ -52,6 +52,7 @@ struct JobSearchView: View {
             }
         }
         .jtNavigationBarStyle()
+        .accessibilityIdentifier("Search.Root")
         .safeAreaInset(edge: .top) {
             Color.clear.frame(height: shellChromeHeight)
         }
@@ -84,6 +85,7 @@ struct JobSearchView: View {
 
     private var searchField: some View {
         JTTextField("Address, job #, status, or teammate", text: $viewModel.query, icon: "magnifyingglass")
+            .accessibilityIdentifier("Search.Query")
             .textInputAutocapitalization(.never)
             .disableAutocorrection(true)
             .submitLabel(.search)
@@ -264,6 +266,7 @@ private struct EmptyResultsView: View {
             .padding(.vertical, JTSpacing.xl)
             .padding(.horizontal, JTSpacing.xl)
         }
+        .accessibilityIdentifier("Search.EmptyState")
     }
 }
 
