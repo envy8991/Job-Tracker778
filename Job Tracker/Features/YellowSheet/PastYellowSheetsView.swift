@@ -22,7 +22,7 @@ struct PastYellowSheetsView: View {
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
             }
-            .navigationTitle("Past Yellow Sheets")
+            .navigationTitle("Past Materials")
             .navigationBarTitleDisplayMode(.inline)
             .jtNavigationBarStyle()
             .onAppear {

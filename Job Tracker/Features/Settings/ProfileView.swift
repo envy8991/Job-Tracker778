@@ -168,7 +168,7 @@ private extension ProfileView {
                 )
 
                 historyCard(
-                    title: "Yellow Sheets",
+                    title: "Materials",
                     icon: "folder.fill.badge.person.crop",
                     accent: JTColors.info,
                     primaryValue: yellowSheetCountText,
@@ -250,7 +250,7 @@ private extension ProfileView {
 
     var yellowSheetDetailText: String? {
         guard let latest = sortedYellowSheets.first else {
-            return yellowSheetHistory.yellowSheets.isEmpty ? "Capture a yellow sheet to see it appear here." : nil
+            return yellowSheetHistory.yellowSheets.isEmpty ? "Capture a materials record to see it appear here." : nil
         }
 
         let date = ProfileView.weekFormatter.string(from: latest.weekStart)
@@ -285,7 +285,7 @@ private extension ProfileView {
             }
 
             QuickActionLink(
-                title: "Past Yellow Sheets",
+                title: "Past Materials",
                 subtitle: "Keep tabs on weekly job groupings.",
                 icon: "folder.badge.person.crop",
                 accent: JTColors.info,
@@ -353,7 +353,7 @@ private extension ProfileView {
                     .font(JTTypography.headline)
                     .foregroundStyle(JTColors.textPrimary)
 
-                Text("Sign in from the main screen to see your profile, timesheets, and yellow sheets in one place.")
+                Text("Sign in from the main screen to see your profile, timesheets, and materials in one place.")
                     .font(JTTypography.caption)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(JTColors.textSecondary)

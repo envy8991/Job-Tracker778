@@ -314,7 +314,7 @@ function renderPastYellowSheets() {
   list.innerHTML = "";
 
   if (appState.yellowSheets.length === 0) {
-    list.innerHTML = `<p class="empty-state">No saved yellow sheets yet.</p>`;
+    list.innerHTML = `<p class="empty-state">No saved materials yet.</p>`;
     return;
   }
 

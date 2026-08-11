@@ -29,7 +29,7 @@ class YellowSheetPDFGenerator {
             let margin: CGFloat = 20
             
             // 1) Draw the header.
-            let headerText = "Yellow Sheet for Week Starting: \(formattedDate(weekStart))"
+            let headerText = "Materials for Week Starting: \(formattedDate(weekStart))"
             drawText(headerText, at: CGPoint(x: margin, y: currentY), fontSize: 16, isBold: true)
             currentY += 30
             
@@ -81,7 +81,7 @@ class YellowSheetPDFGenerator {
             }
         }
         
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("YellowSheet-\(UUID().uuidString).pdf")
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("Materials-\(UUID().uuidString).pdf")
         do {
             try data.write(to: tempURL)
             return tempURL

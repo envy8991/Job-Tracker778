@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="A browser version of the Job Tracker iOS app with Dashboard, Timesheets, Yellow Sheet, Job Search, and More tabs."
+      content="A browser version of the Job Tracker iOS app with Dashboard, Timesheets, Materials, Job Search, and More tabs."
     />
     <title>Job Tracker Web</title>
     <link rel="stylesheet" href="styles.css" />
@@ -121,18 +121,18 @@
 
         <section class="tab-view" id="yellowSheetView" data-tab="yellowSheet" aria-labelledby="yellowSheetTitle" hidden>
           <header class="page-heading">
-            <p class="eyebrow">Yellow Sheet</p>
-            <h1 id="yellowSheetTitle">Weekly yellow sheet</h1>
-            <p class="lede">Save the week-starting date and total job count for the same yellow sheet record the iOS app stores.</p>
+            <p class="eyebrow">Materials</p>
+            <h1 id="yellowSheetTitle">Weekly materials</h1>
+            <p class="lede">Save the week-starting date and total job count for the same materials record the iOS app stores.</p>
           </header>
 
           <section class="workspace-card">
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Current week</p>
-                <h2>Yellow Sheet summary</h2>
+                <h2>Materials summary</h2>
               </div>
-              <button class="button primary" id="saveYellowSheetButton" type="button">Save Yellow Sheet</button>
+              <button class="button primary" id="saveYellowSheetButton" type="button">Save Materials</button>
             </div>
             <div class="yellow-summary">
               <article>
@@ -149,7 +149,7 @@
 
           <section class="workspace-card">
             <p class="eyebrow">History</p>
-            <h2>Past Yellow Sheets</h2>
+            <h2>Past Materials</h2>
             <div class="compact-list" id="pastYellowSheetsList"></div>
           </section>
         </section>
@@ -207,7 +207,7 @@
       <nav class="bottom-tabs" aria-label="Primary tabs">
         <button class="tab-button active" type="button" data-tab-target="dashboard" aria-label="Dashboard" aria-current="page"><span>▦</span><small>Dashboard</small></button>
         <button class="tab-button" type="button" data-tab-target="timesheets" aria-label="Timesheets"><span>◷</span><small>Timesheets</small></button>
-        <button class="tab-button" type="button" data-tab-target="yellowSheet" aria-label="Yellow Sheet"><span>▤</span><small>Yellow Sheet</small></button>
+        <button class="tab-button" type="button" data-tab-target="yellowSheet" aria-label="Materials"><span>▤</span><small>Materials</small></button>
         <button class="tab-button" type="button" data-tab-target="jobSearch" aria-label="Job Search"><span>⌕</span><small>Job Search</small></button>
         <button class="tab-button" type="button" data-tab-target="more" aria-label="More"><span>•••</span><small>More</small></button>
       </nav>

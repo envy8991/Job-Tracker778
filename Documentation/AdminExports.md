@@ -4,7 +4,7 @@
 
 Company exports are available only through the Cloud Functions API. `requestCompanyExport` and `createCompanyExportDownload` require the Firebase `admin: true` custom claim and an ID token whose `auth_time` is no more than five minutes old. The app must reauthenticate the administrator before each call. Supervisor or technician UI visibility is not authorization; the backend rejects them.
 
-Requesting an export creates an `adminExports` job and immediately returns its ID. A Firestore-triggered backend worker reads jobs, timesheets, yellow sheets, and users in bounded pages, inventories attachments, and streams a ZIP to private Cloud Storage. The phone only observes its small status document: `status`, `progress`, `expiresAt`, `checksum`, `recordCounts`, and a bounded `failure` object. It never assembles the archive.
+Requesting an export creates an `adminExports` job and immediately returns its ID. A Firestore-triggered backend worker reads jobs, timesheets, materials, and users in bounded pages, inventories attachments, and streams a ZIP to private Cloud Storage. The phone only observes its small status document: `status`, `progress`, `expiresAt`, `checksum`, `recordCounts`, and a bounded `failure` object. It never assembles the archive.
 
 When the job is `ready`, call `createCompanyExportDownload` after reauthentication. It returns a random, single-use URL valid for five minutes. The HTTP endpoint atomically consumes that token, records a `downloaded` audit event with the actor UID, and streams the private object. Requests and downloads are append-only audit documents. Do not place export URLs in analytics, logs, email, or support tickets.
 
@@ -12,7 +12,7 @@ When the job is `ready`, call `createCompanyExportDownload` after reauthenticati
 
 The ZIP and its root `manifest.json` use semantic `archiveVersion` **1.0**. Importers must reject unsupported major versions and may accept newer minor versions while ignoring unknown fields.
 
-* `data/jobs.{json,csv}`, `data/timesheets.{json,csv}`, and `data/yellowSheets.{json,csv}` contain operational records.
+* `data/jobs.{json,csv}`, `data/timesheets.{json,csv}`, and `data/yellowSheets.{json,csv}` contain operational records. The `yellowSheets` export path is retained as a legacy compatibility name for materials data.
 * `data/users.{json,csv}` retains UID, name, crew position, and role flags so relationships can be reconstructed. Email, profile-picture URL, phone, tokens, and all unknown profile fields are deliberately omitted.
 * Each JSON file is an array. Each RFC 4180 CSV has `id,json` columns; `json` is the canonical complete record, avoiding lossy flattening of arrays and nested Firestore data.
 * `attachments/manifest.json` inventories path, byte size, content type, update time, and MD5 metadata. Attachment bytes are not included in v1.0; recovery tooling must restore them from the separately retained Storage backup.

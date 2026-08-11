@@ -19,7 +19,7 @@ final class SearchTimesheetYellowSheetSettingsUITests: XCTestCase {
         app.tabBars.buttons["Timesheets"].tap()
         waitForElement(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Timesheet")).firstMatch)
 
-        app.tabBars.buttons["Yellow Sheet"].tap()
+        app.tabBars.buttons["Materials"].tap()
         waitForElement(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Yellow")).firstMatch)
     }
 

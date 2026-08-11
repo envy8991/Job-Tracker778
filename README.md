@@ -163,9 +163,9 @@ Future update checklist:
 - Update PDF generator tests and templates when changing document layout.
 - Keep job suggestions connected to `TimesheetJobsViewModel` and `JobsViewModel`.
 
-### Yellow Sheets
+### Materials
 
-Yellow sheets support daily compliance/safety paperwork, material usage, supervisor review, historical records, PDF generation, and in-app PDF viewing/annotation. Records may link to specific jobs so forms can prefill addresses and partner details.
+Materials support daily compliance/safety paperwork, material usage, supervisor review, historical records, PDF generation, and in-app PDF viewing/annotation. Records may link to specific jobs so forms can prefill addresses and partner details.
 
 Future update checklist:
 
@@ -300,7 +300,7 @@ Future update checklist:
 | `jobs` | Job assignments and searchable job records | Dashboard, Jobs, Search, Timesheets, CarPlay |
 | `sharedJobs` | Tokenized job share/import payloads | Deep links, iMessage, cross-device sharing |
 | `timesheets` | Weekly timesheet documents | Timesheets, PDF export/history |
-| `yellowSheets` | Daily yellow sheet documents | Yellow Sheet workflows, PDF export/history |
+| `yellowSheets` (legacy collection name) | Daily materials documents | Materials workflows, PDF export/history |
 | `partnerRequests` | Pending/accepted/declined partner requests | Find Partner, Team |
 | `partnerships` | Active partner pairings | Team, Messaging, Shared job context |
 | `conversations/{id}/messages` | Chat messages | Partner chat |
@@ -310,7 +310,7 @@ Future update checklist:
 
 ### Storage Usage
 
-Firebase Storage is used for job photos and generated PDFs. `JobPhotoUploadQueue` handles deferred photo uploads and updates job document photo URL fields after upload succeeds. Timesheet and yellow sheet PDF generators produce shareable documents and should remain aligned with Storage rules.
+Firebase Storage is used for job photos and generated PDFs. `JobPhotoUploadQueue` handles deferred photo uploads and updates job document photo URL fields after upload succeeds. Timesheet and materials PDF generators produce shareable documents and should remain aligned with Storage rules.
 
 ### Security Expectations
 
@@ -413,7 +413,7 @@ npm run test:firebase-rules
 - Shared job service behavior.
 - Fiber map view model behavior.
 
-`Job TrackerUITests/` covers user flows such as authentication, dashboard job flow, admin navigation, search, timesheets, yellow sheets, and settings.
+`Job TrackerUITests/` covers user flows such as authentication, dashboard job flow, admin navigation, search, timesheets, materials, and settings.
 
 ### Test Launch Arguments
 
@@ -542,7 +542,7 @@ Update all applicable locations:
 ### PDF export fails
 
 - Confirm Storage rules allow writes for the signed-in user.
-- Confirm linked jobs/timesheets/yellow sheets have required metadata.
+- Confirm linked jobs/timesheets/materials have required metadata.
 - Re-run tests around PDF generator behavior after layout changes.
 
 ### CarPlay does not appear
@@ -566,7 +566,7 @@ Update all applicable locations:
 - [Shared](Documentation/Features/Shared.md)
 - [Splice Assist](Documentation/Features/SpliceAssist.md)
 - [Timesheets](Documentation/Features/Timesheets.md)
-- [Yellow Sheet](Documentation/Features/YellowSheet.md)
+- [Materials](Documentation/Features/YellowSheet.md)
 - [Design System](Job%20Tracker/DesignSystem/DesignSystem.md)
 - [Testing Safety Net](Documentation/TestingSafetyNet.md)
 - [Xcode Cloud Testing](Documentation/XcodeCloudTesting.md)
