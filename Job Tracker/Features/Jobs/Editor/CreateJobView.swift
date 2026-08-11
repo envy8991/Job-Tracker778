@@ -42,6 +42,10 @@ private extension View {
     }
 }
 
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
 // MARK: - Section Card
 @ViewBuilder
 private func SectionCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -310,6 +314,18 @@ struct CreateJobView: View {
     @State private var locationNumber = ""
     @State private var customStatusText = ""
     @State private var assignmentsText: String = ""
+    @State private var fiberType = ""
+    @State private var jobPlacement = ""
+    @State private var canFootage = ""
+    @State private var nidFootage = ""
+    @State private var housePhotoImage: UIImage?
+    @State private var nidPhotoImage: UIImage?
+    @State private var canPhotoImage: UIImage?
+    @State private var mapDesignPhotoImage: UIImage?
+    @State private var activePhotoSlot: JobPhotoSlot?
+    @State private var selectedPhotoSource: UIImagePickerController.SourceType = .photoLibrary
+    @State private var showPhotoSourceDialog = false
+    @State private var showImagePicker = false
     @FocusState private var isAssignmentsFocused: Bool
     @FocusState private var focusedAddressID: AddressDraft.ID?
     @StateObject private var addressSearch = AddressSearchCompleter()
@@ -318,8 +334,12 @@ struct CreateJobView: View {
     @State private var alertMessage: String?
     @State private var duplicatePrompt: DuplicateJobPrompt?
     @State private var duplicateCheckTasks: [AddressDraft.ID: Task<Void, Never>] = [:]
+    @State private var approvedSeparateAddresses = Set<String>()
+    @State private var isSaving = false
 
     let statusOptions = ["Pending","OH","UG","Nid","Can","Done","Talk to Rick","Custom"]
+    let fiberChoices = ["Flat", "Round", "Mainline"]
+    let placementChoices = ["OH", "UG"]
 
     // Address suggestion state removed
 
@@ -478,6 +498,31 @@ struct CreateJobView: View {
                             }
                         }
 
+                        SectionCard(title: "Fiber & Placement") {
+                            VStack(alignment: .leading, spacing: 14) {
+                                Picker("Fiber Type", selection: $fiberType) {
+                                    Text("Not selected").tag("")
+                                    ForEach(fiberChoices, id: \.self) { Text($0).tag($0) }
+                                }
+                                .pickerStyle(.segmented)
+
+                                Picker("Placement", selection: $jobPlacement) {
+                                    Text("Not selected").tag("")
+                                    ForEach(placementChoices, id: \.self) { Text($0).tag($0) }
+                                }
+                                .pickerStyle(.segmented)
+
+                                HStack(spacing: 12) {
+                                    TextField("CAN footage", text: $canFootage)
+                                        .keyboardType(.numberPad)
+                                        .textFieldStyle(.roundedBorder)
+                                    TextField("NID footage", text: $nidFootage)
+                                        .keyboardType(.numberPad)
+                                        .textFieldStyle(.roundedBorder)
+                                }
+                            }
+                        }
+
                         // Materials
                         SectionCard(title: "Materials Used") {
                             TextField("Enter materials info…", text: $materialsUsed)
@@ -508,6 +553,15 @@ struct CreateJobView: View {
                                 )
                         }
 
+                        SectionCard(title: "Job Photos") {
+                            VStack(spacing: 10) {
+                                createPhotoRow("House", image: housePhotoImage, slot: .house)
+                                createPhotoRow("NID", image: nidPhotoImage, slot: .nid)
+                                createPhotoRow("CAN", image: canPhotoImage, slot: .can)
+                                createPhotoRow("Map / Design", image: mapDesignPhotoImage, slot: .mapDesign)
+                            }
+                        }
+
                         // Save Button (prominent)
                         Button {
                             attemptSave()
@@ -522,6 +576,7 @@ struct CreateJobView: View {
                             .glassCard(cornerRadius: 14)
                         }
                         .buttonStyle(.plain)
+                        .disabled(isSaving)
                         .padding(.top, 4)
                     }
                     .padding(.horizontal, 16)
@@ -539,6 +594,7 @@ struct CreateJobView: View {
                     Button("Save") {
                         attemptSave()
                     }
+                    .disabled(isSaving)
                 }
             }
             .alert(alertTitle, isPresented: alertBinding, actions: {
@@ -561,6 +617,22 @@ struct CreateJobView: View {
                         duplicatePrompt = nil
                     }
                 )
+            }
+            .confirmationDialog("Add Photo", isPresented: $showPhotoSourceDialog, titleVisibility: .visible) {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button("Take Photo") {
+                        selectedPhotoSource = .camera
+                        showImagePicker = true
+                    }
+                }
+                Button("Choose from Photos") {
+                    selectedPhotoSource = .photoLibrary
+                    showImagePicker = true
+                }
+                Button("Cancel", role: .cancel) { activePhotoSlot = nil }
+            }
+            .sheet(isPresented: $showImagePicker, onDismiss: { activePhotoSlot = nil }) {
+                ImagePicker(image: selectedPhotoBinding, sourceType: selectedPhotoSource)
             }
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
@@ -605,6 +677,7 @@ struct CreateJobView: View {
     // MARK: - Save
 
     private func attemptSave() {
+        guard !isSaving else { return }
         let addressDraftsToSave = addresses.compactMap { draft -> AddressDraft? in
             let trimmed = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : AddressDraft(id: draft.id, text: trimmed, apartment: draft.trimmedApartment)
@@ -641,6 +714,7 @@ struct CreateJobView: View {
             return
         }
 
+        isSaving = true
         saveJobs(addressDraftsToSave: addressDraftsToSave)
     }
 
@@ -661,6 +735,10 @@ struct CreateJobView: View {
         let trimmedJobNumber = jobNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         let jobNumberValue = trimmedJobNumber.isEmpty ? nil : trimmedJobNumber
         let materialsUsedValue = materialsUsed
+        let fiberValue = fiberType.trimmingCharacters(in: .whitespacesAndNewlines)
+        let combinedMaterials = [fiberValue.isEmpty ? nil : "Fiber: \(fiberValue)", materialsUsedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : materialsUsedValue]
+            .compactMap { $0 }
+            .joined(separator: ", ")
 
         Task {
             var preparedJobs: [PreparedJob] = []
@@ -680,7 +758,10 @@ struct CreateJobView: View {
                     portalID: portalIDValue,
                     locationNumber: locationNumberValue,
                     assignments: assignmentsValue,
-                    materialsUsed: materialsUsedValue,
+                    materialsUsed: combinedMaterials.isEmpty ? nil : combinedMaterials,
+                    nidFootage: nidFootage.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                    canFootage: canFootage.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                    jobPlacement: jobPlacement.isEmpty ? nil : jobPlacement,
                     latitude: coord?.latitude,
                     longitude: coord?.longitude
                 )))
@@ -694,13 +775,14 @@ struct CreateJobView: View {
 
     private func processPreparedJobs(_ jobs: [PreparedJob]) {
         guard let next = jobs.first else {
+            isSaving = false
             dismiss()
             return
         }
 
         let remaining = Array(jobs.dropFirst())
 
-        let matches = duplicateMatches(for: next.job)
+        let matches = approvedSeparateAddresses.contains(addressKey(next.job.address)) ? [] : duplicateMatches(for: next.job)
         if matches.isEmpty {
             createJobAndContinue(next, remainingJobs: remaining)
         } else {
@@ -717,13 +799,15 @@ struct CreateJobView: View {
 
     private func createJobAndContinue(_ preparedJob: PreparedJob, remainingJobs: [PreparedJob]) {
         duplicatePrompt = nil
-        jobsViewModel.createJob(preparedJob.job) { success in
+        jobsViewModel.createJobReturningID(preparedJob.job) { success, createdJobID in
             guard success else {
+                isSaving = false
                 alertMessage = "Could not create this job. Please try again."
                 return
             }
 
             removeCompletedAddress(id: preparedJob.addressID)
+            if let createdJobID { enqueueSelectedPhotos(for: createdJobID) }
 
             if remainingJobs.isEmpty {
                 onAddedToDashboard?(preparedJob.job)
@@ -739,9 +823,10 @@ struct CreateJobView: View {
         let dashboardDate = prompt.newJob?.job.date ?? date
         let dashboardCopy = dashboardCopyForCurrentUser(from: match.entry, scheduledDate: dashboardDate)
 
-        jobsViewModel.createJob(dashboardCopy) { success in
+        jobsViewModel.createJobReturningID(dashboardCopy) { success, createdJobID in
             handleDuplicateJoinResult(
                 success: success,
+                createdJobID: createdJobID,
                 dashboardJob: dashboardCopy,
                 prompt: prompt
             )
@@ -759,8 +844,9 @@ struct CreateJobView: View {
         return dashboardCopy
     }
 
-    private func handleDuplicateJoinResult(success: Bool, dashboardJob: Job, prompt: DuplicateJobPrompt) {
+    private func handleDuplicateJoinResult(success: Bool, createdJobID: String?, dashboardJob: Job, prompt: DuplicateJobPrompt) {
         if success {
+            if let createdJobID { enqueueSelectedPhotos(for: createdJobID) }
             if prompt.joinsAndContinuesSave {
                 if prompt.remainingJobs.isEmpty {
                     onAddedToDashboard?(dashboardJob)
@@ -774,11 +860,10 @@ struct CreateJobView: View {
                 if let addressID = prompt.addressID {
                     removeCompletedAddress(id: addressID)
                 }
-                if validAddressCount == 0 {
-                    dismiss()
-                }
+                ensureEmptyAddressRow()
             }
         } else {
+            isSaving = false
             alertMessage = "Could not add this duplicate job to your dashboard. Please try again or create a separate job."
         }
     }
@@ -787,6 +872,8 @@ struct CreateJobView: View {
         duplicatePrompt = nil
         if prompt.joinsAndContinuesSave, let newJob = prompt.newJob {
             createJobAndContinue(newJob, remainingJobs: prompt.remainingJobs)
+        } else {
+            approvedSeparateAddresses.insert(addressKey(prompt.address))
         }
     }
 
@@ -909,11 +996,79 @@ struct CreateJobView: View {
         )
     }
 
+    private var selectedPhotoBinding: Binding<UIImage?> {
+        Binding(
+            get: {
+                switch activePhotoSlot {
+                case .house: housePhotoImage
+                case .nid: nidPhotoImage
+                case .can: canPhotoImage
+                case .mapDesign: mapDesignPhotoImage
+                case nil: nil
+                }
+            },
+            set: { image in
+                switch activePhotoSlot {
+                case .house: housePhotoImage = image
+                case .nid: nidPhotoImage = image
+                case .can: canPhotoImage = image
+                case .mapDesign: mapDesignPhotoImage = image
+                case nil: break
+                }
+            }
+        )
+    }
+
+    private func createPhotoRow(_ title: String, image: UIImage?, slot: JobPhotoSlot) -> some View {
+        HStack(spacing: 12) {
+            Group {
+                if let image {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else {
+                    Image(systemName: "photo").foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 52, height: 52)
+            .clipped()
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+
+            Text(title).font(.subheadline.weight(.semibold))
+            Spacer()
+            Button(image == nil ? "Add" : "Replace") {
+                activePhotoSlot = slot
+                showPhotoSourceDialog = true
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    private func enqueueSelectedPhotos(for jobID: String) {
+        let photos: [(slot: JobPhotoSlot, image: UIImage)] = [
+            housePhotoImage.map { (.house, $0) },
+            nidPhotoImage.map { (.nid, $0) },
+            canPhotoImage.map { (.can, $0) },
+            mapDesignPhotoImage.map { (.mapDesign, $0) }
+        ].compactMap { $0 }
+        guard !photos.isEmpty else { return }
+        JobPhotoUploadQueue.shared.enqueue(photos, for: jobID)
+    }
+
+    private func addressKey(_ address: String) -> String {
+        AddressDuplicateMatcher.normalizedAddressKey(address)
+    }
+
+    private func ensureEmptyAddressRow() {
+        if addresses.isEmpty {
+            addresses = [AddressDraft()]
+        }
+        isSaving = false
+    }
+
     @ViewBuilder
     private func addressField(for address: Binding<AddressDraft>) -> some View {
         let addressID = address.wrappedValue.id
 
-        ZStack(alignment: .topLeading) {
+        VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 8) {
             TextField("Enter address", text: Binding(
                 get: { address.wrappedValue.text },
@@ -1008,7 +1163,6 @@ struct CreateJobView: View {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                 )
-                .padding(.top, 58)
             }
         }
         .overlay(alignment: .topTrailing) {

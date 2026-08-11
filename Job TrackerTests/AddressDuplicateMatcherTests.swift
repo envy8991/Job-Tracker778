@@ -31,4 +31,21 @@ final class AddressDuplicateMatcherTests: XCTestCase {
         XCTAssertFalse(comparison.isExact)
         XCTAssertTrue(comparison.isClose)
     }
+
+    func testNormalizedKeyTreatsApartmentSpellingsAsTheSameDraft() {
+        XCTAssertEqual(
+            AddressDuplicateMatcher.normalizedAddressKey("1207 Main Street, Apartment 4B"),
+            AddressDuplicateMatcher.normalizedAddressKey("1207 main st #4B")
+        )
+    }
+
+    func testDifferentApartmentNumbersAreNotExactDuplicates() {
+        let comparison = AddressDuplicateMatcher.compare(
+            "1207 Main Street Apt 4B",
+            "1207 Main Street Apt 5B"
+        )
+
+        XCTAssertFalse(comparison.isExact)
+        XCTAssertFalse(comparison.isClose)
+    }
 }
