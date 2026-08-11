@@ -6,6 +6,7 @@ struct SpliceAssistView: View {
     @State private var isImagePickerPresented = false
     @State private var isTroubleshootSheetPresented = false
     @State private var isT2TooltipPresented = false
+    @State private var hasUploadConsent = false
 
     @State private var troubleshootIdentifier: String = ""
     @State private var troubleshootColor: String = ""
@@ -88,6 +89,15 @@ struct SpliceAssistView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(JTColors.accent)
+
+                    Toggle("I consent to securely upload this map for transient AI processing.", isOn: $hasUploadConsent)
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+
+                    Text("Job Tracker does not store the uploaded map or AI request. The provider processes it under the company AI agreement; clear or replace the map in the app at any time.")
+                        .font(JTTypography.caption)
+                        .foregroundStyle(JTColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Toggle(isOn: $viewModel.isT2SplitterPresent) {
@@ -146,7 +156,7 @@ struct SpliceAssistView: View {
                         SpliceAssistActionButton(title: "Troubleshoot",
                                                   symbol: "exclamationmark.triangle.fill",
                                                   tint: .red,
-                                                  isDisabled: !viewModel.hasMapImage) {
+                                                  isDisabled: !viewModel.hasMapImage || !hasUploadConsent) {
                             troubleshootIdentifier = viewModel.canIdentifier
                             troubleshootColor = ""
                             isTroubleshootSheetPresented = true
@@ -157,14 +167,14 @@ struct SpliceAssistView: View {
                         SpliceAssistActionButton(title: "Find Assignment",
                                                   symbol: "magnifyingglass",
                                                   tint: .green,
-                                                  isDisabled: !viewModel.hasMapImage) {
+                                                  isDisabled: !viewModel.hasMapImage || !hasUploadConsent) {
                             Task { await viewModel.performAssignmentSearch() }
                         }
 
                         SpliceAssistActionButton(title: "Analyze Splice",
                                                   symbol: "bolt.fill",
                                                   tint: .blue,
-                                                  isDisabled: !viewModel.canRunAnalysis) {
+                                                  isDisabled: !viewModel.canRunAnalysis || !hasUploadConsent) {
                             Task { await viewModel.performAnalysis() }
                         }
                     }

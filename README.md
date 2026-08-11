@@ -346,7 +346,11 @@ Firebase Storage is used for job photos and generated PDFs. `JobPhotoUploadQueue
 
 ### Sensitive Values
 
-`Job-Tracker-Info.plist` contains a `GEMINI_API_KEY` key placeholder. Do not commit real production secrets. Prefer a secure build setting, encrypted configuration, remote config, or CI-secret injection strategy for real keys.
+AI provider credentials are Firebase Functions secrets and are never included in the iOS app. Configure them with `firebase functions:secrets:set OPENAI_API_KEY` and `firebase functions:secrets:set GEMINI_API_KEY` before deployment.
+
+### AI image privacy
+
+Job-sheet and splice-map images are uploaded only after an in-app disclosure and consent. Callable Functions authenticate the caller, authorize the supervisor/admin role, validate and rate-limit the request, and send the image directly to the configured AI provider. Job Tracker does not write images, prompts, or provider responses to Firestore or Cloud Storage: request bodies remain only for transient processing and are discarded when the invocation completes. Users can cancel before upload or clear/replace the local image. Imported job records follow the normal company retention and deletion policy; administrators can delete them through the existing job-management workflow. Provider-side processing and abuse-log retention are controlled by the organization's provider agreement.
 
 ### Entitlements and Capabilities
 

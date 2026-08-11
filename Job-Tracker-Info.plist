@@ -45,10 +45,6 @@
 			</array>
 		</dict>
 	</dict>
-	<key>OPENAI_API_KEY</key>
-	<string></string>
-	<key>GEMINI_API_KEY</key>
-	<string></string>
 	<key>NSCameraUsageDescription</key>
 	<string>Job Tracker uses the camera to capture job-site evidence photos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

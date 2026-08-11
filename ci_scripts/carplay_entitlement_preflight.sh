@@ -47,8 +47,7 @@ import plistlib
 from pathlib import Path
 info = plistlib.loads(Path(r"$INFO_PLIST").read_bytes())
 for key in ["OPENAI_API_KEY", "GEMINI_API_KEY"]:
-    value = info.get(key, "")
-    if isinstance(value, str) and value.strip():
+    if key in info:
         raise SystemExit(1)
 PY
 then
