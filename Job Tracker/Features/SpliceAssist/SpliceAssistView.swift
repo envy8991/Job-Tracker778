@@ -19,9 +19,16 @@ struct SpliceAssistView: View {
                 stepThreeCard
 
                 if let message = viewModel.message {
-                    messageCard(message)
+                    Button(action: viewModel.clearMessage) {
+                        messageCard(message)
+                    }
+                        .buttonStyle(.plain)
+                        .frame(minHeight: 44)
+                        .accessibilityLabel("Dismiss message")
+                        .accessibilityValue(message)
+                        .accessibilityHint("Clears this message")
+                        .accessibilityIdentifier("spliceAssist.dismissMessage")
                         .transition(.opacity.combined(with: .move(edge: .top)))
-                        .onTapGesture { viewModel.clearMessage() }
                 }
 
                 if viewModel.isProcessing || viewModel.result != nil {

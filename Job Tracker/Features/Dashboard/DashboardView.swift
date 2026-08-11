@@ -136,15 +136,21 @@ struct DashboardView: View {
             .overlay(alignment: .top) {
                 VStack(spacing: JTSpacing.sm) {
                     if viewModel.showSyncBanner, viewModel.syncTotal > 0, viewModel.syncDone <= viewModel.syncTotal {
-                        DashboardSyncBanner(
-                            done: viewModel.syncDone,
-                            total: viewModel.syncTotal,
-                            inFlight: viewModel.syncInFlight,
-                            failed: viewModel.syncFailed,
-                            waitingForNetwork: viewModel.syncWaitingForNetwork,
-                            phase: viewModel.wavePhase
-                        )
-                        .onTapGesture { viewModel.presentSyncDetails() }
+                        Button(action: viewModel.presentSyncDetails) {
+                            DashboardSyncBanner(
+                                done: viewModel.syncDone,
+                                total: viewModel.syncTotal,
+                                inFlight: viewModel.syncInFlight,
+                                failed: viewModel.syncFailed,
+                                waitingForNetwork: viewModel.syncWaitingForNetwork,
+                                phase: viewModel.wavePhase
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Sync status")
+                        .accessibilityValue("\(viewModel.syncDone) of \(viewModel.syncTotal) changes uploaded")
+                        .accessibilityHint("Opens sync details")
+                        .accessibilityIdentifier("dashboard.syncDetails")
                         .transition(.move(edge: .top).combined(with: .opacity))
                     }
 

@@ -668,7 +668,52 @@ extension JobDetailView {
 
     private func jobPhotoSlotRow(title: String, urlString: String?, image: UIImage?, slot: JobPhotoSlot) -> some View {
         HStack(spacing: 12) {
+            let fullScreenURL = image == nil ? urlString.flatMap { URL(string: $0) } : nil
+            let isAvailable = image != nil || urlString?.isEmpty == false
+
             Group {
+                if let fullScreenURL {
+                    Button {
+                        fullScreenImageURL = fullScreenURL
+                    } label: {
+                        photoThumbnail(urlString: urlString, image: image)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(title), available")
+                    .accessibilityValue("Ready")
+                    .accessibilityHint("Opens the full-screen photo")
+                    .accessibilityIdentifier("jobDetail.photo.\(slot.rawValue)")
+                } else {
+                    photoThumbnail(urlString: urlString, image: image)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(title), \(isAvailable ? "available" : "not added")")
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(isAvailable ? "Ready" : "Not added")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button(isAvailable ? "Replace" : "Add") {
+                activePhotoSlot = slot
+                showPhotoSourceDialog = true
+            }
+            .font(.subheadline)
+            .buttonStyle(.borderless)
+            .frame(minWidth: 44, minHeight: 44)
+            .accessibilityHint("Choose a photo source for \(title)")
+            .accessibilityIdentifier("jobDetail.photo.\(slot.rawValue).edit")
+        }
+    }
+
+    private func photoThumbnail(urlString: String?, image: UIImage?) -> some View {
+        Group {
                 if let image {
                     Image(uiImage: image)
                         .resizable()
@@ -701,29 +746,6 @@ extension JobDetailView {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
             )
-            .onTapGesture {
-                if image == nil, let urlString, let url = URL(string: urlString) {
-                    fullScreenImageURL = url
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(image != nil || urlString?.isEmpty == false ? "Ready" : "Not added")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Button(image != nil || urlString?.isEmpty == false ? "Replace" : "Add") {
-                activePhotoSlot = slot
-                showPhotoSourceDialog = true
-            }
-            .font(.subheadline)
-            .buttonStyle(.borderless)
-        }
     }
 
 
@@ -755,6 +777,9 @@ extension JobDetailView {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Other job photo, available")
+        .accessibilityValue("Ready")
+        .accessibilityHint("Opens the full-screen photo")
     }
 
     // OH Materials Section
