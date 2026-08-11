@@ -115,6 +115,75 @@ if updated != project:
 PYRESTORE
 }
 
+preflight_archive_version() {
+  # Ask Xcode for the app target's Release settings rather than trusting values
+  # parsed directly from project.pbxproj. This catches unresolved xcconfig/build
+  # setting substitutions before App Store Connect sees the archive.
+  command -v xcodebuild >/dev/null 2>&1 || {
+    printf '[xcode-cloud-safety-net] ERROR: xcodebuild is required for archive version preflight.\n' >&2
+    exit 1
+  }
+
+  log "Resolving the archive version from the Job Tracker Release configuration."
+  settings=$(xcodebuild -showBuildSettings \
+    -project "$PROJECT_PATH" \
+    -target "Job Tracker" \
+    -configuration Release \
+    -sdk iphoneos)
+  marketing_version=$(printf '%s\n' "$settings" | sed -n 's/^[[:space:]]*MARKETING_VERSION = //p' | tail -n 1)
+  project_version=$(printf '%s\n' "$settings" | sed -n 's/^[[:space:]]*CURRENT_PROJECT_VERSION = //p' | tail -n 1)
+
+  case "$marketing_version" in
+    ""|*'$('*|*'${'*)
+      printf '[xcode-cloud-safety-net] ERROR: CFBundleShortVersionString is empty or unresolved: %s\n' "$marketing_version" >&2
+      exit 1
+      ;;
+  esac
+  case "$project_version" in
+    ""|*'$('*|*'${'*)
+      printf '[xcode-cloud-safety-net] ERROR: CFBundleVersion is empty or unresolved: %s\n' "$project_version" >&2
+      exit 1
+      ;;
+  esac
+
+  ARCHIVE_MARKETING_VERSION=$marketing_version \
+  ARCHIVE_PROJECT_VERSION=$project_version \
+  python3 <<'PYVERSION'
+import os
+import re
+
+version = os.environ["ARCHIVE_MARKETING_VERSION"]
+build = os.environ["ARCHIVE_PROJECT_VERSION"]
+last_version = os.environ.get("CI_LAST_UPLOADED_VERSION", "").strip()
+last_build = os.environ.get("CI_LAST_UPLOADED_BUILD", "").strip()
+
+if not re.fullmatch(r"\d+(?:\.\d+){1,2}", version):
+    raise SystemExit(f"[xcode-cloud-safety-net] ERROR: Invalid resolved CFBundleShortVersionString: {version}")
+if not re.fullmatch(r"\d+", build):
+    raise SystemExit(f"[xcode-cloud-safety-net] ERROR: Invalid resolved CFBundleVersion: {build}")
+
+def version_tuple(value):
+    return tuple(int(component) for component in value.split("."))
+
+if last_version and not re.fullmatch(r"\d+(?:\.\d+){1,2}", last_version):
+    raise SystemExit(f"[xcode-cloud-safety-net] ERROR: CI_LAST_UPLOADED_VERSION is invalid: {last_version}")
+if last_build and not re.fullmatch(r"\d+", last_build):
+    raise SystemExit(f"[xcode-cloud-safety-net] ERROR: CI_LAST_UPLOADED_BUILD is invalid: {last_build}")
+if last_build and not last_version:
+    raise SystemExit("[xcode-cloud-safety-net] ERROR: CI_LAST_UPLOADED_BUILD requires CI_LAST_UPLOADED_VERSION.")
+if last_version:
+    comparison_width = max(len(version_tuple(version)), len(version_tuple(last_version)))
+    current_train = version_tuple(version) + (0,) * (comparison_width - len(version_tuple(version)))
+    uploaded_train = version_tuple(last_version) + (0,) * (comparison_width - len(version_tuple(last_version)))
+    if current_train < uploaded_train:
+        raise SystemExit(f"[xcode-cloud-safety-net] ERROR: Release {version} is older than uploaded version {last_version}.")
+    if current_train == uploaded_train and last_build and int(build) <= int(last_build):
+        raise SystemExit(f"[xcode-cloud-safety-net] ERROR: Build {build} must exceed uploaded build {last_build} for version {version}.")
+
+print(f"[xcode-cloud-safety-net] Archive version resolved to {version} ({build}).")
+PYVERSION
+}
+
 # Xcode Cloud runs ci_pre_xcodebuild.sh before every workflow action, including
 # Archive. Keep these safety-net checks out of Archive/Build actions so release
 # packaging is not blocked by a test-only guardrail.
@@ -122,6 +191,12 @@ if [ "${CI_XCODE_CLOUD:-}" = "TRUE" ]; then
   normalize_xcode_cloud_bundle_identifiers
   case "${CI_XCODEBUILD_ACTION:-}" in
     build-for-testing|test|test-without-building)
+      ;;
+    archive)
+      restore_xcode_cloud_archive_graph
+      preflight_archive_version
+      log "Archive version preflight passed; skipping test-only safety-net checks."
+      exit 0
       ;;
     *)
       restore_xcode_cloud_archive_graph
@@ -154,6 +229,7 @@ project = Path("Job Tracker.xcodeproj/project.pbxproj").read_text()
 scheme = Path("Job Tracker.xcodeproj/xcshareddata/xcschemes/Job Tracker.xcscheme").read_text()
 plan_path = Path("Job Tracker Safety Net.xctestplan")
 plan = json.loads(plan_path.read_text())
+app_plist = Path("Job-Tracker-Info.plist").read_text()
 
 # Shared schemes live under Job Tracker.xcodeproj/xcshareddata/xcschemes.
 # Xcode resolves TestPlanReference container paths from the .xcodeproj bundle,
@@ -165,6 +241,37 @@ errors = []
 def check(condition, message):
     if not condition:
         errors.append(message)
+
+check("<string>$(MARKETING_VERSION)</string>" in app_plist,
+      "The app Info.plist must derive CFBundleShortVersionString from MARKETING_VERSION.")
+check("<string>$(CURRENT_PROJECT_VERSION)</string>" in app_plist,
+      "The app Info.plist must derive CFBundleVersion from CURRENT_PROJECT_VERSION.")
+
+# Only products shipped in the archive own release numbers. The watch app must
+# match its containing iOS app; XCTest bundles intentionally inherit no public
+# release train/build-number policy of their own.
+release_settings = []
+for config_id in ("CD1C8C832E5BBB150001CE7E", "CD1C8C842E5BBB150001CE7E",
+                  "CDDA112C2D579EC2007BADFF", "CDDA112D2D579EC2007BADFF"):
+    config_match = re.search(rf'{config_id} /\* (?:Debug|Release) \*/ = \{{.*?buildSettings = \{{(?P<body>.*?)\n\s+\}};', project, re.S)
+    check(config_match is not None, f"Missing distributable build configuration {config_id}.")
+    if config_match:
+        marketing_match = re.search(r"MARKETING_VERSION = ([^;]+);", config_match.group("body"))
+        build_match = re.search(r"CURRENT_PROJECT_VERSION = ([^;]+);", config_match.group("body"))
+        check(marketing_match is not None and build_match is not None,
+              "Every distributable configuration must define marketing and build versions.")
+        if marketing_match and build_match:
+            release_settings.append((marketing_match.group(1), build_match.group(1)))
+check(len(set(release_settings)) == 1,
+      "iOS and watch app Debug/Release configurations must use the same release version and build.")
+for config_id in ("CD7E57000000000000000109", "CD7E5700000000000000010A",
+                  "CD9A00000000000000000009", "CD9A0000000000000000000A"):
+    config_match = re.search(rf'{config_id} /\* (?:Debug|Release) \*/ = \{{.*?buildSettings = \{{(?P<body>.*?)\n\s+\}};', project, re.S)
+    check(config_match is not None, f"Missing test build configuration {config_id}.")
+    if config_match:
+        check("MARKETING_VERSION" not in config_match.group("body") and
+              "CURRENT_PROJECT_VERSION" not in config_match.group("body"),
+              "Unit-test and UI-test bundles must not participate in release numbering.")
 
 check(f'reference = "{expected_plan_reference}"' in scheme,
       "Shared Job Tracker scheme must use the safety-net test plan via a path relative to the .xcodeproj container.")
