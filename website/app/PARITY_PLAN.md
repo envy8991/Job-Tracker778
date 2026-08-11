@@ -1,6 +1,6 @@
 # Job Tracker Web App Parity Plan
 
-This audit compares the Firebase-backed web app in `website/app/` against the native iOS flow that matters for the web release: dashboard, job creation/detail/search, timesheets, yellow sheets, sharing, More/Profile/Settings/Find a Partner, and login.
+This audit compares the Firebase-backed web app in `website/app/` against the native iOS flow that matters for the web release: dashboard, job creation/detail/search, timesheets, materials, sharing, More/Profile/Settings/Find a Partner, and login.
 
 ## What was checked
 
@@ -24,11 +24,11 @@ This audit compares the Firebase-backed web app in `website/app/` against the na
 
 - Replace the current desktop-first hero treatment with a closer SwiftUI glass-card layout: centered auth header, segmented controls, card spacing, and button sizing that mirrors the native `JTPrimaryButton` and `JTTextField` components.
 - Add icon affordances to web inputs where the app uses SF Symbols: envelope, lock, person, map pin, clock, and document symbols.
-- Normalize terminology and capitalization so the web uses the same labels as the app: `Sign In`, `Create Account`, `Yellow Sheet`, `Find a Partner`, and native status labels.
+- Normalize terminology and capitalization so the web uses the same labels as the app: `Sign In`, `Create Account`, `Materials`, `Find a Partner`, and native status labels.
 
 ### 2. Dashboard parity
 
-- Keep the current Monday-Friday picker, selected-day rollups, next-job card, timesheet hours, yellow sheet state, and partner card.
+- Keep the current Monday-Friday picker, selected-day rollups, next-job card, timesheet hours, materials state, and partner card.
 - Add a dedicated job detail drawer or route from dashboard cards so users can inspect/edit one job without relying only on inline status changes.
 - Add route/map affordances for addresses after map-provider integration is selected.
 
@@ -38,11 +38,11 @@ This audit compares the Firebase-backed web app in `website/app/` against the na
 - Expand sharing with an import-preview route for pasted/deep-linked tokens so the browser can consume the same `SharedJobPayload` flow it can now publish.
 - Expand search results so each result can open the same detail drawer and show matching fields.
 
-### 4. Timesheets and yellow sheets
+### 4. Timesheets and materials
 
-- Keep the current web editors for weekly timesheets and daily yellow sheets.
+- Keep the current web editors for weekly timesheets and daily materials.
 - Replace text exports with browser PDF generation or a shared server-side PDF service that matches the native PDF output.
-- Add profile shortcuts to past timesheets and past yellow sheets, matching the native Profile screen.
+- Add profile shortcuts to past timesheets and past materials, matching the native Profile screen.
 
 ### 5. More tab scope
 
@@ -54,7 +54,7 @@ This audit compares the Firebase-backed web app in `website/app/` against the na
 
 - Login, signup, reset, sign-out, and persisted-session refresh.
 - Create/update/remove jobs as technician and supervisor/admin roles.
-- Save/reopen timesheets and yellow sheets across refreshes.
+- Save/reopen timesheets and materials across refreshes.
 - Search by job number, address, type, status, date, notes, assignment, and materials.
 - Send/accept/decline partner requests between two test users.
 - Verify the UI at phone, tablet, and desktop widths.

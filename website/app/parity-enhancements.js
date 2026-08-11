@@ -323,7 +323,7 @@ function renderProfileShortcuts() {
   container.innerHTML = "";
   [
     { label: "Past Timesheets", count: timesheets.length, detail: latestTimesheet ? `Latest week of ${dateLabel(latestTimesheet.weekStart)}` : "No saved weeks yet", route: "timesheets" },
-    { label: "Past Yellow Sheets", count: yellowSheets.length, detail: latestYellow ? `Latest ${dateLabel(latestYellow.date)}` : "No saved sheets yet", route: "yellowSheets" },
+    { label: "Past Materials", count: yellowSheets.length, detail: latestYellow ? `Latest ${dateLabel(latestYellow.date)}` : "No saved sheets yet", route: "yellowSheets" },
   ].forEach((shortcut) => {
     const button = document.createElement("button");
     const label = document.createElement("span");

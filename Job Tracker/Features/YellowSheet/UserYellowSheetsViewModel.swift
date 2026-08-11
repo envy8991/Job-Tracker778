@@ -28,7 +28,7 @@ class UserYellowSheetsViewModel: ObservableObject {
                 .whereField("userId", isEqualTo: ownerId)
                 .addSnapshotListener { [weak self] snapshot, error in
                     if let error = error {
-                        print("Error fetching yellow sheets: \(error)")
+                        print("Error fetching materials: \(error)")
                         return
                     }
 
@@ -53,14 +53,14 @@ class UserYellowSheetsViewModel: ObservableObject {
             let docRef = db.collection("yellowSheets").document(docID)
             try docRef.setData(from: sheet) { error in
                 if let error = error {
-                    print("Error saving yellow sheet: \(error)")
+                    print("Error saving materials: \(error)")
                     completion(false)
                 } else {
                     completion(true)
                 }
             }
         } catch {
-            print("Error encoding yellow sheet: \(error)")
+            print("Error encoding materials: \(error)")
             completion(false)
         }
     }
@@ -68,7 +68,7 @@ class UserYellowSheetsViewModel: ObservableObject {
     func deleteYellowSheet(documentID: String, completion: @escaping (Bool) -> Void = { _ in }) {
         db.collection("yellowSheets").document(documentID).delete { error in
             if let error = error {
-                print("Error deleting yellow sheet: \(error)")
+                print("Error deleting materials: \(error)")
                 completion(false)
             } else {
                 completion(true)

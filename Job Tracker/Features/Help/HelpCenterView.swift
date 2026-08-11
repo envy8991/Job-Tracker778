@@ -40,9 +40,9 @@ struct HelpCenterView: View {
                 bullets: [
                     "**Step 1:** From the **Dashboard**, tap **Create Job** (plus button) to capture the job #, address, crew, and schedule.",
                     "**Step 2:** Save, then tap the new job card to adjust assignments, notes, materials, and attach progress photos as work continues.",
-                    "**Step 3:** Move the status to **In Progress** when you roll out and **Done** when complete—anything not Pending flows automatically into Timesheets and the Yellow Sheet.",
-                    "**Step 4:** Open **Timesheets** to enter daily Gibson/CS hours; switch to **Yellow Sheet** to verify the week’s grouped jobs before submitting.",
-                    "**Step 5:** Use **Share** or **Print** from a job, Timesheet, or Yellow Sheet to deliver a PDF recap to supervisors."
+                    "**Step 3:** Move the status to **In Progress** when you roll out and **Done** when complete—anything not Pending flows automatically into Timesheets and Materials.",
+                    "**Step 4:** Open **Timesheets** to enter daily Gibson/CS hours; switch to **Materials** to verify the week’s grouped jobs before submitting.",
+                    "**Step 5:** Use **Share** or **Print** from a job, Timesheet, or Materials to deliver a PDF recap to supervisors."
                 ],
                 action: { showingCreateJob = true }
             ),
@@ -80,7 +80,7 @@ struct HelpCenterView: View {
                     "**Step 1:** Open a job from the **Dashboard** or **Job Search** and review the colored status pill at the top.",
                     "**Step 2:** Tap the status to choose **Pending**, **In Progress**, **Done**, or a custom need such as Needs Underground.",
                     "**Step 3:** The updated status saves immediately and appears for your partner and supervisors.",
-                    "**Step 4:** Any status other than Pending automatically includes the job in the current week’s **Timesheet** and **Yellow Sheet**.",
+                    "**Step 4:** Any status other than Pending automatically includes the job in the current week’s **Timesheet** and **Materials**.",
                     "**Step 5:** Switch back to Pending only when a job should drop off payroll tracking for the week."
                 ],
                 action: { navigation.navigate(to: .dashboard) }
@@ -138,14 +138,14 @@ struct HelpCenterView: View {
                 action: { navigation.navigate(to: .profile) }
             ),
             HelpTopic(
-                title: "Yellow Sheet",
+                title: "Materials",
                 icon: "doc.text",
                 summary: "Confirm non-pending jobs for the week before submitting payroll.",
                 bullets: [
-                    "**Step 1:** Go to **Yellow Sheet** and select the week with the picker or calendar sheet.",
+                    "**Step 1:** Go to **Materials** and select the week with the picker or calendar sheet.",
                     "**Step 2:** Review grouped sections by Job #—every non-Pending job from you or your partner is included.",
                     "**Step 3:** Expand a job card to double-check notes, assignments, and materials for the inspector.",
-                    "**Step 4:** Tap **Save Yellow Sheet** to capture the weekly summary and sync it to the archive.",
+                    "**Step 4:** Tap **Save Materials** to capture the weekly summary and sync it to the archive.",
                     "**Step 5:** Use the share button on individual jobs (from Dashboard) if additional documentation is requested."
                 ],
                 action: { navigation.navigate(to: .yellowSheet) }
@@ -183,7 +183,7 @@ struct HelpCenterView: View {
                 bullets: [
                     "**Step 1:** Open **Find a Partner** to see your current pairing status at the top of the list.",
                     "**Step 2:** Browse coworkers—tap **Request** to send a pairing invite or approve/decline incoming requests.",
-                    "**Step 3:** Once connected, your jobs, Timesheets, and Yellow Sheets stay aligned across both accounts.",
+                    "**Step 3:** Once connected, your jobs, Timesheets, and Materials stay aligned across both accounts.",
                     "**Step 4:** Use the outgoing and incoming sections to monitor pending requests or resend if needed.",
                     "**Step 5:** Tap **Unpair** whenever you need to switch partners; the change syncs immediately."
                 ],

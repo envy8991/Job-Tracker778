@@ -12,7 +12,7 @@ The `Job TrackerTests` bundle should keep fast, deterministic XCTest coverage ar
 - **Job intake, sharing, and search**: Deep-link, shared-payload, parser, and search-matcher tests cover import/export payloads and matching heuristics that affect daily job routing.
 - **Dashboard and recent crew jobs**: View-model tests cover summaries and detail sheets that crew members use to understand current work.
 - **Help and tutorial flows**: Tutorial stage tests protect onboarding guidance from accidental regressions.
-- **Seeded UI flows**: `Job TrackerUITests` launches with `JT_UI_TESTING=1` and deterministic seed data to cover authentication validation, dashboard job flow, create/detail/delete controls, search, timesheets, yellow sheets, settings, and admin-only navigation without writing to production Firebase.
+- **Seeded UI flows**: `Job TrackerUITests` launches with `JT_UI_TESTING=1` and deterministic seed data to cover authentication validation, dashboard job flow, create/detail/delete controls, search, timesheets, materials, settings, and admin-only navigation without writing to production Firebase.
 - **Integration smoke tests**: `ServiceIntegrationSmokeTests` covers PDF generation, job-photo slot mapping, arrival-alert inactive state, and watch sync payload filtering; `AppIntentEntryPointTests` protects App Intent discoverability and fallback messaging.
 - **Firebase rules emulator tests**: `firebase-emulator-tests/firestore-storage.rules.test.js` is wired through `npm run test:firebase-rules` and intentionally skips until both `firestore.rules` and `storage.rules` are present.
 
@@ -22,7 +22,7 @@ Add or update tests in the same pull request when a change affects any of these 
 
 1. Decoding or encoding app models that come from Firebase, links, files, or JSON payloads.
 2. Crew-position, job-status, search, or matching normalization logic.
-3. View models with business decisions, especially admin, update, dashboard, job list, timesheet, yellow sheet, and sharing workflows.
+3. View models with business decisions, especially admin, update, dashboard, job list, timesheet, materials, and sharing workflows.
 4. App update requirements, version comparisons, package downloads, package retention, or safe-apply conditions.
 5. Deep links, shared job payloads, imported job sheets, or parsing of externally supplied data.
 6. Bug fixes where a regression test can reproduce the failing case.

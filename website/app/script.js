@@ -786,14 +786,14 @@ async function handleSaveYellowSheet() {
   await setDoc("yellowSheets", sheet.id, sheet);
   await loadAppData();
   renderAll();
-  showToast("Yellow sheet saved to Firebase.");
+  showToast("Materials saved to Firebase.");
 }
 
 function renderPastYellowSheets() {
   const sheets = Object.values(appState.yellowSheets).filter((sheet) => sheet.savedAt);
   const list = $("#pastYellowSheetsList");
   list.innerHTML = "";
-  if (sheets.length === 0) { list.innerHTML = `<p class="empty-state">Saved yellow sheets will appear here.</p>`; return; }
+  if (sheets.length === 0) { list.innerHTML = `<p class="empty-state">Saved materials will appear here.</p>`; return; }
   sheets.sort((a, b) => b.date.localeCompare(a.date)).forEach((sheet) => { const checks = Object.values(sheet.checks || {}).filter(Boolean).length; const item = document.createElement("article"); item.className = "compact-item"; item.innerHTML = `<div><h3>${dateLabel(sheet.date)}</h3><span>${checks}/4 checks complete • Signature: ${sheet.signature || "Missing"}</span></div>`; list.append(item); });
 }
 
@@ -801,7 +801,7 @@ function downloadText(filename, text) { const blob = new Blob([text], { type: "t
 async function copyText(text, fallbackName) { try { await navigator.clipboard.writeText(text); showToast("Summary copied to clipboard."); } catch { downloadText(fallbackName, text); showToast("Clipboard unavailable, downloaded a text summary instead."); } }
 function dailySummaryText() { const lines = [`Job Tracker Daily Summary`, `Date: ${dateLabel(selectedDate)}`, `Technician: ${currentUser.firstName} ${currentUser.lastName}`, ""]; selectedJobs().forEach((job) => lines.push(`${job.jobNumber || "No job #"} • ${job.status} • ${job.address} • ${job.notes || "No note"}`)); if (selectedJobs().length === 0) lines.push("No jobs scheduled."); return lines.join("\n"); }
 function timesheetText() { const sheet = captureTimesheet(); return [`Job Tracker Timesheet`, `Week: ${sheet.weekStart}`, `Technician: ${sheet.name1}`, `Supervisor: ${sheet.supervisor || "Not set"}`, `Partner: ${sheet.name2 || "None"}`, "", ...sheet.days.map((day) => `${day.name}: ${sumDay(day).toFixed(2)} hrs - ${day.notes || "No notes"}`), `Total: ${sheet.totalHours} hrs`].join("\n"); }
-function yellowSheetText() { const sheet = captureYellowSheet(); const checks = Object.entries(sheet.checks).map(([key, value]) => `${key}: ${value ? "yes" : "no"}`).join("\n"); return [`Job Tracker Yellow Sheet`, `Date: ${sheet.date}`, `Technician: ${currentUser.firstName} ${currentUser.lastName}`, `Signature: ${sheet.signature || "Missing"}`, "", checks, "", `Materials: ${sheet.materials || "None"}`, `Notes: ${sheet.notes || "None"}`].join("\n"); }
+function yellowSheetText() { const sheet = captureYellowSheet(); const checks = Object.entries(sheet.checks).map(([key, value]) => `${key}: ${value ? "yes" : "no"}`).join("\n"); return [`Job Tracker Materials`, `Date: ${sheet.date}`, `Technician: ${currentUser.firstName} ${currentUser.lastName}`, `Signature: ${sheet.signature || "Missing"}`, "", checks, "", `Materials: ${sheet.materials || "None"}`, `Notes: ${sheet.notes || "None"}`].join("\n"); }
 
 function displayUserName(user) {
   if (!user) return "";
@@ -1181,7 +1181,7 @@ function bindEvents() {
   $("#exportTimesheetButton").addEventListener("click", () => downloadText(`timesheet-${$("#timesheetWeekInput").value}.txt`, timesheetText()));
   $("#yellowDateInput").addEventListener("change", renderYellowSheet);
   $("#saveYellowSheetButton").addEventListener("click", () => handleSaveYellowSheet().catch((error) => showToast(error.message)));
-  $("#exportYellowSheetButton").addEventListener("click", () => downloadText(`yellow-sheet-${$("#yellowDateInput").value}.txt`, yellowSheetText()));
+  $("#exportYellowSheetButton").addEventListener("click", () => downloadText(`materials-${$("#yellowDateInput").value}.txt`, yellowSheetText()));
   $("#jobSearchInput").addEventListener("input", renderSearch);
   $$('[data-more-tab]').forEach((button) => button.addEventListener("click", () => setMoreTab(button.dataset.moreTab)));
   $("#saveProfileButton").addEventListener("click", () => saveProfile().catch((error) => showToast(error.message)));

@@ -44,7 +44,7 @@ struct PDFEditorView: View {
             return
         }
         // Write the modified PDF to a temporary file.
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("EditedYellowSheet-\(UUID().uuidString).pdf")
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("EditedMaterials-\(UUID().uuidString).pdf")
         if doc.write(to: tempURL) {
             // Upload the edited PDF.
             uploadEditedPDF(from: tempURL)

@@ -42,7 +42,7 @@ struct YellowSheetView: View {
                                         Image(systemName: "tray")
                                             .font(.system(size: 34))
                                             .foregroundStyle(JTColors.textMuted)
-                                        Text("No yellow sheet jobs")
+                                        Text("No materials jobs")
                                             .font(JTTypography.headline)
                                             .foregroundStyle(JTColors.textPrimary)
                                         Text("Completed jobs for this week will show here once they are available.")
@@ -78,7 +78,7 @@ struct YellowSheetView: View {
                         .padding(.bottom, JTSpacing.xl)
                     }
 
-                    JTPrimaryButton("Save Yellow Sheet", systemImage: "tray.and.arrow.down") {
+                    JTPrimaryButton("Save Materials", systemImage: "tray.and.arrow.down") {
                         saveCurrentYellowSheet()
                     }
                     .padding(.horizontal, JTSpacing.lg)
@@ -115,7 +115,7 @@ struct YellowSheetView: View {
                 }
             }
             .alert(isPresented: $showSaveAlert) {
-                Alert(title: Text("Yellow Sheet"), message: Text(saveAlertMessage), dismissButton: .default(Text("OK")))
+                Alert(title: Text("Materials"), message: Text(saveAlertMessage), dismissButton: .default(Text("OK")))
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
@@ -251,7 +251,7 @@ struct YellowSheetView: View {
                 sheet.pdfURL = downloadURL
                 yellowSheetsVM.saveYellowSheet(sheet) { success in
                     DispatchQueue.main.async {
-                        saveAlertMessage = success ? "Yellow Sheet saved successfully!" : "Failed to save Yellow Sheet."
+                        saveAlertMessage = success ? "Materials saved successfully!" : "Failed to save materials."
                         showSaveAlert = true
                     }
                 }

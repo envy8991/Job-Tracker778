@@ -12,7 +12,7 @@ struct YellowSheetDetailView: View {
                 VStack(alignment: .leading, spacing: JTSpacing.lg) {
                     GlassCard(cornerRadius: JTShapes.largeCardCornerRadius, strokeColor: JTColors.glassSoftStroke) {
                         VStack(alignment: .leading, spacing: JTSpacing.md) {
-                            Text("Yellow Sheet Detail")
+                            Text("Materials Detail")
                                 .font(JTTypography.title3)
                                 .foregroundStyle(JTColors.textPrimary)
 
@@ -46,7 +46,7 @@ struct YellowSheetDetailView: View {
                 .padding(JTSpacing.lg)
             }
         }
-        .navigationTitle("Yellow Sheet Detail")
+        .navigationTitle("Materials Detail")
         .navigationBarTitleDisplayMode(.inline)
         .jtNavigationBarStyle()
     }
