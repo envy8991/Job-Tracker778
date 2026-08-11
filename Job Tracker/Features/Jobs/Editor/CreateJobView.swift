@@ -70,6 +70,29 @@ private struct MaterialsInputField: View {
     }
 }
 
+private struct JobNumberInputField: View {
+    @Binding var text: String
+
+    var body: some View {
+        TextField("Required", text: $text)
+            .textInputAutocapitalization(.never)
+            .disableAutocorrection(true)
+            .padding(12)
+            .background(fieldBackground)
+            .overlay(fieldBorder)
+    }
+
+    private var fieldBackground: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(Color(.systemBackground).opacity(0.9))
+    }
+
+    private var fieldBorder: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+    }
+}
+
 // MARK: - Section Card
 @ViewBuilder
 private func SectionCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -369,284 +392,216 @@ struct CreateJobView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: Color(red: 0.05, green: 0.07, blue: 0.10), location: 0.0),   // deep ink
-                        .init(color: Color(red: 0.10, green: 0.13, blue: 0.18), location: 0.35),  // night
-                        .init(color: Color(red: 0.12, green: 0.30, blue: 0.36), location: 0.70),  // teal hint
-                        .init(color: Color(red: 0.18, green: 0.12, blue: 0.28), location: 1.0)    // purple hint
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+            lifecycleConfiguredContent
+        }
+    }
 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        // Addresses
-                        SectionCard(title: addresses.count > 1 ? "Addresses" : "Address") {
-                            VStack(spacing: 12) {
-                                ForEach($addresses) { $address in
-                                    addressField(for: $address)
-                                }
+    private var formContent: some View {
+        ZStack {
+            LinearGradient(
+                gradient: Gradient(stops: [
+                    .init(color: Color(red: 0.05, green: 0.07, blue: 0.10), location: 0.0),
+                    .init(color: Color(red: 0.10, green: 0.13, blue: 0.18), location: 0.35),
+                    .init(color: Color(red: 0.12, green: 0.30, blue: 0.36), location: 0.70),
+                    .init(color: Color(red: 0.18, green: 0.12, blue: 0.28), location: 1.0)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
 
-                                Button {
-                                    let newAddress = AddressDraft()
-                                    addresses.append(newAddress)
-                                    focusedAddressID = newAddress.id
-                                } label: {
-                                    Label("Add Another Address", systemImage: "plus.circle")
-                                        .font(.subheadline.weight(.semibold))
-                                }
-                                .buttonStyle(.plain)
-                                .padding(.top, 4)
-                            }
-                            .onAppear { locationProvider.request() }
-                        }
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 16) {
+                    addressAndDateSections
+                    jobDetailsSections
+                    assignmentsAndPlacementSections
+                    materialsSection
+                    notesPhotosAndSaveSection
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
+            }
+        }
+    }
 
-                        // Date
-                        SectionCard(title: "Date") {
-                            DatePicker("Select Date", selection: $date, displayedComponents: [.date])
-                                .datePickerStyle(.compact)
-                        }
+    @ViewBuilder
+    private var addressAndDateSections: some View {
+        SectionCard(title: addresses.count > 1 ? "Addresses" : "Address") {
+            VStack(spacing: 12) {
+                ForEach($addresses) { $address in
+                    addressField(for: $address)
+                }
+                Button {
+                    let newAddress = AddressDraft()
+                    addresses.append(newAddress)
+                    focusedAddressID = newAddress.id
+                } label: {
+                    Label("Add Another Address", systemImage: "plus.circle")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+            }
+            .onAppear { locationProvider.request() }
+        }
 
-                        // Status
-                        SectionCard(title: "Status") {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Picker("Status", selection: $status) {
-                                    ForEach(statusOptions, id: \.self) { Text($0).tag($0) }
-                                }
-                                .pickerStyle(.menu)
+        SectionCard(title: "Date") {
+            DatePicker("Select Date", selection: $date, displayedComponents: [.date])
+                .datePickerStyle(.compact)
+        }
+    }
 
-                                if status == "Custom" {
-                                    TextField("Enter custom status", text: $customStatusText)
-                                        .textFieldStyle(.roundedBorder)
-                                }
-                            }
-                        }
-
-                        // Job Number
-                        SectionCard(title: "Job Number *") {
-                            TextField("Required", text: $jobNumber)
-                                .textInputAutocapitalization(.never)
-                                .disableAutocorrection(true)
-                                .padding(12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(Color(.systemBackground).opacity(0.9))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                                )
-                        }
-
-                        // Portal ID
-                        SectionCard(title: "Portal ID") {
-                            VStack(alignment: .leading, spacing: 6) {
-                                TextField("Optional, e.g. 97087", text: $portalID)
-                                    .keyboardType(.numberPad)
-                                    .textInputAutocapitalization(.never)
-                                    .disableAutocorrection(true)
-                                    .padding(12)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(Color(.systemBackground).opacity(0.9))
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                                    )
-
-                                Text("Enter the Gibson portal edit ID, or paste the full portal link and the app will store the ID.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        // Location Number
-                        SectionCard(title: "Location Number") {
-                            VStack(alignment: .leading, spacing: 6) {
-                                TextField("Optional, e.g. 833167", text: $locationNumber)
-                                    .keyboardType(.numberPad)
-                                    .textInputAutocapitalization(.never)
-                                    .disableAutocorrection(true)
-                                    .padding(12)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(Color(.systemBackground).opacity(0.9))
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                                    )
-
-                                Text("Use this when the job does not have a portal ID. You can enter the location number or paste a Gibson consumer search link.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        // Assignments (role-based)
-                        if authViewModel.currentUser?.position == "Can" {
-                            SectionCard(title: "Assignments") {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    TextField("e.g. 12.3.2", text: $assignmentsText)
-                                        .keyboardType(.decimalPad)
-                                        .textInputAutocapitalization(.never)
-                                        .focused($isAssignmentsFocused)
-                                        .onChange(of: assignmentsText) { _, newValue in
-                                            assignmentsText = sanitizeAssignmentTyping(newValue)
-                                        }
-                                        .padding(12)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .fill(Color(.systemBackground).opacity(0.9))
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                                        )
-
-                                    Text("Digits and dots only • examples: 12.3.2, 123.2.4")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-
-                                    if !assignmentsText.isEmpty && !isValidAssignment(assignmentsText) {
-                                        Text("Invalid format. Use digits separated by single dots (no leading/trailing dot).")
-                                            .font(.caption)
-                                            .foregroundStyle(.red)
-                                    }
-                                }
-                            }
-                        }
-
-                        SectionCard(title: "Fiber & Placement") {
-                            VStack(alignment: .leading, spacing: 14) {
-                                Picker("Fiber Type", selection: $fiberType) {
-                                    Text("Not selected").tag("")
-                                    ForEach(fiberChoices, id: \.self) { Text($0).tag($0) }
-                                }
-                                .pickerStyle(.segmented)
-
-                                Picker("Placement", selection: $jobPlacement) {
-                                    Text("Not selected").tag("")
-                                    ForEach(placementChoices, id: \.self) { Text($0).tag($0) }
-                                }
-                                .pickerStyle(.segmented)
-
-                                HStack(spacing: 12) {
-                                    TextField("CAN footage", text: $canFootage)
-                                        .keyboardType(.numberPad)
-                                        .textFieldStyle(.roundedBorder)
-                                    TextField("NID footage", text: $nidFootage)
-                                        .keyboardType(.numberPad)
-                                        .textFieldStyle(.roundedBorder)
-                                }
-                            }
-                        }
-
-                        // Materials
-                        SectionCard(title: "Materials Used") {
-                            MaterialsInputField(text: $materialsUsed)
-                        }
-
-                        // Notes
-                        SectionCard(title: "Notes") {
-                            TextEditor(text: $notes)
-                                .frame(minHeight: 120)
-                                .padding(12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(Color(.systemBackground).opacity(0.9))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                                )
-                        }
-
-                        SectionCard(title: "Job Photos") {
-                            VStack(spacing: 10) {
-                                createPhotoRow("House", image: housePhotoImage, slot: .house)
-                                createPhotoRow("NID", image: nidPhotoImage, slot: .nid)
-                                createPhotoRow("CAN", image: canPhotoImage, slot: .can)
-                                createPhotoRow("Map / Design", image: mapDesignPhotoImage, slot: .mapDesign)
-                            }
-                        }
-
-                        // Save Button (prominent)
-                        Button {
-                            attemptSave()
-                        } label: {
-                            HStack {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text(validAddressCount > 1 ? "Save Jobs" : "Save Job")
-                                    .fontWeight(.semibold)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .glassCard(cornerRadius: 14)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isSaving)
-                        .padding(.top, 4)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 20)
+    @ViewBuilder
+    private var jobDetailsSections: some View {
+        SectionCard(title: "Status") {
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("Status", selection: $status) {
+                    ForEach(statusOptions, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.menu)
+                if status == "Custom" {
+                    TextField("Enter custom status", text: $customStatusText)
+                        .textFieldStyle(.roundedBorder)
                 }
             }
+        }
+
+        SectionCard(title: "Job Number *") {
+            JobNumberInputField(text: $jobNumber)
+        }
+
+        SectionCard(title: "Portal ID") {
+            identifierField(
+                placeholder: "Optional, e.g. 97087",
+                text: $portalID,
+                help: "Enter the Gibson portal edit ID, or paste the full portal link and the app will store the ID."
+            )
+        }
+
+        SectionCard(title: "Location Number") {
+            identifierField(
+                placeholder: "Optional, e.g. 833167",
+                text: $locationNumber,
+                help: "Use this when the job does not have a portal ID. You can enter the location number or paste a Gibson consumer search link."
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var assignmentsAndPlacementSections: some View {
+        if authViewModel.currentUser?.position == "Can" {
+            SectionCard(title: "Assignments") {
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("e.g. 12.3.2", text: $assignmentsText)
+                        .keyboardType(.decimalPad)
+                        .textInputAutocapitalization(.never)
+                        .focused($isAssignmentsFocused)
+                        .onChange(of: assignmentsText) { _, newValue in
+                            assignmentsText = sanitizeAssignmentTyping(newValue)
+                        }
+                        .padding(12)
+                        .background(inputBackground)
+                        .overlay(inputBorder)
+                    Text("Digits and dots only • examples: 12.3.2, 123.2.4")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if !assignmentsText.isEmpty && !isValidAssignment(assignmentsText) {
+                        Text("Invalid format. Use digits separated by single dots (no leading/trailing dot).")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+        }
+
+        SectionCard(title: "Fiber & Placement") {
+            VStack(alignment: .leading, spacing: 14) {
+                Picker("Fiber Type", selection: $fiberType) {
+                    Text("Not selected").tag("")
+                    ForEach(fiberChoices, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                Picker("Placement", selection: $jobPlacement) {
+                    Text("Not selected").tag("")
+                    ForEach(placementChoices, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                HStack(spacing: 12) {
+                    TextField("CAN footage", text: $canFootage).keyboardType(.numberPad).textFieldStyle(.roundedBorder)
+                    TextField("NID footage", text: $nidFootage).keyboardType(.numberPad).textFieldStyle(.roundedBorder)
+                }
+            }
+        }
+    }
+
+    private var materialsSection: some View {
+        SectionCard(title: "Materials Used") {
+            MaterialsInputField(text: $materialsUsed)
+        }
+    }
+
+    @ViewBuilder
+    private var notesPhotosAndSaveSection: some View {
+        SectionCard(title: "Notes") {
+            TextEditor(text: $notes)
+                .frame(minHeight: 120)
+                .padding(12)
+                .background(inputBackground)
+                .overlay(inputBorder)
+        }
+        SectionCard(title: "Job Photos") {
+            VStack(spacing: 10) {
+                createPhotoRow("House", image: housePhotoImage, slot: .house)
+                createPhotoRow("NID", image: nidPhotoImage, slot: .nid)
+                createPhotoRow("CAN", image: canPhotoImage, slot: .can)
+                createPhotoRow("Map / Design", image: mapDesignPhotoImage, slot: .mapDesign)
+            }
+        }
+        Button(action: attemptSave) {
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                Text(validAddressCount > 1 ? "Save Jobs" : "Save Job").fontWeight(.semibold)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .glassCard(cornerRadius: 14)
+        }
+        .buttonStyle(.plain)
+        .disabled(isSaving)
+        .padding(.top, 4)
+    }
+
+    private func identifierField(placeholder: String, text: Binding<String>, help: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField(placeholder, text: text)
+                .keyboardType(.numberPad)
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
+                .padding(12)
+                .background(inputBackground)
+                .overlay(inputBorder)
+            Text(help).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private var inputBackground: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(Color(.systemBackground).opacity(0.9))
+    }
+
+    private var inputBorder: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+    }
+
+    private var navigationConfiguredContent: some View {
+        formContent
             .navigationTitle("Create Job")
             .navigationBarTitleDisplayMode(.inline)
             .jtNavigationBarStyle()
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        attemptSave()
-                    }
-                    .disabled(isSaving)
-                }
-            }
-            .alert(alertTitle, isPresented: alertBinding, actions: {
-                Button("OK", role: .cancel) { alertMessage = nil }
-            }, message: {
-                if let alertMessage {
-                    Text(alertMessage)
-                }
-            })
-            .sheet(item: $duplicatePrompt) { prompt in
-                DuplicateJobsSheet(
-                    prompt: prompt,
-                    onJoin: { match in
-                        joinExistingJob(match, prompt: prompt)
-                    },
-                    onCreateSeparate: {
-                        createSeparateJob(from: prompt)
-                    },
-                    onCancel: {
-                        duplicatePrompt = nil
-                    }
-                )
-            }
-            .confirmationDialog("Add Photo", isPresented: $showPhotoSourceDialog, titleVisibility: .visible) {
-                if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                    Button("Take Photo") {
-                        selectedPhotoSource = .camera
-                        showImagePicker = true
-                    }
-                }
-                Button("Choose from Photos") {
-                    selectedPhotoSource = .photoLibrary
-                    showImagePicker = true
-                }
-                Button("Cancel", role: .cancel) { activePhotoSlot = nil }
-            }
-            .sheet(isPresented: $showImagePicker, onDismiss: { activePhotoSlot = nil }) {
-                ImagePicker(image: selectedPhotoBinding, sourceType: selectedPhotoSource)
+                ToolbarItem(placement: .navigationBarLeading) { Button("Close") { dismiss() } }
+                ToolbarItem(placement: .navigationBarTrailing) { Button("Save", action: attemptSave).disabled(isSaving) }
             }
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
@@ -661,31 +616,49 @@ struct CreateJobView: View {
                     }
                 }
             }
-            .onChange(of: addressSearch.results) { _, _ in
-                addressSearch.updateDistances(from: locationProvider.location)
+    }
+
+    private var presentationConfiguredContent: some View {
+        navigationConfiguredContent
+            .alert(alertTitle, isPresented: alertBinding) {
+                Button("OK", role: .cancel) { alertMessage = nil }
+            } message: {
+                if let alertMessage { Text(alertMessage) }
             }
-            .onChange(of: locationProvider.location) { _, _ in
-                addressSearch.updateDistances(from: locationProvider.location)
+            .sheet(item: $duplicatePrompt) { prompt in
+                DuplicateJobsSheet(
+                    prompt: prompt,
+                    onJoin: { joinExistingJob($0, prompt: prompt) },
+                    onCreateSeparate: { createSeparateJob(from: prompt) },
+                    onCancel: { duplicatePrompt = nil }
+                )
             }
+            .confirmationDialog("Add Photo", isPresented: $showPhotoSourceDialog, titleVisibility: .visible) {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button("Take Photo") { selectedPhotoSource = .camera; showImagePicker = true }
+                }
+                Button("Choose from Photos") { selectedPhotoSource = .photoLibrary; showImagePicker = true }
+                Button("Cancel", role: .cancel) { activePhotoSlot = nil }
+            }
+            .sheet(isPresented: $showImagePicker, onDismiss: { activePhotoSlot = nil }) {
+                ImagePicker(image: selectedPhotoBinding, sourceType: selectedPhotoSource)
+            }
+    }
+
+    private var lifecycleConfiguredContent: some View {
+        presentationConfiguredContent
+            .onChange(of: addressSearch.results) { _, _ in addressSearch.updateDistances(from: locationProvider.location) }
+            .onChange(of: locationProvider.location) { _, _ in addressSearch.updateDistances(from: locationProvider.location) }
             .onChange(of: focusedAddressID) { oldValue, newValue in
                 if let oldValue, newValue != oldValue,
                    let draft = addresses.first(where: { $0.id == oldValue }) {
                     scheduleDuplicateReview(for: oldValue, draft: draft)
                 }
-                guard let newValue else {
-                    addressSearch.results = []
-                    return
-                }
-                let current = addresses.first(where: { $0.id == newValue })?.text ?? ""
-                handleAddressQueryChange(current)
+                guard let newValue else { addressSearch.results = []; return }
+                handleAddressQueryChange(addresses.first(where: { $0.id == newValue })?.text ?? "")
             }
-            .onAppear {
-                jobsViewModel.startSearchIndexForAllJobs()
-            }
-            .onDisappear {
-                cancelDuplicateReviewTasks()
-            }
-        }
+            .onAppear { jobsViewModel.startSearchIndexForAllJobs() }
+            .onDisappear { cancelDuplicateReviewTasks() }
     }
 
     // MARK: - Save
