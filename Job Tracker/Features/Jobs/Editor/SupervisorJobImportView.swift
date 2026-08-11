@@ -86,6 +86,7 @@ struct SupervisorJobImportView: View {
     @State private var parsingError: Error?
     @State private var pending: Set<String> = []
     @State private var confirmed: Set<String> = []
+    @State private var showUploadConsent = false
 
     // Review → open Create Job prefilled
     private struct ParsedJobFields {
@@ -150,6 +151,12 @@ struct SupervisorJobImportView: View {
                 .environmentObject(usersViewModel)
             }
         }
+        .alert("Upload Job Sheet?", isPresented: $showUploadConsent) {
+            Button("Cancel", role: .cancel) { }
+            Button("Upload & Parse") { runParsing() }
+        } message: {
+            Text("The selected image will be securely sent to Job Tracker's AI provider for parsing. It is processed transiently, is not stored by Job Tracker, and can contain sensitive job details. Provider handling is governed by the company AI agreement.")
+        }
         .onAppear {
             if pickedImage == nil {
                 showImagePicker = true
@@ -212,9 +219,14 @@ struct SupervisorJobImportView: View {
                 .buttonStyle(.plain)
 
                 JTPrimaryButton(isParsing ? "Parsing…" : "Parse Sheet", systemImage: "wand.and.stars") {
-                    runParsing()
+                    showUploadConsent = true
                 }
                 .disabled(pickedImage == nil || isParsing)
+
+                Text("Privacy: only the selected sheet is uploaded after confirmation. Job Tracker does not retain the image; request data exists only while processing. Parsed jobs are saved only when you import them.")
+                    .font(JTTypography.caption)
+                    .foregroundStyle(JTColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 if isParsing {
                     ProgressView("Reading job sheet…")
@@ -480,249 +492,23 @@ final class JobSheetParser {
         }
     }
 
+    private struct ParseRequest: Encodable { let imageBase64: String }
+    private struct ParseResponse: Decodable { let items: [RawEntry] }
+
     func parse(image: UIImage, users: [AppUser]) async throws -> [ParsedEntry] {
         let preparedImage = image.aiFixingOrientationAndResizingIfNeeded(maxDimension: 2048) ?? image
-        // The 2048 px cap keeps these 0.8-quality JPEGs around 3–4 MB (≈5 MB once base64-encoded), well under OpenAI's 20 MB
-        // per-image upload limit while preserving legible job text.
-        guard let jpegData = preparedImage.jpegData(compressionQuality: 0.8) else { return [] }
-        guard
-            let apiKey = Bundle.main.infoDictionary?["OPENAI_API_KEY"] as? String,
-            !apiKey.isEmpty
-        else {
-            throw ParserError.missingAPIKey
+        guard let jpegData = preparedImage.jpegData(compressionQuality: 0.72) else { return [] }
+        guard jpegData.count <= 4 * 1024 * 1024 else {
+            throw ParserError.serverError("The job sheet is too large. Crop it or choose a lower-resolution image.")
         }
-
-        let base64 = jpegData.base64EncodedString()
-        let url = URL(string: "https://api.openai.com/v1/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-        let rosterEntries: [[String: Any]] = users.map { user in
-            let trimmedFirst = user.firstName.trimmingCharacters(in: .whitespacesAndNewlines)
-            let trimmedLast = user.lastName.trimmingCharacters(in: .whitespacesAndNewlines)
-            let displayNameComponents = [trimmedFirst, trimmedLast].filter { !$0.isEmpty }
-            let displayName = displayNameComponents.joined(separator: " ")
-            let normalizedPosition = user.normalizedPosition.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            var aliasSet = Set<String>()
-            if !trimmedFirst.isEmpty { aliasSet.insert(trimmedFirst) }
-            if !trimmedLast.isEmpty { aliasSet.insert(trimmedLast) }
-            if !displayName.isEmpty { aliasSet.insert(displayName) }
-            if !normalizedPosition.isEmpty {
-                aliasSet.insert(normalizedPosition)
-                if !trimmedFirst.isEmpty {
-                    aliasSet.insert("\(trimmedFirst) \(normalizedPosition)")
-                }
-                if !displayName.isEmpty {
-                    aliasSet.insert("\(displayName) (\(normalizedPosition))")
-                }
-            }
-
-            var entry: [String: Any] = ["id": user.id]
-            if !displayName.isEmpty {
-                entry["displayName"] = displayName
-            }
-            if !normalizedPosition.isEmpty {
-                entry["position"] = normalizedPosition
-            }
-
-            let aliases = aliasSet
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-            if !aliases.isEmpty {
-                entry["aliases"] = Array(Set(aliases)).sorted()
-            }
-
-            return entry
-        }
-
-        let rosterNames = rosterEntries
-            .compactMap { $0["displayName"] as? String }
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        let fallbackAssigneeNames = [
-            "Brandon",
-            "Chris",
-            "Hunter",
-            "Justin",
-            "Nate",
-            "Rick",
-            "Trey",
-            "Will"
-        ]
-
-        let displayAssigneeNames: [String]
-        if rosterNames.isEmpty {
-            displayAssigneeNames = fallbackAssigneeNames
-        } else {
-            displayAssigneeNames = Array(Set(rosterNames)).sorted()
-        }
-
-        let limitedAssigneeNames = Array(displayAssigneeNames.prefix(12))
-
-        let formattedAssigneeNames: String
-        if let onlyName = limitedAssigneeNames.first, limitedAssigneeNames.count == 1 {
-            formattedAssigneeNames = onlyName
-        } else if limitedAssigneeNames.count >= 2, let last = limitedAssigneeNames.last {
-            let head = limitedAssigneeNames.dropLast().joined(separator: ", ")
-            formattedAssigneeNames = head.isEmpty ? last : "\(head), and \(last)"
-        } else {
-            formattedAssigneeNames = ""
-        }
-
-        let assigneeGuidance: String
-        if formattedAssigneeNames.isEmpty {
-            assigneeGuidance = "Capture the text exactly as written, even if it's only a first name, initials, or multiple names."
-        } else {
-            assigneeGuidance = "Expect names such as \(formattedAssigneeNames). Capture the text exactly as written, even if it's only a first name, initials, or multiple names."
-        }
-
-        let systemPrompt = """
-        You extract structured job information from construction job sheets. Always reply with strictly valid JSON.
-        """
-
-        let extractionPrompt = """
-        Analyze the provided job sheet image and return a JSON array. Each object must include:
-        - "address": the job address as a string (required).
-        - "jobNumber": a string job number or null if not shown.
-        - "assigneeName": the person's name responsible for the job, or null.
-        - "assigneeId": the worker's roster id string when a match exists, or null.
-        - "notes": any additional notes or description, or null.
-        - "rawText": the original text snippet for this job entry, or null.
-        Use null instead of empty strings when data is missing.
-        You will receive a "Known worker roster" JSON snippet describing each worker (id, displayName, aliases, position). When the sheet lists an assignee whose text matches any roster displayName or alias (case-insensitive and ignoring punctuation), set "assigneeId" to that worker's id and still capture the literal sheet text in "assigneeName". Use null when no roster entry matches.
-        The sheet is a table where each row describes one job. Follow these cues when extracting fields:
-        - Column 5 (header "JOB #") contains the job number for that row. Read the string from this cell exactly as written (including values like "12345", "12345 ask Rick", "ask Rick", or "?"). Only use null when the cell is blank or illegible.
-        Supervisors provided examples of acceptable job-number formats: 5-digit IDs such as "12345", annotated strings like "12345 ask Rick", and placeholders like "ask Rick" or "?" when the number is pending. Treat these literally as the jobNumber value when present.
-        - Column 9 (header "ADDRESS" / "LOCATION") contains the full job address. Use the entire text from this column, including unit numbers or landmarks that appear there.
-        - The rightmost column lists the assigned worker name(s). \(assigneeGuidance)
-        When populating "rawText", capture the clearest full-line snippet for that row so supervisors can audit the entry later.
-        Respond with JSON only (no explanations, markdown, or extra text). Return [] if no jobs are present.
-        """
-
-        let jobItemProperties: [String: Any] = [
-            "address": ["type": "string"],
-            "jobNumber": ["type": ["string", "null"]],
-            "assigneeName": ["type": ["string", "null"]],
-            "assigneeId": ["type": ["string", "null"]],
-            "notes": ["type": ["string", "null"]],
-            "rawText": ["type": ["string", "null"]]
-        ]
-
-        let jobItemSchema: [String: Any] = [
-            "type": "object",
-            "required": ["address"],
-            "properties": jobItemProperties,
-            "additionalProperties": false
-        ]
-
-        let responseSchema: [String: Any] = [
-            "type": "json_schema",
-            "json_schema": [
-                "name": "job_sheet_entries",
-                "schema": [
-                    "type": "array",
-                    "items": jobItemSchema
-                ]
-            ]
-        ]
-
-        let rosterMessage: String?
-        if !rosterEntries.isEmpty,
-           let rosterData = try? JSONSerialization.data(withJSONObject: rosterEntries, options: [.sortedKeys]),
-           let rosterText = String(data: rosterData, encoding: .utf8),
-           !rosterText.isEmpty {
-            rosterMessage = "Known worker roster (JSON):\n\(rosterText)"
-        } else {
-            rosterMessage = nil
-        }
-
-        var userContent: [[String: Any]] = [["type": "text", "text": extractionPrompt]]
-        if let rosterMessage {
-            userContent.append(["type": "text", "text": rosterMessage])
-        }
-        userContent.append(["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(base64)"]])
-
-        let body: [String: Any] = [
-            "model": "gpt-4o-mini",
-            "response_format": responseSchema,
-            "messages": [
-                [
-                    "role": "system",
-                    "content": systemPrompt
-                ],
-                [
-                    "role": "user",
-                    "content": userContent
-                ]
-            ]
-        ]
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-
-        let (data, _) = try await URLSession.shared.data(for: request)
-
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw ParserError.invalidResponse
-        }
-
-        // Surface server-side error messages if present
-        if let error = json["error"] as? [String: Any],
-           let message = error["message"] as? String {
-            throw ParserError.serverError(message)
-        }
-
-        guard
-            let choices = json["choices"] as? [[String: Any]],
-            let message = choices.first?["message"] as? [String: Any]
-        else {
-            throw ParserError.invalidResponse
-        }
-
-        let jsonData: Data
-        if let contentItems = message["content"] as? [[String: Any]] {
-            if let jsonItem = contentItems.first(where: { ($0["type"] as? String)?.lowercased() == "output_json" }),
-               let jsonObject = jsonItem["json"],
-               !(jsonObject is NSNull) {
-                if JSONSerialization.isValidJSONObject(jsonObject) {
-                    jsonData = try JSONSerialization.data(withJSONObject: jsonObject, options: [])
-                } else if let string = jsonObject as? String {
-                    let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard let data = trimmed.data(using: .utf8), !data.isEmpty else {
-                        throw ParserError.malformedJSON("Parser response was empty. Please try again.")
-                    }
-                    jsonData = data
-                } else {
-                    throw ParserError.malformedJSON("Parser response was empty. Please try again.")
-                }
-            } else {
-                let textPayload = contentItems.compactMap { item -> String? in
-                    if let text = item["text"] as? String { return text }
-                    return nil
-                }.joined(separator: "\n")
-
-                let trimmedPayload = textPayload.trimmingCharacters(in: .whitespacesAndNewlines)
-
-                guard let data = trimmedPayload.data(using: .utf8), !data.isEmpty else {
-                    throw ParserError.malformedJSON("Parser response was empty. Please try again.")
-                }
-
-                jsonData = data
-            }
-        } else if let contentString = message["content"] as? String {
-            let trimmed = contentString.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let data = trimmed.data(using: .utf8), !data.isEmpty else {
-                throw ParserError.malformedJSON("Parser response was empty. Please try again.")
-            }
-            jsonData = data
-        } else {
-            throw ParserError.invalidResponse
-        }
-
-        return try parseEntries(from: jsonData, users: users)
+        let response: ParseResponse = try await AIBackendClient().call(
+            "parseJobSheet",
+            request: ParseRequest(imageBase64: jpegData.base64EncodedString())
+        )
+        let encoded = try JSONEncoder().encode(response.items)
+        // IDs are resolved from the server-side roster; local matching remains only
+        // as a compatibility fallback for older endpoint responses.
+        return try parseEntries(from: encoded, users: users)
     }
 
     func parseEntries(from jsonData: Data, users: [AppUser]) throws -> [ParsedEntry] {
@@ -817,7 +603,7 @@ final class JobSheetParser {
             .filter { !$0.isEmpty }
     }
 
-    private struct RawEntry: Decodable {
+    private struct RawEntry: Codable {
         let address: String?
         let jobNumber: String?
         let assigneeName: String?
@@ -852,6 +638,16 @@ final class JobSheetParser {
             assigneeID = RawEntry.decodeFirstString(for: [.assigneeID, .assigneeId, .assignedUserID, .assignedUserId], in: container)
             notes = RawEntry.decodeFirstString(for: [.notes, .note], in: container)
             rawText = RawEntry.decodeFirstString(for: [.rawText, .originalText, .entryText, .sourceText], in: container)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(address, forKey: .address)
+            try container.encodeIfPresent(jobNumber, forKey: .jobNumber)
+            try container.encodeIfPresent(assigneeName, forKey: .assigneeName)
+            try container.encodeIfPresent(assigneeID, forKey: .assigneeId)
+            try container.encodeIfPresent(notes, forKey: .notes)
+            try container.encodeIfPresent(rawText, forKey: .rawText)
         }
 
         private static func decodeFirstString(
