@@ -5,6 +5,7 @@ This folder collects long-form guides for each feature area in Job Tracker. The 
 ## Feature Guides
 
 - [Admin](Features/Admin.md)
+- [Administrator Company Exports](AdminExports.md)
 - [Authentication](Features/Authentication.md)
 - [CarPlay Job Dispatch](Features/CarPlay.md)
 - [CarPlay Entitlement Request Packet](CarPlayEntitlementRequest.md)

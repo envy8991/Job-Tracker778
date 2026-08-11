@@ -33,6 +33,16 @@ service cloud.firestore {
       allow delete: if admin();
     }
 
+    match /adminExports/{exportId} {
+      allow read: if admin() && resource.data.requestedBy == request.auth.uid;
+      allow create, update, delete: if false;
+      match /audit/{auditId} {
+        allow read: if admin() && get(/databases/$(database)/documents/adminExports/$(exportId)).data.requestedBy == request.auth.uid;
+        allow write: if false;
+      }
+      match /downloadTokens/{tokenId} { allow read, write: if false; }
+    }
+
     match /partnerships/{pairId} {
       allow read, create, update, delete: if signedIn() && request.auth.uid in resource.data.members;
       allow create: if signedIn() && request.auth.uid in request.resource.data.members;
