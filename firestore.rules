@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function admin() { return signedIn() && request.auth.token.admin == true; }
+    function jobMember(job) {
+      return signedIn() && (request.auth.uid in job.participants || request.auth.uid == job.createdBy || request.auth.uid == job.assignedTo);
+    }
+
+    match /jobs/{jobId} {
+      allow read: if jobMember(resource.data) || admin();
+      allow create: if signedIn() && jobMember(request.resource.data);
+      allow update, delete: if jobMember(resource.data) || admin();
+
+      match /events/{eventId} {
+        allow read: if admin() || jobMember(get(/databases/$(database)/documents/jobs/$(jobId)).data);
+        allow create: if signedIn()
+          && (admin() || jobMember(get(/databases/$(database)/documents/jobs/$(jobId)).data))
+          && request.resource.data.keys().hasOnly(['actorID', 'occurredAt', 'type', 'before', 'after'])
+          && request.resource.data.actorID == request.auth.uid
+          && request.resource.data.occurredAt == request.time
+          && request.resource.data.type is string
+          && request.resource.data.before is map
+          && request.resource.data.after is map;
+        // Audit history is append-only, including for administrators.
+        allow update, delete: if false;
+      }
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && (request.auth.uid == userId || admin());
+      allow delete: if admin();
+    }
+
+    match /partnerships/{pairId} {
+      allow read, create, update, delete: if signedIn() && request.auth.uid in resource.data.members;
+      allow create: if signedIn() && request.auth.uid in request.resource.data.members;
+    }
+
+    match /partnerRequests/{requestId} {
+      allow read: if signedIn() && (request.auth.uid == resource.data.fromUid || request.auth.uid == resource.data.toUid);
+      allow create: if signedIn() && request.auth.uid == request.resource.data.fromUid;
+      allow update, delete: if signedIn() && (request.auth.uid == resource.data.fromUid || request.auth.uid == resource.data.toUid);
+    }
+  }
+}

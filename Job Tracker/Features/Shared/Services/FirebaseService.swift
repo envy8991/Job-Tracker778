@@ -354,6 +354,7 @@ class FirebaseService {
                     completion(.failure(err))
                     return
                 }
+                JobAudit.write(jobID: job.id, type: "job_created", before: [:], after: JobAudit.summary(job))
                 self.gatherParticipants(for: job) { participants in
                     guard !participants.isEmpty else {
                         completion(.success(()))
@@ -585,41 +586,47 @@ class FirebaseService {
     // - allow update if user is in participants.
     // Implementing the dynamic "paired" check may require Cloud Functions or a secure schema; client enforces it here.
 
-    /// Delete logic that respects current pairing:
-    /// - If the current user is actively paired with another participant on this job at deletion time, HARD delete the job (removes for both).
-    /// - If not paired, SOFT delete (remove only the current user from `participants`; delete doc only if no one remains).
+    /// Tombstone deletion preserves the job's append-only history and permits privileged restoration.
     func deleteJobRespectingPairing(jobId: String, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let me = currentUserID() else {
             completion(.failure(NSError(domain: "FirebaseService", code: 401, userInfo: [NSLocalizedDescriptionKey: "Not signed in"])))
             return
         }
         let ref = db.collection("jobs").document(jobId)
-        ref.getDocument { [weak self] snap, err in
-            guard let self = self else { return }
+        ref.getDocument { snap, err in
             if let err = err { completion(.failure(err)); return }
             guard let data = snap?.data() else {
                 completion(.failure(NSError(domain: "FirebaseService", code: 404, userInfo: [NSLocalizedDescriptionKey: "Job not found"])))
                 return
             }
-            let participants = (data["participants"] as? [String]) ?? []
-            // Who am I currently paired with?
-            self.fetchPartnerId(for: me) { currentPartner in
-                // If we're currently paired and the partner is also a participant on this job, HARD delete (removes for both).
-                if let partner = currentPartner, participants.contains(partner) {
-                    ref.delete { delErr in
-                        if let delErr = delErr { completion(.failure(delErr)) }
-                        else { completion(.success(())) }
-                    }
-                } else {
-                    // Not paired (or partner not on this job): SOFT delete (leave the job)
-                    self.leaveJob(jobId: jobId) { result in
-                        switch result {
-                        case .success: completion(.success(()))
-                        case .failure(let e): completion(.failure(e))
-                        }
-                    }
-                }
+            guard (data["participants"] as? [String] ?? []).contains(me) || data["createdBy"] as? String == me else {
+                completion(.failure(NSError(domain: "FirebaseService", code: 403, userInfo: [NSLocalizedDescriptionKey: "You cannot delete this job."])))
+                return
             }
+            JobAudit.write(jobID: jobId, type: "job_deleted",
+                           before: ["deletion": "Active"], after: ["deletion": "Deleted"])
+            ref.updateData(["isDeleted": true, "deletedAt": FieldValue.serverTimestamp(), "deletedBy": me]) { delErr in
+                if let delErr { completion(.failure(delErr)) }
+                else { completion(.success(())) }
+            }
+        }
+    }
+
+    /// Restores a tombstoned job. Firestore rules restrict this to a participant or administrator.
+    func restoreJob(jobId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard currentUserID() != nil else {
+            completion(.failure(NSError(domain: "FirebaseService", code: 401, userInfo: [NSLocalizedDescriptionKey: "Not signed in"])))
+            return
+        }
+        JobAudit.write(jobID: jobId, type: "job_restored",
+                       before: ["deletion": "Deleted"], after: ["deletion": "Active"])
+        db.collection("jobs").document(jobId).updateData([
+            "isDeleted": false,
+            "restoredAt": FieldValue.serverTimestamp(),
+            "deletedAt": FieldValue.delete(),
+            "deletedBy": FieldValue.delete()
+        ]) { error in
+            if let error { completion(.failure(error)) } else { completion(.success(())) }
         }
     }
     

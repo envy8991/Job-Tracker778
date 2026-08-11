@@ -28,6 +28,7 @@ struct Job: Identifiable, Codable {
     var nidFootage: String?
     var canFootage: String?
     var jobPlacement: String?       // "OH" or "UG"
+    var isDeleted: Bool?            // Soft deletion preserves append-only audit history
     
     // Default initializer updated to include new fields.
     init(
@@ -80,6 +81,7 @@ struct Job: Identifiable, Codable {
         self.jobPlacement = jobPlacement
         self.latitude = latitude
         self.longitude = longitude
+        self.isDeleted = false
     }
 }
 

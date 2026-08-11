@@ -743,6 +743,12 @@ struct UniversalJobDetailView: View {
                         if !photoURLStrings.isEmpty {
                             PhotosSection(photos: photoURLStrings)
                         }
+
+                        GlassCard(cornerRadius: JTShapes.largeCardCornerRadius,
+                                  strokeColor: JTColors.glassSoftStroke) {
+                            JobAuditTimeline(jobID: job.id, displayName: displayName(for:))
+                                .padding(JTSpacing.lg)
+                        }
                     }
                     .padding(.horizontal, JTSpacing.lg)
                     .padding(.vertical, JTSpacing.xl)

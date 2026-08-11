@@ -215,6 +215,7 @@ class JobsViewModel: ObservableObject {
                 }
                 var job = try? doc.data(as: Job.self)
                 job?.id = doc.documentID
+                if job?.isDeleted == true { return nil }
                 if let id = job?.id, !seen.contains(id) {
                     seen.insert(id)
                     return job
@@ -451,6 +452,7 @@ class JobsViewModel: ObservableObject {
         }
 
         let ref = db.collection("jobs").document(documentID)
+        let requestedSummary = JobAudit.summary(job)
 
         // 1) Read current participants so we never drop them during an update
         ref.getDocument { [weak self] snap, readErr in
@@ -459,6 +461,7 @@ class JobsViewModel: ObservableObject {
                 print("updateJob: failed to read existing doc: \(readErr)")
             }
             let documentParticipants = (snap?.data()?["participants"] as? [String]) ?? []
+            let priorJob = snap.flatMap { try? $0.data(as: Job.self) }
             let jobParticipants = job.participants ?? []
             let cleanedDocumentParticipants = documentParticipants.filter { !$0.isEmpty }
             let cleanedJobParticipants = jobParticipants.filter { !$0.isEmpty }
@@ -472,6 +475,8 @@ class JobsViewModel: ObservableObject {
                         print("updateJob: merge setData error: \(writeErr)")
                         return
                     }
+                    JobAudit.write(jobID: documentID, type: "job_updated",
+                                   before: priorJob.map(JobAudit.summary) ?? [:], after: requestedSummary)
                     var patch: [String: Any] = [:]
 
                     // The Firestore Codable encoder omits nil optionals. Because this update uses
@@ -550,6 +555,9 @@ class JobsViewModel: ObservableObject {
         }
 
         // Patch Firestore; if the doc isn't there offline, fallback to setData
+        var statusAfter = JobAudit.summary(job)
+        statusAfter["status"] = newStatus
+        JobAudit.write(jobID: docID, type: "status_changed", before: JobAudit.summary(job), after: statusAfter)
         db.collection("jobs").document(docID).updateData(["status": newStatus]) { [weak self] err in
             if err != nil {
                 var updated = job

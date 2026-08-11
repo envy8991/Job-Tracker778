@@ -76,7 +76,10 @@ final class SupervisorJobsViewModel: ObservableObject {
                 return
             }
             let docs = snap?.documents ?? []
-            let mapped: [Job] = docs.compactMap { try? $0.data(as: Job.self) }
+            let mapped: [Job] = docs.compactMap { doc in
+                guard let job = try? doc.data(as: Job.self), job.isDeleted != true else { return nil }
+                return job
+            }
             DispatchQueue.main.async {
                 self.jobs = mapped
                 self.isLoading = false
