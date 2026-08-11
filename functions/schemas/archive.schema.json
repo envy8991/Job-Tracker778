@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jobtracker.example/schemas/export/1.0/archive.schema.json",
+  "title": "Job Tracker export archive 1.0",
+  "type": "object",
+  "required": ["archiveVersion", "createdAt", "recordCounts", "personalDataPolicy"],
+  "properties": {
+    "archiveVersion": { "const": "1.0" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "recordCounts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+    "personalDataPolicy": { "type": "string" }
+  },
+  "$comment": "data/*.json contains record arrays. RFC 4180 CSV files use id,json columns. attachments/manifest.json inventories but does not embed attachment bytes."
+}
