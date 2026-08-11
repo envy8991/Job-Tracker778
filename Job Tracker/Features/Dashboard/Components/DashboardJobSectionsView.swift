@@ -34,6 +34,7 @@ struct DashboardJobSectionsView: View {
                                 job: job,
                                 isHere: job.id == nearestJobID,
                                 statusOptions: statusOptions,
+                                onJobTap: { onJobTap(job) },
                                 onMapTap: { onMapTap(job) },
                                 onStatusChange: { newStatus in onStatusChange(job, newStatus) },
                                 onDelete: { onDelete(job) },
@@ -41,7 +42,6 @@ struct DashboardJobSectionsView: View {
                                 distanceString: distanceStrings[job.id]
                             )
                             .id("\(job.id)_\(job.status)")
-                            .onTapGesture { onJobTap(job) }
                         }
                     }
 
@@ -53,6 +53,7 @@ struct DashboardJobSectionsView: View {
                                 job: job,
                                 isHere: job.id == nearestJobID,
                                 statusOptions: statusOptions,
+                                onJobTap: { onJobTap(job) },
                                 onMapTap: { onMapTap(job) },
                                 onStatusChange: { newStatus in onStatusChange(job, newStatus) },
                                 onDelete: { onDelete(job) },
@@ -60,7 +61,6 @@ struct DashboardJobSectionsView: View {
                                 distanceString: distanceStrings[job.id]
                             )
                             .id("\(job.id)_\(job.status)")
-                            .onTapGesture { onJobTap(job) }
                         }
                     }
                 }
@@ -88,6 +88,7 @@ struct JobCard: View {
     let job: Job
     let isHere: Bool
     let statusOptions: [String]
+    let onJobTap: () -> Void
     let onMapTap: () -> Void
     let onStatusChange: (String) -> Void
     let onDelete: () -> Void
@@ -104,6 +105,7 @@ struct JobCard: View {
         job: Job,
         isHere: Bool,
         statusOptions: [String],
+        onJobTap: @escaping () -> Void,
         onMapTap: @escaping () -> Void,
         onStatusChange: @escaping (String) -> Void,
         onDelete: @escaping () -> Void,
@@ -113,6 +115,7 @@ struct JobCard: View {
         self.job = job
         self.isHere = isHere
         self.statusOptions = statusOptions
+        self.onJobTap = onJobTap
         self.onMapTap = onMapTap
         self.onStatusChange = onStatusChange
         self.onDelete = onDelete
@@ -123,8 +126,20 @@ struct JobCard: View {
     var body: some View {
         GlassCard(cornerRadius: JTShapes.cardCornerRadius) {
             VStack(alignment: .leading, spacing: JTSpacing.sm) {
-                header
-                details
+                Button(action: onJobTap) {
+                    VStack(alignment: .leading, spacing: JTSpacing.sm) {
+                        header
+                        details
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+                .accessibilityLabel("Job at \(job.address)")
+                .accessibilityValue("\(job.displayStatus), \(DateFormatter.localizedString(from: job.date, dateStyle: .medium, timeStyle: .none))")
+                .accessibilityHint("Opens job details")
+                .accessibilityIdentifier("dashboard.job.\(job.id).details")
                 actions
             }
             .padding(JTSpacing.md)
@@ -154,9 +169,7 @@ struct JobCard: View {
         .sheet(item: $portalPage) { page in
             GibsonPortalView(url: page.url)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(houseNumber(job.address)), \(DateFormatter.localizedString(from: job.date, dateStyle: .medium, timeStyle: .none))")
-        .accessibilityHint("Double tap for details. Swipe actions for share and delete.")
+        .accessibilityElement(children: .contain)
     }
 
     private var header: some View {
@@ -239,6 +252,11 @@ struct JobCard: View {
                     .clipShape(Capsule())
             }
             .buttonStyle(.plain)
+            .frame(minWidth: 44, minHeight: 44)
+            .accessibilityLabel("Change status")
+            .accessibilityValue(job.displayStatus)
+            .accessibilityHint("Shows available job statuses")
+            .accessibilityIdentifier("dashboard.job.\(job.id).status")
             .confirmationDialog("Change Status", isPresented: $showStatusDialog, titleVisibility: .visible) {
                 ForEach(statusOptions, id: \.self) { option in
                     if option == "Custom" {
@@ -289,6 +307,10 @@ struct JobCard: View {
                         .jtGlassBackground(shape: Capsule(), strokeColor: JTColors.glassSoftStroke)
                 }
                 .accessibilityLabel("Open Gibson portal")
+                .accessibilityValue(job.address)
+                .accessibilityHint("Opens this job in the Gibson portal")
+                .accessibilityIdentifier("dashboard.job.\(job.id).portal")
+                .frame(minHeight: 44)
             }
 
             Button(action: onMapTap) {
@@ -299,6 +321,10 @@ struct JobCard: View {
                     .jtGlassBackground(shape: Circle(), strokeColor: JTColors.glassSoftStroke)
             }
             .accessibilityLabel("Directions")
+            .accessibilityValue(job.address)
+            .accessibilityHint("Opens this job in Maps")
+            .accessibilityIdentifier("dashboard.job.\(job.id).map")
+            .frame(minWidth: 44, minHeight: 44)
 
             Button(action: onShare) {
                 Image(systemName: "square.and.arrow.up")
@@ -307,6 +333,11 @@ struct JobCard: View {
                     .padding(JTSpacing.xs)
                     .jtGlassBackground(shape: Circle(), strokeColor: JTColors.glassSoftStroke)
             }
+            .accessibilityLabel("Share job")
+            .accessibilityValue(job.address)
+            .accessibilityHint("Opens sharing options for this job")
+            .accessibilityIdentifier("dashboard.job.\(job.id).share")
+            .frame(minWidth: 44, minHeight: 44)
 
             Button {
                 showDeleteConfirm = true
@@ -320,6 +351,11 @@ struct JobCard: View {
                     .padding(JTSpacing.xs)
                     .jtGlassBackground(shape: Circle(), strokeColor: JTColors.glassSoftStroke)
             }
+            .accessibilityLabel("Delete job")
+            .accessibilityValue(job.address)
+            .accessibilityHint("Asks for confirmation before deleting this job")
+            .accessibilityIdentifier("dashboard.job.\(job.id).delete")
+            .frame(minWidth: 44, minHeight: 44)
         }
     }
 

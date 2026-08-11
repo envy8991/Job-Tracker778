@@ -482,10 +482,17 @@ struct AdminPanelView: View {
                 }
 
                 if let error = updateViewModel.errorReason {
-                    Text(error)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .onTapGesture { updateViewModel.resetError() }
+                    Button(action: updateViewModel.resetError) {
+                        Text(error)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Dismiss update error")
+                    .accessibilityValue(error)
+                    .accessibilityHint("Clears this error message")
+                    .accessibilityIdentifier("settings.update.dismissError")
                 }
 
                 VStack(spacing: 8) {

@@ -65,8 +65,7 @@ struct DashboardSyncBanner: View {
         }
         .frame(height: 44)
         .padding(.horizontal, JTSpacing.lg)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(title). Tap for details.")
+        .accessibilityHidden(true)
     }
 }
 

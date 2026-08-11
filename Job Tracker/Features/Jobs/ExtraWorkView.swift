@@ -34,18 +34,25 @@ struct ExtraWorkView: View {
                                     .foregroundColor(.gray)
                             } else {
                                 ForEach(matchingJobs) { job in
-                                    VStack(alignment: .leading) {
-                                        Text(job.address)
-                                            .font(.headline)
-                                            .foregroundColor(.white)
-                                        Text("Created by: \(creatorFullName(for: job))")
-                                            .font(.subheadline)
-                                            .foregroundColor(.gray)
-                                    }
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
+                                    Button {
                                         selectedJob = job
+                                    } label: {
+                                        VStack(alignment: .leading) {
+                                            Text(job.address)
+                                                .font(.headline)
+                                                .foregroundColor(.white)
+                                            Text("Created by: \(creatorFullName(for: job))")
+                                                .font(.subheadline)
+                                                .foregroundColor(.gray)
+                                        }
+                                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                        .contentShape(Rectangle())
                                     }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Extra work at \(job.address)")
+                                    .accessibilityValue("Created by \(creatorFullName(for: job))")
+                                    .accessibilityHint("Opens job details")
+                                    .accessibilityIdentifier("extraWork.job.\(job.id)")
                                 }
                             }
                         }
