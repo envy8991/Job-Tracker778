@@ -3,19 +3,41 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function admin() { return signedIn() && request.auth.token.admin == true; }
+    function supervisor() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isSupervisor == true;
+    }
     function jobMember(job) {
-      return signedIn() && (request.auth.uid in job.participants || request.auth.uid == job.createdBy || request.auth.uid == job.assignedTo);
+      return signedIn() && ((job.participants is list && request.auth.uid in job.participants) || request.auth.uid == job.createdBy || request.auth.uid == job.assignedTo);
+    }
+    function validFollowUp(job) {
+      return !('followUp' in job) || job.followUp == null || (
+        job.followUp.keys().hasOnly(['reason', 'assignedUserID', 'dueDate', 'createdAt', 'updatedAt', 'completedAt', 'notificationPreference'])
+        && job.followUp.reason is string
+        && job.followUp.assignedUserID is string
+        && job.followUp.dueDate is timestamp
+        && job.followUp.createdAt is timestamp
+        && job.followUp.updatedAt is timestamp
+        && job.followUp.notificationPreference in ['none', 'dueDate']
+        && ((job.participants is list && job.followUp.assignedUserID in job.participants)
+          || job.followUp.assignedUserID == job.createdBy
+          || job.followUp.assignedUserID == job.assignedTo
+          || (exists(/databases/$(database)/documents/users/$(job.followUp.assignedUserID))
+            && get(/databases/$(database)/documents/users/$(job.followUp.assignedUserID)).data.isSupervisor == true))
+      );
     }
 
     match /jobs/{jobId} {
-      allow read: if jobMember(resource.data) || admin();
-      allow create: if signedIn() && jobMember(request.resource.data);
-      allow update, delete: if jobMember(resource.data) || admin();
+      allow read: if jobMember(resource.data) || supervisor() || admin();
+      allow create: if signedIn() && jobMember(request.resource.data) && validFollowUp(request.resource.data);
+      allow update: if (jobMember(resource.data) || supervisor() || admin()) && validFollowUp(request.resource.data);
+      allow delete: if jobMember(resource.data) || supervisor() || admin();
 
       match /events/{eventId} {
-        allow read: if admin() || jobMember(get(/databases/$(database)/documents/jobs/$(jobId)).data);
+        allow read: if admin() || supervisor() || jobMember(get(/databases/$(database)/documents/jobs/$(jobId)).data);
         allow create: if signedIn()
-          && (admin() || jobMember(get(/databases/$(database)/documents/jobs/$(jobId)).data))
+          && (admin() || supervisor() || jobMember(get(/databases/$(database)/documents/jobs/$(jobId)).data))
           && request.resource.data.keys().hasOnly(['actorID', 'occurredAt', 'type', 'before', 'after'])
           && request.resource.data.actorID == request.auth.uid
           && request.resource.data.occurredAt == request.time

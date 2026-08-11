@@ -1,5 +1,30 @@
 import Foundation
 
+struct JobFollowUp: Codable, Hashable, Sendable {
+    enum NotificationPreference: String, Codable, CaseIterable, Sendable {
+        case none
+        case dueDate
+
+        var title: String { self == .dueDate ? "On due date" : "None" }
+    }
+
+    var reason: String
+    var assignedUserID: String
+    var dueDate: Date
+    var createdAt: Date
+    var updatedAt: Date
+    var completedAt: Date?
+    var notificationPreference: NotificationPreference
+
+    var isCompleted: Bool { completedAt != nil }
+    func isDueToday(calendar: Calendar = .current, now: Date = Date()) -> Bool {
+        !isCompleted && calendar.isDate(dueDate, inSameDayAs: now)
+    }
+    func isOverdue(calendar: Calendar = .current, now: Date = Date()) -> Bool {
+        !isCompleted && dueDate < calendar.startOfDay(for: now)
+    }
+}
+
 struct Job: Identifiable, Codable {
     var id: String                  // Firestore doc ID or UUID
     var address: String             // Full physical job address
@@ -29,6 +54,7 @@ struct Job: Identifiable, Codable {
     var canFootage: String?
     var jobPlacement: String?       // "OH" or "UG"
     var isDeleted: Bool?            // Soft deletion preserves append-only audit history
+    var followUp: JobFollowUp?      // Optional for backwards compatibility with legacy jobs
     
     // Default initializer updated to include new fields.
     init(
@@ -55,7 +81,8 @@ struct Job: Identifiable, Codable {
         canFootage: String? = nil,
         jobPlacement: String? = nil,
         latitude: Double? = nil,
-        longitude: Double? = nil
+        longitude: Double? = nil,
+        followUp: JobFollowUp? = nil
     ) {
         self.id = id
         self.address = address
@@ -84,6 +111,7 @@ struct Job: Identifiable, Codable {
         self.latitude = latitude
         self.longitude = longitude
         self.isDeleted = false
+        self.followUp = followUp
     }
 }
 
@@ -114,8 +142,10 @@ extension Job {
             canFootage: try values.decodeIfPresent(String.self, forKey: .canFootage),
             jobPlacement: try values.decodeIfPresent(String.self, forKey: .jobPlacement),
             latitude: try values.decodeIfPresent(Double.self, forKey: .latitude),
-            longitude: try values.decodeIfPresent(Double.self, forKey: .longitude)
+            longitude: try values.decodeIfPresent(Double.self, forKey: .longitude),
+            followUp: try values.decodeIfPresent(JobFollowUp.self, forKey: .followUp)
         )
+        self.isDeleted = try values.decodeIfPresent(Bool.self, forKey: .isDeleted) ?? false
     }
 }
 

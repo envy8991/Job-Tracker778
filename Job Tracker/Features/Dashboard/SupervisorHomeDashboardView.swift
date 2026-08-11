@@ -17,6 +17,8 @@ struct SupervisorHomeDashboardView: View {
                         header
                         datePickerCard
 
+                        FollowUpDashboardSection(jobs: viewModel.jobs, users: usersViewModel.usersDict) { _ in }
+
                         if viewModel.isLoading {
                             supervisorHomeStateCard(title: "Loading crew jobs…", systemImage: "hourglass")
                         }

@@ -35,3 +35,31 @@ describe("job event security", () => {
     await assertFails(getDoc(doc(db, "jobs/job-1/events/event-1")));
   });
 });
+
+describe("job follow-up security", () => {
+  const followUp = assignedUserID => ({
+    reason: "Needs OH", assignedUserID, dueDate: new Date(), createdAt: new Date(),
+    updatedAt: new Date(), completedAt: null, notificationPreference: "dueDate"
+  });
+
+  it("allows a participant to assign another participant", async () => {
+    await env.withSecurityRulesDisabled(async context => updateDoc(doc(context.firestore(), "jobs/job-1"), {
+      participants: ["member", "crew-2"]
+    }));
+    const db = env.authenticatedContext("member").firestore();
+    await assertSucceeds(updateDoc(doc(db, "jobs/job-1"), { followUp: followUp("crew-2") }));
+  });
+
+  it("denies assignment to an unrelated user", async () => {
+    const db = env.authenticatedContext("member").firestore();
+    await assertFails(updateDoc(doc(db, "jobs/job-1"), { followUp: followUp("stranger") }));
+  });
+
+  it("allows a supervisor to manage a participant follow-up", async () => {
+    await env.withSecurityRulesDisabled(async context => setDoc(doc(context.firestore(), "users/boss"), {
+      isSupervisor: true
+    }));
+    const db = env.authenticatedContext("boss").firestore();
+    await assertSucceeds(updateDoc(doc(db, "jobs/job-1"), { followUp: followUp("member") }));
+  });
+});

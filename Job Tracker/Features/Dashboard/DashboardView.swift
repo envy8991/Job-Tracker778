@@ -4,6 +4,7 @@ struct DashboardView: View {
     @EnvironmentObject var jobsViewModel: JobsViewModel
     @EnvironmentObject var locationService: LocationService
     @EnvironmentObject var authViewModel: AuthViewModel
+    @EnvironmentObject var usersViewModel: UsersViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.shellChromeHeight) private var shellChromeHeight
 
@@ -106,6 +107,11 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal)
                     .padding(.top, JTSpacing.sm)
+
+                    FollowUpDashboardSection(jobs: jobsViewModel.jobs, users: usersViewModel.usersDict) {
+                        viewModel.selectedJob = $0
+                    }
+                    .padding(.horizontal)
 
                     DashboardJobSectionsView(
                         sections: sections,
