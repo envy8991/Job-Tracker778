@@ -46,6 +46,30 @@ private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
+// Keep these form controls in their own view types so the compiler does not
+// need to infer every modifier in CreateJobView's large view hierarchy at once.
+private struct MaterialsInputField: View {
+    @Binding var text: String
+
+    var body: some View {
+        TextField("Enter materials info…", text: $text)
+            .textInputAutocapitalization(.sentences)
+            .padding(12)
+            .background(fieldBackground)
+            .overlay(fieldBorder)
+    }
+
+    private var fieldBackground: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(Color(.systemBackground).opacity(0.9))
+    }
+
+    private var fieldBorder: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+    }
+}
+
 // MARK: - Section Card
 @ViewBuilder
 private func SectionCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -525,17 +549,7 @@ struct CreateJobView: View {
 
                         // Materials
                         SectionCard(title: "Materials Used") {
-                            TextField("Enter materials info…", text: $materialsUsed)
-                                .textInputAutocapitalization(.sentences)
-                                .padding(12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(Color(.systemBackground).opacity(0.9))
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                                )
+                            MaterialsInputField(text: $materialsUsed)
                         }
 
                         // Notes
