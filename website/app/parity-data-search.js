@@ -1,6 +1,6 @@
 // Web-only parity layer kept separate from parity-enhancements.js to avoid merge conflicts
 // with the shared baseline file while preserving iOS data/search/sharing behavior.
-const nativeStatusOptions = ["Pending", "Needs OH", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick", "Custom"];
+const nativeStatusOptions = ["Pending", "Needs OH", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Supervisor", "Custom"];
 statuses.splice(0, statuses.length, ...nativeStatusOptions);
 
 appState.searchJobs = appState.searchJobs || [];
@@ -144,7 +144,7 @@ loadAppData = async function enhancedLoadAppData() {
     paginatedListDocs("partnerRequests"),
   ]);
   appState.users = users;
-  appState.jobs = jobs.filter((job) => canSeeJob(job));
+  appState.jobs = jobs.filter((job) => canSeeJob(job)).map((job) => ({ ...job, status: normalizeCrewStatus(job.status) }));
   appState.searchJobs = mergeSearchEntries(jobs, searchIndex);
   appState.timesheets = Object.fromEntries(timesheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.weekStart, normalizeTimesheet(sheet)]));
   appState.yellowSheets = Object.fromEntries(yellowSheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.date || sheet.weekStart, normalizeYellowSheet(sheet)]));
@@ -198,7 +198,7 @@ isOpen = function enhancedIsOpen(job) {
 statusClass = function enhancedStatusClass(status) {
   const normalized = String(status || "").toLowerCase();
   if (normalized === "done") return "done";
-  if (normalized.startsWith("needs") || normalized === "talk to rick" || normalized === "custom") return "warning";
+  if (normalized.startsWith("needs") || ["talk to supervisor", "talk to rick"].includes(normalized) || normalized === "custom") return "warning";
   if (normalized === "pending") return "pending";
   return "";
 };

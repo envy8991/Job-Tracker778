@@ -18,7 +18,7 @@ enum JobStatusIntentEnum: String, AppEnum {
     case needsNid = "Needs Nid"
     case needsCan = "Needs Can"
     case done = "Done"
-    case talkToRick = "Talk to Rick"
+    case talkToSupervisor = "Talk to Supervisor"
     case custom = "Custom"
 
     static var typeDisplayRepresentation: TypeDisplayRepresentation = "Job Status"
@@ -30,7 +30,7 @@ enum JobStatusIntentEnum: String, AppEnum {
         .needsNid: "Needs Nid",
         .needsCan: "Needs Can",
         .done: "Done",
-        .talkToRick: "Talk to Rick",
+        .talkToSupervisor: "Talk to Supervisor",
         .custom: "Custom"
     ]
 }

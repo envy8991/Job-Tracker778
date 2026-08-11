@@ -337,7 +337,7 @@ struct CreateJobView: View {
     @State private var approvedSeparateAddresses = Set<String>()
     @State private var isSaving = false
 
-    let statusOptions = ["Pending","OH","UG","Nid","Can","Done","Talk to Rick","Custom"]
+    let statusOptions = ["Pending","OH","UG","Nid","Can","Done","Talk to Supervisor","Custom"]
     let fiberChoices = ["Flat", "Round", "Mainline"]
     let placementChoices = ["OH", "UG"]
 

@@ -86,7 +86,7 @@ struct JobDetailView: View {
         "Needs Nid",
         "Needs Can",
         "Done",
-        "Talk to Rick",   // fixed option
+        "Talk to Supervisor",   // fixed option
         "Custom"          // allows manual entry
     ]
     let ohMaterials = ["None", "Weatherhead", "Rams Head"]

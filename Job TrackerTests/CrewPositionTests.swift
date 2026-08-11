@@ -29,4 +29,36 @@ final class CrewPositionTests: XCTestCase {
         XCTAssertEqual(CrewPosition.statusDisplayName(from: " needs overhead "), "Needs OH")
         XCTAssertEqual(CrewPosition.normalizedStatusForSaving("Complete"), "Complete")
     }
+
+    func testLegacySupervisorStatusUsesCurrentDisplayText() {
+        XCTAssertEqual(CrewPosition.statusDisplayName(from: " Talk to Rick "), "Talk to Supervisor")
+        XCTAssertEqual(CrewPosition.statusDisplayName(from: "Talk to Supervisor"), "Talk to Supervisor")
+    }
+
+    func testLegacySupervisorStatusDecodesAsCurrentValue() throws {
+        let legacyJob = Job(address: "1 Main St", date: Date(timeIntervalSinceReferenceDate: 1), status: "Pending")
+        let encoded = try JSONEncoder().encode(legacyJob)
+        var document = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        document["status"] = "Talk to Rick"
+
+        let decoded = try JSONDecoder().decode(Job.self, from: JSONSerialization.data(withJSONObject: document))
+
+        XCTAssertEqual(decoded.status, "Talk to Supervisor")
+    }
+
+    func testNewSupervisorStatusIsSavedAsDisplayLabel() throws {
+        let job = Job(address: "1 Main St", date: Date(), status: " talk to supervisor ")
+        let document = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(job)) as? [String: Any])
+
+        XCTAssertEqual(job.status, "Talk to Supervisor")
+        XCTAssertEqual(document["status"] as? String, "Talk to Supervisor")
+    }
+
+    @available(iOS 26.0, *)
+    func testAppIntentSupervisorStatusRawAndDisplayValues() {
+        XCTAssertEqual(JobStatusIntentEnum.talkToSupervisor.rawValue, "Talk to Supervisor")
+        let representation = JobStatusIntentEnum.caseDisplayRepresentations[.talkToSupervisor]
+        XCTAssertEqual(representation.map { String(localized: $0.title) }, "Talk to Supervisor")
+        XCTAssertNil(JobStatusIntentEnum(rawValue: "Talk to Rick"))
+    }
 }

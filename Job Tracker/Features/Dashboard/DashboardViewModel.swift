@@ -87,7 +87,7 @@ final class DashboardViewModel: ObservableObject {
         "Needs Nid",
         "Needs Can",
         "Done",
-        "Talk to Rick",
+        "Talk to Supervisor",
         "Custom"
     ]
 
