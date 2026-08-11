@@ -26,7 +26,7 @@ struct WatchJobDetailView: View {
         "Needs Nid",
         "Needs Can",
         "Done",
-        "Talk to Rick",
+        "Talk to Supervisor",
         "Custom"
     ]
 
@@ -75,7 +75,10 @@ struct WatchJobDetailView: View {
         }
         .navigationTitle("Details")
         .onAppear {
-            let s = job.status ?? "Pending"
+            let rawStatus = job.status ?? "Pending"
+            let s = rawStatus.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "talk to rick"
+                ? "Talk to Supervisor"
+                : rawStatus
             if statuses.contains(s) {
                 status = s
                 customStatus = ""

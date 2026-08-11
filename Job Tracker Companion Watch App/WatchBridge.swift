@@ -126,7 +126,10 @@ final class WatchBridge: NSObject, ObservableObject, WCSessionDelegate {
                   let address = raw["address"] as? String else { return nil }
             let date = parseDate(from: raw)
             let jobNumber = raw["jobNumber"] as? String
-            let status = raw["status"] as? String
+            let rawStatus = raw["status"] as? String
+            let status = rawStatus?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "talk to rick"
+                ? "Talk to Supervisor"
+                : rawStatus
             return WatchJob(id: id, address: address, date: date, jobNumber: jobNumber, status: status)
         }
 

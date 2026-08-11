@@ -1,4 +1,4 @@
-const nativeStatusOptions = ["Pending", "Needs OH", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick", "Custom"];
+const nativeStatusOptions = ["Pending", "Needs OH", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Supervisor", "Custom"];
 statuses.splice(0, statuses.length, ...nativeStatusOptions);
 
 const parityBase = {

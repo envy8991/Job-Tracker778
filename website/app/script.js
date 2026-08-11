@@ -4,7 +4,7 @@ const tokenBase = "https://securetoken.googleapis.com/v1/token";
 const firestoreBase = config.projectId ? `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents` : "";
 const sessionKey = "job-tracker-web-firebase-session";
 const appDataCachePrefix = "job-tracker-web-app-data";
-const statuses = ["Pending", "Needs OH", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Rick", "Custom"];
+const statuses = ["Pending", "Needs OH", "Needs Underground", "Needs Nid", "Needs Can", "Done", "Talk to Supervisor", "Custom"];
 const weekDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const shortDays = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const shareTokenAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -269,7 +269,7 @@ async function loadAppData() {
     listDocs("partnerRequests"),
   ]);
   appState.users = users;
-  appState.jobs = jobs.filter((job) => canSeeJob(job));
+  appState.jobs = jobs.filter((job) => canSeeJob(job)).map((job) => ({ ...job, status: normalizeCrewStatus(job.status) }));
   appState.timesheets = Object.fromEntries(timesheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.weekStart, normalizeTimesheet(sheet)]));
   appState.yellowSheets = Object.fromEntries(yellowSheets.filter((sheet) => sheet.userId === currentUser.id).map((sheet) => [sheet.date || sheet.weekStart, normalizeYellowSheet(sheet)]));
   appState.partnerRequests = partnerRequests.filter((request) => request.fromUid === currentUser.id || request.toUid === currentUser.id);
@@ -287,6 +287,7 @@ function normalizeCrewStatus(status) {
   const key = value.toLowerCase().replace(/[^a-z0-9]/g, "");
   if (["oh", "overhead", "aerial", "ariel", "arial"].includes(key)) return "OH";
   if (["needsoh", "needsoverhead", "needsaerial", "needsariel", "needsarial"].includes(key)) return "Needs OH";
+  if (["talktorick", "talktosupervisor"].includes(key)) return "Talk to Supervisor";
   return value;
 }
 
@@ -432,7 +433,7 @@ function isOpen(job) { return String(job.status || "Pending").toLowerCase() === 
 function statusClass(status) {
   const normalized = String(status || "").toLowerCase();
   if (normalized === "done") return "done";
-  if (normalized.startsWith("needs") || normalized === "talk to rick" || normalized === "custom") return "warning";
+  if (normalized.startsWith("needs") || ["talk to supervisor", "talk to rick"].includes(normalized) || normalized === "custom") return "warning";
   if (normalized === "pending") return "pending";
   return "";
 }

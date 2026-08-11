@@ -59,7 +59,9 @@ struct Job: Identifiable, Codable {
         self.id = id
         self.address = address
         self.date = date
-        self.status = status
+        // Statuses are persisted as their user-facing label. Normalize legacy labels at the
+        // model boundary so every writer and reader converges on the same current value.
+        self.status = CrewPosition.normalizedStatusForSaving(status)
         self.assignedTo = assignedTo
         self.createdBy = createdBy
         self.notes = notes
@@ -80,6 +82,38 @@ struct Job: Identifiable, Codable {
         self.jobPlacement = jobPlacement
         self.latitude = latitude
         self.longitude = longitude
+    }
+}
+
+extension Job {
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try values.decode(String.self, forKey: .id),
+            address: try values.decode(String.self, forKey: .address),
+            date: try values.decode(Date.self, forKey: .date),
+            status: try values.decode(String.self, forKey: .status),
+            assignedTo: try values.decodeIfPresent(String.self, forKey: .assignedTo),
+            createdBy: try values.decodeIfPresent(String.self, forKey: .createdBy),
+            notes: try values.decodeIfPresent(String.self, forKey: .notes) ?? "",
+            jobNumber: try values.decodeIfPresent(String.self, forKey: .jobNumber),
+            portalID: try values.decodeIfPresent(String.self, forKey: .portalID),
+            locationNumber: try values.decodeIfPresent(String.self, forKey: .locationNumber),
+            assignments: try values.decodeIfPresent(String.self, forKey: .assignments),
+            materialsUsed: try values.decodeIfPresent(String.self, forKey: .materialsUsed),
+            photos: try values.decodeIfPresent([String].self, forKey: .photos) ?? [],
+            housePhotoURL: try values.decodeIfPresent(String.self, forKey: .housePhotoURL),
+            nidPhotoURL: try values.decodeIfPresent(String.self, forKey: .nidPhotoURL),
+            canPhotoURL: try values.decodeIfPresent(String.self, forKey: .canPhotoURL),
+            mapDesignPhotoURL: try values.decodeIfPresent(String.self, forKey: .mapDesignPhotoURL),
+            participants: try values.decodeIfPresent([String].self, forKey: .participants),
+            hours: try values.decodeIfPresent(Double.self, forKey: .hours) ?? 0,
+            nidFootage: try values.decodeIfPresent(String.self, forKey: .nidFootage),
+            canFootage: try values.decodeIfPresent(String.self, forKey: .canFootage),
+            jobPlacement: try values.decodeIfPresent(String.self, forKey: .jobPlacement),
+            latitude: try values.decodeIfPresent(Double.self, forKey: .latitude),
+            longitude: try values.decodeIfPresent(Double.self, forKey: .longitude)
+        )
     }
 }
 

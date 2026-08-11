@@ -38,6 +38,7 @@ enum CrewPosition: String, CaseIterable, Identifiable, Hashable {
 
     static func normalizedStatusForSaving(_ rawStatus: String) -> String {
         let trimmed = rawStatus.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isTalkToSupervisor(trimmed) { return "Talk to Supervisor" }
         if isOH(trimmed) { return oh.rawValue }
         if isNeedsOH(trimmed) { return "Needs OH" }
         return trimmed
@@ -45,6 +46,7 @@ enum CrewPosition: String, CaseIterable, Identifiable, Hashable {
 
     static func statusDisplayName(from rawStatus: String) -> String {
         let trimmed = rawStatus.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isTalkToSupervisor(trimmed) { return "Talk to Supervisor" }
         if isOH(trimmed) { return oh.rawValue }
         if isNeedsOH(trimmed) { return "Needs OH" }
         return trimmed
@@ -58,6 +60,11 @@ enum CrewPosition: String, CaseIterable, Identifiable, Hashable {
     private static func isNeedsOH(_ rawStatus: String) -> Bool {
         let token = normalizedToken(rawStatus)
         return token == "needsoh" || token == "needsaerial" || token == "needsariel" || token == "needsarial" || token == "needsoverhead"
+    }
+
+    private static func isTalkToSupervisor(_ rawStatus: String) -> Bool {
+        let token = normalizedToken(rawStatus)
+        return token == "talktorick" || token == "talktosupervisor"
     }
 
     private static let ohAliases: Set<String> = ["oh", "overhead", "aerial", "ariel", "arial"]
