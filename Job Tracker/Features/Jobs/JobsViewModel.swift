@@ -225,6 +225,7 @@ class JobsViewModel: ObservableObject {
 
             DispatchQueue.main.async {
                 self.jobs = decoded
+                decoded.forEach { FollowUpNotificationCoordinator.shared.synchronize(job: $0) }
                 self.pendingWriteIDs = pending
                 self.hasPendingWrites = snapshot.metadata.hasPendingWrites || !pending.isEmpty
 
@@ -565,6 +566,26 @@ class JobsViewModel: ObservableObject {
                 self?.updateJob(updated)
             }
             // No success handler needed — listener will clear pending once synced
+        }
+    }
+
+    /// Saves or completes a follow-up independently from status so field updates stay fast.
+    func updateFollowUp(job: Job, followUp: JobFollowUp?) {
+        var updated = job
+        updated.followUp = followUp
+        let before = JobAudit.summary(job)
+        let after = JobAudit.summary(updated)
+        let type = followUp?.completedAt != nil ? "follow_up_completed" : "follow_up_assignment_changed"
+        JobAudit.write(jobID: job.id, type: type, before: before, after: after)
+
+        let firestoreValue: Any = followUp.flatMap { try? Firestore.Encoder().encode($0) } ?? NSNull()
+        db.collection("jobs").document(job.id).updateData(["followUp": firestoreValue]) { [weak self] error in
+            if error != nil { self?.updateJob(updated) }
+        }
+        if let index = jobs.firstIndex(where: { $0.id == job.id }) {
+            jobs[index].followUp = followUp
+            FollowUpNotificationCoordinator.shared.synchronize(job: jobs[index])
+            notifyJobsChanged()
         }
     }
 

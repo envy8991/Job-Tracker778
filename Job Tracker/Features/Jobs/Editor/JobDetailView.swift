@@ -22,6 +22,11 @@ private extension View {
     func glassCard() -> some View { modifier(GlassCardModifier()) }
 }
 
+private struct FollowUpPrompt: Identifiable {
+    let id = UUID()
+    let reason: String
+}
+
 // Safe wrapper so we can call iOS 18-only toolbarBackgroundVisibility on earlier iOS without compile errors.
 extension View {
     @ViewBuilder
@@ -39,10 +44,12 @@ struct JobDetailView: View {
 
     @EnvironmentObject var jobsViewModel: JobsViewModel
     @EnvironmentObject var authViewModel: AuthViewModel
+    @EnvironmentObject var usersViewModel: UsersViewModel
     @Environment(\.dismiss) var dismiss
 
     // Local states for editing
     @State private var editedStatus = ""
+    @State private var followUpPrompt: FollowUpPrompt?
     @State private var customStatusText = ""
     @State private var editedNotes = ""
     @State private var editedJobNumber = ""
@@ -202,6 +209,9 @@ private let jobPlacementChoices = ["OH", "UG"]
                             // If user chose a predefined status, push it immediately
                             if newValue != "Custom" {
                                 jobsViewModel.updateJobStatus(job: job, newStatus: newValue)
+                                if newValue == "Talk to Supervisor" || newValue.hasPrefix("Needs ") {
+                                    followUpPrompt = FollowUpPrompt(reason: newValue)
+                                }
                             }
                         }
                         .glassCard()
@@ -225,6 +235,22 @@ private let jobPlacementChoices = ["OH", "UG"]
                             .foregroundColor(.secondary)
                             .glassCard()
                             .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                        if let followUp = job.followUp {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label(followUp.reason, systemImage: followUp.isCompleted ? "checkmark.circle.fill" : "bell.badge")
+                                Text("Due \(followUp.dueDate.formatted(date: .abbreviated, time: .omitted))")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                if !followUp.isCompleted {
+                                    Button("Mark Follow-up Complete") {
+                                        var completed = followUp
+                                        completed.completedAt = Date()
+                                        completed.updatedAt = Date()
+                                        jobsViewModel.updateFollowUp(job: job, followUp: completed)
+                                        job.followUp = completed
+                                    }
+                                }
+                            }.glassCard()
+                        }
                     }
 
                     // MARK: Assignments (Separate) — only for Can Splicers
@@ -492,6 +518,12 @@ private let jobPlacementChoices = ["OH", "UG"]
                         Spacer()
                         Button("Done") { isAssignmentsFocused = false }
                     }
+                }
+            }
+            .sheet(item: $followUpPrompt) { prompt in
+                FollowUpSheet(job: job, statusReason: prompt.reason, users: usersViewModel.allUsers) { followUp in
+                    jobsViewModel.updateFollowUp(job: job, followUp: followUp)
+                    job.followUp = followUp
                 }
             }
             .onAppear {

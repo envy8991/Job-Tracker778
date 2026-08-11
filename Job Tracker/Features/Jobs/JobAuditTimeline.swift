@@ -21,6 +21,8 @@ enum JobAudit {
         [
             "status": job.status,
             "assignment": job.assignedTo?.isEmpty == false ? job.assignedTo! : "Unassigned",
+            "follow-up assignment": job.followUp?.assignedUserID ?? "Unassigned",
+            "follow-up completion": job.followUp?.completedAt == nil ? "Open" : "Completed",
             "schedule": ISO8601DateFormatter().string(from: job.date),
             "notes": job.notes?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? "Present" : "None",
             "attachments": String(job.photos.count + [job.housePhotoURL, job.nidPhotoURL, job.canPhotoURL, job.mapDesignPhotoURL].compactMap { $0 }.count),
@@ -112,7 +114,7 @@ struct JobAuditTimeline: View {
 
     private func label(_ event: JobAuditEvent) -> String {
         let actor = displayName(event.actorID)
-        let keys = ["status", "assignment", "schedule", "notes", "attachments", "deletion"]
+        let keys = ["status", "assignment", "follow-up assignment", "follow-up completion", "schedule", "notes", "attachments", "deletion"]
         if let key = keys.first(where: { event.before[$0] != event.after[$0] }) {
             return "\(key.capitalized) changed from \(event.before[key] ?? "None") to \(event.after[key] ?? "None") by \(actor)"
         }
