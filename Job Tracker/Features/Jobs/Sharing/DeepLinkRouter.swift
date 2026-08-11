@@ -45,9 +45,11 @@ enum DeepLinkRouter {
 
         let isJob = (host == "job") || (lastSegment == "job")
         if isJob,
-           let id = components.queryItems?.first(where: { $0.name.lowercased() == "id" })?.value,
-           !id.isEmpty {
-            return .job(id: id)
+           let rawID = components.queryItems?.first(where: { $0.name.lowercased() == "id" })?.value {
+            let id = rawID.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !id.isEmpty {
+                return .job(id: id)
+            }
         }
 
         let isImport = (host == "importjob") || (lastSegment == "importjob")
@@ -62,7 +64,8 @@ enum DeepLinkRouter {
         let token = components
             .queryItems?
             .first(where: { $0.name.lowercased() == "token" })?
-            .value
+            .value?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard let token, !token.isEmpty else {
             #if DEBUG

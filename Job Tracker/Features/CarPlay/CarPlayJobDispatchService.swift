@@ -29,12 +29,11 @@ struct CarPlayJobDisplay: Identifiable, Hashable {
     }
 
     var coordinate: CLLocationCoordinate2D? {
-        guard let latitude = job.latitude, let longitude = job.longitude else { return nil }
-        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        job.clLocation?.coordinate
     }
 
     static func formatDistance(_ meters: CLLocationDistance) -> String {
-        guard meters.isFinite else { return "" }
+        guard meters.isFinite, meters >= 0 else { return "" }
         let miles = meters / 1_609.344
         if miles >= 10 {
             return "\(Int(miles.rounded())) mi"
