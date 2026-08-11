@@ -327,13 +327,19 @@ class JobsViewModel: ObservableObject {
     // MARK: - Create
 
     func createJob(_ job: Job, completion: @escaping (Bool) -> Void = { _ in }) {
+        createJobReturningID(job) { success, _ in completion(success) }
+    }
+
+    /// Creates a job and returns the actual local Firestore document ID. Callers that queue
+    /// follow-up work (such as photo uploads) must use this ID instead of the draft UUID.
+    func createJobReturningID(_ job: Job, completion: @escaping (Bool, String?) -> Void) {
         if ProcessInfo.processInfo.shouldSeedJobTrackerUITestData {
             var newJob = job
             newJob.id = "ui-test-created-\(jobs.count + 1)"
             jobs.append(newJob)
             rebuildSearchIndexEntries()
             notifyJobsChanged()
-            completion(true)
+            completion(true, newJob.id)
             return
         }
 
@@ -362,14 +368,14 @@ class JobsViewModel: ObservableObject {
         FirebaseService.shared.createJob(newJob) { result in
             switch result {
             case .success:
-                DispatchQueue.main.async { completion(true) }
+                DispatchQueue.main.async { completion(true, newJob.id) }
             case .failure(let error):
                 print("Error creating job via service: \(error)")
                 DispatchQueue.main.async {
                     self.pendingWriteIDs.remove(docRef.documentID)
                     self.hasPendingWrites = !self.pendingWriteIDs.isEmpty
                     self.postSyncStateChange()
-                    completion(false)
+                    completion(false, nil)
                 }
             }
             // Listener established by fetch methods will reconcile & clear pending when server ACKs
