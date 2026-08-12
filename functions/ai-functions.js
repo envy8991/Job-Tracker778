@@ -62,7 +62,7 @@ async function resolveAssignees(db, items) {
   }).filter(item => item.address || item.rawText);
 }
 
-function createHandlers({ db, fetchImpl = fetch, openAIKey, geminiKey }) {
+function createHandlers({ db, fetchImpl = fetch, openAIKey }) {
   return {
     async parseJobSheet(request) {
       requireRole(request.auth, ["supervisor", "admin"]);
@@ -78,19 +78,6 @@ function createHandlers({ db, fetchImpl = fetch, openAIKey, geminiKey }) {
       try { parsed = JSON.parse(content); } catch (_) { throw new HttpsError("internal", "The parser returned malformed job data."); }
       if (!Array.isArray(parsed?.items)) throw new HttpsError("internal", "The parser returned malformed job data.");
       return { items: await resolveAssignees(db, parsed.items) };
-    },
-
-    async spliceAssist(request) {
-      requireRole(request.auth, ["supervisor", "admin"]);
-      const { image, mimeType } = decodeImage(request.data);
-      const prompt = cleanString(request.data?.prompt, 2000), systemPrompt = cleanString(request.data?.systemPrompt, 6000);
-      if (!prompt || !systemPrompt) throw new HttpsError("invalid-argument", "Prompt fields are required.");
-      await enforceRateLimit(db, request.auth.uid, "spliceAssist");
-      const body = { contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType, data: image.toString("base64") } }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
-      const json = await providerJSON(fetchImpl, `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(geminiKey.value())}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, "Splice Assist");
-      const text = cleanString(json?.candidates?.[0]?.content?.parts?.find(part => typeof part.text === "string")?.text, 12000);
-      if (!text) throw new HttpsError("internal", "Splice Assist returned no content.");
-      return { content: text };
     }
   };
 }

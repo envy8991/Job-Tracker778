@@ -23,4 +23,4 @@ Then open <http://localhost:8000> in a browser.
 - The primary navigation matches the iOS app: Dashboard, Timesheets, Materials, Job Search, and More.
 - Dashboard content is limited to the selected day's job workflow.
 - Timesheet and Materials content are separated into their own tabs.
-- Additional native sections such as Profile, Settings, Find a Partner, Recent Crew Jobs, Route Mapper, Splice Assist, and Help Center are grouped under More instead of appearing on the Dashboard.
+- Additional native sections such as Profile, Settings, Find a Partner, Recent Crew Jobs, Route Mapper, and Help Center are grouped under More instead of appearing on the Dashboard.

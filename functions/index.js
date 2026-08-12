@@ -15,11 +15,9 @@ const db = admin.firestore();
 const bucket = admin.storage().bucket();
 const REGION = "us-central1", STEP_UP_SECONDS = 300, DOWNLOAD_SECONDS = 300, RETENTION_MS = 7 * 86400000;
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
-const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
-const aiHandlers = createHandlers({ db, openAIKey: OPENAI_API_KEY, geminiKey: GEMINI_API_KEY });
+const aiHandlers = createHandlers({ db, openAIKey: OPENAI_API_KEY });
 
 exports.parseJobSheet = onCall({ region: REGION, secrets: [OPENAI_API_KEY], timeoutSeconds: 60, memory: "512MiB", maxInstances: 20 }, aiHandlers.parseJobSheet);
-exports.spliceAssist = onCall({ region: REGION, secrets: [GEMINI_API_KEY], timeoutSeconds: 60, memory: "512MiB", maxInstances: 20 }, aiHandlers.spliceAssist);
 
 function requireAdmin(auth) {
   if (!auth || auth.token.admin !== true) throw new HttpsError("permission-denied", "Company exports are restricted to administrators.");
