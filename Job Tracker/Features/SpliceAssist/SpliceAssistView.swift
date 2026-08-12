@@ -26,7 +26,7 @@ struct SpliceAssistView: View {
                         .buttonStyle(.plain)
                         .frame(minHeight: 44)
                         .accessibilityLabel("Dismiss message")
-                        .accessibilityValue(message)
+                        .accessibilityValue(message.text)
                         .accessibilityHint("Clears this message")
                         .accessibilityIdentifier("spliceAssist.dismissMessage")
                         .transition(.opacity.combined(with: .move(edge: .top)))
