@@ -16,7 +16,6 @@ This folder collects long-form guides for each feature area in Job Tracker. The 
 - [Search](Features/Search.md)
 - [Settings](Features/Settings.md)
 - [Shared](Features/Shared.md)
-- [Splice Assist](Features/SpliceAssist.md)
 - [Timesheets](Features/Timesheets.md)
 - [Materials](Features/YellowSheet.md)
 

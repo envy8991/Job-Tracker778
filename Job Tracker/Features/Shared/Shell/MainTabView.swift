@@ -138,13 +138,6 @@ private struct MoreMenuList: View {
                 }
             }
 
-            Section("Splice Assist") {
-                NavigationLink(value: AppNavigationViewModel.Destination.spliceAssist) {
-                    Label(AppNavigationViewModel.Destination.spliceAssist.title,
-                          systemImage: AppNavigationViewModel.Destination.spliceAssist.systemImage)
-                }
-            }
-
             if authViewModel.isAdminFlag {
                 Section("Admin") {
                     NavigationLink(value: AppNavigationViewModel.Destination.admin) {
@@ -197,8 +190,6 @@ private struct MoreDestinationView: View {
             RecentCrewJobsView()
         case .mapDesigns:
             WeeklyMapDesignsView()
-        case .spliceAssist:
-            SpliceAssistView()
         case .gibsonPortal:
             GibsonPortalView(url: Job.gibsonPortalLoginURL)
                 .navigationTitle(AppNavigationViewModel.Destination.gibsonPortal.title)

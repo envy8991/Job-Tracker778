@@ -54,7 +54,7 @@ Job-Tracker778/
 ├── website/                             # Static marketing/prototype site and web app parity work
 ├── Job Tracker.xcodeproj/               # Xcode project and shared scheme
 ├── Job Tracker Safety Net.xctestplan    # Primary test plan for the shared scheme
-├── Job-Tracker-Info.plist               # Main app Info.plist, URL schemes, CarPlay, Gemini key placeholder
+├── Job-Tracker-Info.plist               # Main app Info.plist, URL schemes, and CarPlay configuration
 └── package.json                         # Node scripts for Firebase rules tests
 ```
 
@@ -214,16 +214,6 @@ Future update checklist:
 - Keep Apple Maps and Google Maps provider behavior consistent across dashboard, job detail, and CarPlay.
 - Do not block core job workflows on location permission.
 
-### Splice Assist
-
-Splice Assist accepts cropped splice map images, normalizes image orientation/size, gathers CAN/T2 context, and sends multimodal requests to Gemini for missing-light troubleshooting, spare assignment suggestions, or general CAN analysis. `SpliceAssistViewModel` controls request state and user-facing results.
-
-Future update checklist:
-
-- Store the Gemini API key securely and avoid committing real production secrets.
-- Keep prompts and response handling testable where possible.
-- Prevent duplicate submissions while requests are active.
-
 ### Help and Tutorial
 
 The Help feature contains a searchable help center, quick links, FAQ/support shortcuts, and a multi-step interactive tutorial. Tutorial stage transitions are covered by tests and should remain deterministic so new technicians can resume safely.
@@ -331,7 +321,6 @@ Firebase Storage is used for job photos and generated PDFs. `JobPhotoUploadQueue
 - **App Intents/Siri/Shortcuts:** Voice and automation entry points.
 - **CarPlay:** Read-only dispatch list and directions flow.
 - **Messages framework:** iMessage job card extension.
-- **Gemini API:** Splice Assist multimodal analysis.
 
 ## Configuration
 
@@ -346,7 +335,7 @@ Firebase Storage is used for job photos and generated PDFs. `JobPhotoUploadQueue
 
 ### Sensitive Values
 
-AI provider credentials are Firebase Functions secrets and are never included in the iOS app. Configure them with `firebase functions:secrets:set OPENAI_API_KEY` and `firebase functions:secrets:set GEMINI_API_KEY` before deployment.
+AI provider credentials are Firebase Functions secrets and are never included in the iOS app. Configure the OpenAI credential with `firebase functions:secrets:set OPENAI_API_KEY` before deployment.
 
 ### AI image privacy
 
@@ -568,7 +557,6 @@ Update all applicable locations:
 - [Search](Documentation/Features/Search.md)
 - [Settings](Documentation/Features/Settings.md)
 - [Shared](Documentation/Features/Shared.md)
-- [Splice Assist](Documentation/Features/SpliceAssist.md)
 - [Timesheets](Documentation/Features/Timesheets.md)
 - [Materials](Documentation/Features/YellowSheet.md)
 - [Design System](Job%20Tracker/DesignSystem/DesignSystem.md)

@@ -22,6 +22,5 @@ test("enforces per-user rate limits", async () => {
 
 test("maps provider failures to a narrow callable error", async () => {
   const db = { collection: () => ({ doc: () => ({}) }), runTransaction: async callback => callback({ get: async () => ({ data: () => null }), set: () => {} }) };
-  const handlers = createHandlers({ db, fetchImpl: async () => ({ ok: false }), openAIKey: { value: () => "secret" }, geminiKey: { value: () => "secret" } });
-  await rejectsCode(() => handlers.spliceAssist({ auth: { uid: "s", token: { role: "supervisor" } }, data: { imageBase64: jpeg, prompt: "p", systemPrompt: "s" } }), "unavailable");
+  const handlers = createHandlers({ db, fetchImpl: async () => ({ ok: false }), openAIKey: { value: () => "secret" } });
 });

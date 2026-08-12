@@ -17,7 +17,6 @@ final class AppNavigationViewModel: ObservableObject {
         case admin
         case settings
         case helpCenter
-        case spliceAssist
         case gibsonPortal
 
         var id: String { title }
@@ -38,7 +37,6 @@ final class AppNavigationViewModel: ObservableObject {
             case .admin:       return "Admin"
             case .settings:    return "Settings"
             case .helpCenter:  return "Help Center"
-            case .spliceAssist: return "Splice Assist"
             case .gibsonPortal: return "Gibson Portal"
         }
         }
@@ -59,7 +57,6 @@ final class AppNavigationViewModel: ObservableObject {
             case .admin:       return "gearshape.2"
             case .settings:    return "gearshape"
             case .helpCenter:  return "questionmark.circle"
-            case .spliceAssist: return "wand.and.stars"
             case .gibsonPortal: return "safari"
         }
         }
@@ -80,7 +77,6 @@ final class AppNavigationViewModel: ObservableObject {
                  .admin,
                  .settings,
                  .helpCenter,
-                 .spliceAssist,
                  .gibsonPortal:
                 return .more
         }
@@ -88,7 +84,7 @@ final class AppNavigationViewModel: ObservableObject {
 
         var isMoreStackDestination: Bool {
             switch self {
-            case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter, .maps, .recentCrewJobs, .mapDesigns, .spliceAssist, .gibsonPortal:
+            case .more, .profile, .findPartner, .supervisor, .admin, .settings, .helpCenter, .maps, .recentCrewJobs, .mapDesigns, .gibsonPortal:
                 return true
             default:
                 return false
